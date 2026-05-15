@@ -5,11 +5,16 @@ import os
 import re
 import json
 import uuid
+import hmac
+import hashlib
+import secrets
 import requests
 from datetime import datetime
+from functools import wraps
+
 from flask import Flask, render_template, redirect, request, session, url_for, flash, jsonify, abort
 from dotenv import load_dotenv
-from pymongo import MongoClient
+from pymongo import MongoClient, ASCENDING
 from werkzeug.utils import secure_filename
 
 
@@ -26,6 +31,27 @@ app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
 
 PROFILE_UPLOAD_FOLDER = os.path.join("static", "uploads", "profiles")
 ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
+
+TRACKER_API_KEY = os.getenv("TRACKER_API_KEY", "").strip()
+
+
+# ==========================================
+# LOCAL TRACKER / WEBVIEW2 CORS
+# ==========================================
+
+@app.after_request
+def add_tracker_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = (
+        "Content-Type, Authorization, X-Tracker-Token, X-Tracker-Code, X-Tracker-Api-Key"
+    )
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return response
+
+
+@app.route("/api/<path:any_path>", methods=["OPTIONS"])
+def api_options(any_path):
+    return jsonify({"success": True})
 
 
 # ==========================================
@@ -47,13 +73,30 @@ API_BASE_URL = "https://discord.com/api/v10"
 # ==========================================
 
 MONGO_URI = os.getenv("MONGO_URI")
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "eifellog")
+
+if not MONGO_URI:
+    raise RuntimeError("MONGO_URI fehlt. Bitte in deiner .env setzen.")
 
 mongo_client = MongoClient(MONGO_URI)
-db = mongo_client["eifellog_db"]
+db = mongo_client[MONGO_DB_NAME]
 
 users_collection = db["users"]
 profile_activity_collection = db["profile_activity"]
 profile_gallery_collection = db["profile_gallery"]
+
+
+def ensure_indexes():
+    try:
+        users_collection.create_index([("discord_id", ASCENDING)], unique=False)
+        users_collection.create_index([("username_lc", ASCENDING)], unique=False)
+        users_collection.create_index([("tracker_code_hash", ASCENDING)], unique=False)
+        users_collection.create_index([("tracker_client_token_hash", ASCENDING)], unique=False)
+    except Exception as error:
+        print(f"MongoDB Index-Erstellung fehlgeschlagen: {error}")
+
+
+ensure_indexes()
 
 
 # ==========================================
@@ -84,6 +127,17 @@ ALLOWED_HUB_ROLES = [
 # ==========================================
 # HILFSFUNKTIONEN
 # ==========================================
+
+def now_utc():
+    return datetime.utcnow()
+
+
+def safe_str(value, fallback=""):
+    if value is None:
+        return fallback
+
+    return str(value).strip()
+
 
 def clean_roles(roles):
     return [str(role).strip() for role in roles if role]
@@ -188,6 +242,31 @@ def find_user_by_username(username):
             "$options": "i"
         }
     })
+
+
+def find_user_for_tracker_name(driver_name):
+    driver_name = safe_str(driver_name)
+
+    if not driver_name:
+        return None
+
+    normalized = normalize_username(driver_name)
+    normalized_lc = normalized.lower()
+
+    possible_queries = [
+        {"username_lc": normalized_lc},
+        {"username": {"$regex": f"^{re.escape(driver_name)}$", "$options": "i"}},
+        {"display_name": {"$regex": f"^{re.escape(driver_name)}$", "$options": "i"}},
+        {"discord_username": {"$regex": f"^{re.escape(driver_name)}$", "$options": "i"}},
+    ]
+
+    for query in possible_queries:
+        user = users_collection.find_one(query)
+
+        if user:
+            return user
+
+    return None
 
 
 def get_current_user():
@@ -333,6 +412,105 @@ def get_gallery_for_user(username):
 
 
 # ==========================================
+# TRACKER CODE / TOKEN HILFSFUNKTIONEN
+# ==========================================
+
+def hash_secret(value):
+    value = safe_str(value)
+
+    if not value:
+        return ""
+
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def secure_compare(value_a, value_b):
+    return hmac.compare_digest(safe_str(value_a), safe_str(value_b))
+
+
+def generate_tracker_code():
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+    part_1 = "".join(secrets.choice(alphabet) for _ in range(4))
+    part_2 = "".join(secrets.choice(alphabet) for _ in range(4))
+    part_3 = "".join(secrets.choice(alphabet) for _ in range(4))
+
+    return f"EL-{part_1}-{part_2}-{part_3}"
+
+
+def generate_client_token():
+    return f"elt_{secrets.token_urlsafe(48)}"
+
+
+def normalize_tracker_code(code):
+    code = safe_str(code).upper()
+    code = code.replace(" ", "")
+    return code
+
+
+def user_has_tracker_access(user_doc):
+    if not user_doc:
+        return False
+
+    if user_doc.get("tracker_enabled") is False:
+        return False
+
+    return True
+
+
+def tracker_profile_payload(user_doc):
+    profile = prepare_profile_data(user_doc)
+    stats = get_profile_stats(user_doc)
+
+    return {
+        "id": str(user_doc.get("_id")),
+        "discordId": safe_str(user_doc.get("discord_id")),
+        "username": profile.get("username"),
+        "displayName": profile.get("display_name"),
+        "driverName": profile.get("display_name") or profile.get("username"),
+        "discordUsername": safe_str(user_doc.get("discord_username")),
+        "avatarUrl": profile.get("avatar_url"),
+        "bannerUrl": safe_str(user_doc.get("banner_url")),
+        "role": get_primary_role_name(user_doc.get("roles", [])),
+        "roles": user_doc.get("roles", []),
+        "status": profile.get("status"),
+        "bio": profile.get("bio"),
+        "location": profile.get("location"),
+        "favoriteTruck": profile.get("favorite_truck"),
+        "memberSince": profile.get("member_since"),
+        "lastSeen": profile.get("last_seen"),
+        "stats": {
+            "km": stats.get("km"),
+            "deliveries": stats.get("deliveries"),
+            "convoys": stats.get("convoys"),
+            "rating": stats.get("rating")
+        }
+    }
+
+
+def tracker_api_key_required(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not TRACKER_API_KEY:
+            return jsonify({
+                "success": False,
+                "error": "TRACKER_API_KEY ist serverseitig nicht konfiguriert."
+            }), 500
+
+        provided_key = request.headers.get("X-Tracker-Api-Key") or request.args.get("api_key")
+
+        if not secure_compare(provided_key, TRACKER_API_KEY):
+            return jsonify({
+                "success": False,
+                "error": "Ungültiger API-Key."
+            }), 401
+
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+# ==========================================
 # ROUTES - ÖFFENTLICH
 # ==========================================
 
@@ -441,7 +619,8 @@ def callback():
         "discord_username": discord_username,
         "avatar": avatar,
         "roles": user_roles,
-        "last_login": now
+        "last_login": now,
+        "tracker_enabled": True
     }
 
     if not existing_user or not existing_user.get("username"):
@@ -499,6 +678,349 @@ def logout():
     session.pop("user", None)
     flash("Erfolgreich abgemeldet.", "success")
     return redirect(url_for("home"))
+
+
+# ==========================================
+# TRACKER API - LOGIN.HTML / INDEX.HTML
+# ==========================================
+
+@app.route("/api/tracker/login", methods=["POST", "OPTIONS"])
+def tracker_login():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    data = request.get_json(silent=True) or {}
+
+    driver_name = safe_str(data.get("driverName"))
+    tracker_code = normalize_tracker_code(data.get("trackerCode") or data.get("accessCode"))
+    remember = bool(data.get("remember", True))
+
+    if not driver_name:
+        return jsonify({
+            "success": False,
+            "error": "Fahrername fehlt."
+        }), 400
+
+    if not tracker_code:
+        return jsonify({
+            "success": False,
+            "error": "Tracker-Code fehlt."
+        }), 400
+
+    user_doc = find_user_for_tracker_name(driver_name)
+
+    if not user_doc:
+        return jsonify({
+            "success": False,
+            "error": "Fahrer wurde nicht gefunden."
+        }), 404
+
+    if not user_has_tracker_access(user_doc):
+        return jsonify({
+            "success": False,
+            "error": "Tracker-Zugriff ist für diesen Fahrer deaktiviert."
+        }), 403
+
+    incoming_code_hash = hash_secret(tracker_code)
+    stored_hash = user_doc.get("tracker_code_hash", "")
+    legacy_plain_code = normalize_tracker_code(user_doc.get("tracker_code"))
+
+    valid_code = False
+
+    if stored_hash and secure_compare(incoming_code_hash, stored_hash):
+        valid_code = True
+
+    if legacy_plain_code and secure_compare(tracker_code, legacy_plain_code):
+        valid_code = True
+
+        users_collection.update_one(
+            {"_id": user_doc["_id"]},
+            {
+                "$set": {
+                    "tracker_code_hash": incoming_code_hash,
+                    "tracker_code_migrated_at": now_utc()
+                },
+                "$unset": {
+                    "tracker_code": ""
+                }
+            }
+        )
+
+    if not valid_code:
+        return jsonify({
+            "success": False,
+            "error": "Tracker-Code ist ungültig."
+        }), 401
+
+    client_token = generate_client_token()
+    client_token_hash = hash_secret(client_token)
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": {
+                "tracker_client_token_hash": client_token_hash,
+                "tracker_last_login": now_utc(),
+                "tracker_last_driver_name": driver_name,
+                "tracker_enabled": True
+            },
+            "$inc": {
+                "tracker_login_count": 1
+            }
+        }
+    )
+
+    fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
+
+    return jsonify({
+        "success": True,
+        "message": "Tracker freigeschaltet.",
+        "remember": remember,
+        "clientToken": client_token,
+        "profile": tracker_profile_payload(fresh_user)
+    })
+
+
+@app.route("/api/tracker/session", methods=["POST", "OPTIONS"])
+def tracker_session_login():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    data = request.get_json(silent=True) or {}
+
+    client_token = (
+        safe_str(data.get("clientToken"))
+        or safe_str(request.headers.get("X-Tracker-Token"))
+        or safe_str(request.headers.get("Authorization")).replace("Bearer ", "").strip()
+    )
+
+    if not client_token:
+        return jsonify({
+            "success": False,
+            "error": "Kein gespeicherter Tracker-Token vorhanden."
+        }), 401
+
+    client_token_hash = hash_secret(client_token)
+
+    user_doc = users_collection.find_one({
+        "tracker_client_token_hash": client_token_hash
+    })
+
+    if not user_doc:
+        return jsonify({
+            "success": False,
+            "error": "Gespeicherte Sitzung ist ungültig. Bitte Tracker-Code erneut eingeben."
+        }), 401
+
+    if not user_has_tracker_access(user_doc):
+        return jsonify({
+            "success": False,
+            "error": "Tracker-Zugriff ist deaktiviert."
+        }), 403
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": {
+                "tracker_last_session_login": now_utc()
+            }
+        }
+    )
+
+    fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
+
+    return jsonify({
+        "success": True,
+        "message": "Tracker-Sitzung gültig.",
+        "profile": tracker_profile_payload(fresh_user)
+    })
+
+
+@app.route("/api/tracker/profile", methods=["GET", "POST", "OPTIONS"])
+def tracker_profile():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    if request.method == "GET":
+        client_token = (
+            safe_str(request.headers.get("X-Tracker-Token"))
+            or safe_str(request.headers.get("Authorization")).replace("Bearer ", "").strip()
+            or safe_str(request.args.get("clientToken"))
+        )
+    else:
+        data = request.get_json(silent=True) or {}
+        client_token = safe_str(data.get("clientToken"))
+
+    if not client_token:
+        return jsonify({
+            "success": False,
+            "error": "Tracker-Token fehlt."
+        }), 401
+
+    user_doc = users_collection.find_one({
+        "tracker_client_token_hash": hash_secret(client_token)
+    })
+
+    if not user_doc:
+        return jsonify({
+            "success": False,
+            "error": "Tracker-Token ist ungültig."
+        }), 401
+
+    if not user_has_tracker_access(user_doc):
+        return jsonify({
+            "success": False,
+            "error": "Tracker-Zugriff ist deaktiviert."
+        }), 403
+
+    return jsonify({
+        "success": True,
+        "profile": tracker_profile_payload(user_doc)
+    })
+
+
+@app.route("/api/tracker/logout", methods=["POST", "OPTIONS"])
+def tracker_logout():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    data = request.get_json(silent=True) or {}
+    client_token = safe_str(data.get("clientToken"))
+
+    if client_token:
+        users_collection.update_one(
+            {"tracker_client_token_hash": hash_secret(client_token)},
+            {
+                "$unset": {
+                    "tracker_client_token_hash": ""
+                },
+                "$set": {
+                    "tracker_logged_out_at": now_utc()
+                }
+            }
+        )
+
+    return jsonify({
+        "success": True,
+        "message": "Tracker lokal abgemeldet."
+    })
+
+
+@app.route("/api/tracker/code/create", methods=["POST", "OPTIONS"])
+@tracker_api_key_required
+def tracker_create_code_admin():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    data = request.get_json(silent=True) or {}
+
+    driver_name = safe_str(data.get("driverName"))
+    discord_id = safe_str(data.get("discordId"))
+    force_new = bool(data.get("forceNew", False))
+
+    if not driver_name and not discord_id:
+        return jsonify({
+            "success": False,
+            "error": "driverName oder discordId fehlt."
+        }), 400
+
+    if discord_id:
+        user_doc = users_collection.find_one({"discord_id": discord_id})
+    else:
+        user_doc = find_user_for_tracker_name(driver_name)
+
+    if not user_doc:
+        return jsonify({
+            "success": False,
+            "error": "Fahrer wurde nicht gefunden."
+        }), 404
+
+    existing_hash = user_doc.get("tracker_code_hash")
+
+    if existing_hash and not force_new:
+        return jsonify({
+            "success": True,
+            "message": "Für diesen Fahrer existiert bereits ein Tracker-Code. Aus Sicherheitsgründen wird er nicht erneut angezeigt. Nutze forceNew=true für einen neuen Code.",
+            "trackerCode": None,
+            "driver": tracker_profile_payload(user_doc)
+        })
+
+    tracker_code = generate_tracker_code()
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": {
+                "tracker_code_hash": hash_secret(tracker_code),
+                "tracker_code_created_at": now_utc(),
+                "tracker_enabled": True
+            },
+            "$unset": {
+                "tracker_code": ""
+            }
+        }
+    )
+
+    fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
+
+    return jsonify({
+        "success": True,
+        "message": "Tracker-Code erstellt.",
+        "trackerCode": tracker_code,
+        "driver": tracker_profile_payload(fresh_user)
+    })
+
+
+@app.route("/api/tracker/code/my", methods=["POST", "OPTIONS"])
+def tracker_create_code_for_logged_in_user():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    current_user = get_current_user()
+
+    if not current_user:
+        return jsonify({
+            "success": False,
+            "error": "Bitte zuerst im Dashboard einloggen."
+        }), 401
+
+    data = request.get_json(silent=True) or {}
+    force_new = bool(data.get("forceNew", False))
+
+    existing_hash = current_user.get("tracker_code_hash")
+
+    if existing_hash and not force_new:
+        return jsonify({
+            "success": True,
+            "message": "Tracker-Code existiert bereits. Er wird nicht erneut angezeigt.",
+            "trackerCode": None,
+            "driver": tracker_profile_payload(current_user)
+        })
+
+    tracker_code = generate_tracker_code()
+
+    users_collection.update_one(
+        {"_id": current_user["_id"]},
+        {
+            "$set": {
+                "tracker_code_hash": hash_secret(tracker_code),
+                "tracker_code_created_at": now_utc(),
+                "tracker_enabled": True
+            },
+            "$unset": {
+                "tracker_code": ""
+            }
+        }
+    )
+
+    fresh_user = users_collection.find_one({"_id": current_user["_id"]})
+
+    return jsonify({
+        "success": True,
+        "message": "Tracker-Code erstellt.",
+        "trackerCode": tracker_code,
+        "driver": tracker_profile_payload(fresh_user)
+    })
 
 
 # ==========================================
@@ -770,10 +1292,20 @@ def sign_policy():
     })
 
 
+@app.route("/api/health")
+def health_check():
+    return jsonify({
+        "success": True,
+        "service": "EifelLog",
+        "database": MONGO_DB_NAME,
+        "time": now_utc().isoformat() + "Z"
+    })
+
+
 # ==========================================
 # SERVER START
 # ==========================================
 
 if __name__ == "__main__":
-    print("Starte Eifel LOG Server mit MongoDB und Eventlet auf Port 5005...")
+    print(f"Starte Eifel LOG Server mit MongoDB DB '{MONGO_DB_NAME}' und Eventlet auf Port 5005...")
     eventlet.wsgi.server(eventlet.listen(("0.0.0.0", 5005)), app)
