@@ -1,1763 +1,1078 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8" />
+{% extends "base.html" %}
 
-    <meta
-        http-equiv="Content-Security-Policy"
-        content="default-src 'self'; connect-src 'self' http://localhost:* https://localhost:*; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: file:; frame-src 'none';"
-    />
+{% block title %}
+    {% set p = profile if profile is defined and profile else {} %}
+    {{ p.display_name if p.display_name is defined and p.display_name else p.username if p.username is defined and p.username else "Profil" }} - Eifel LOG
+{% endblock %}
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EifelLog Tracker | Login</title>
+{% block content %}
+{% set p = profile if profile is defined and profile else {} %}
+{% set own_profile = is_own_profile if is_own_profile is defined else false %}
+{% set profile_name = p.display_name if p.display_name is defined and p.display_name else p.username if p.username is defined and p.username else "Eifel LOG Fahrer" %}
+{% set username = p.username if p.username is defined and p.username else "driver" %}
+{% set avatar = p.avatar_url if p.avatar_url is defined and p.avatar_url else url_for('static', filename='eifellog.jpg') %}
+{% set banner = p.banner_url if p.banner_url is defined and p.banner_url else "" %}
+{% set rank = p.rank if p.rank is defined and p.rank else "Driver" %}
+{% set status = p.status if p.status is defined and p.status else "Bereit für die nächste Tour." %}
+{% set bio = p.bio if p.bio is defined and p.bio else "Dieses Profil wurde noch nicht ausgefüllt." %}
+{% set location = p.location if p.location is defined and p.location else "Nicht angegeben" %}
+{% set discord = p.discord if p.discord is defined and p.discord else "" %}
+{% set truckersmp_id = p.truckersmp_id if p.truckersmp_id is defined and p.truckersmp_id else "" %}
+{% set steam = p.steam if p.steam is defined and p.steam else "" %}
+{% set website = p.website if p.website is defined and p.website else "" %}
+{% set favorite_truck = p.favorite_truck if p.favorite_truck is defined and p.favorite_truck else "Nicht angegeben" %}
+{% set show_email = p.show_email if p.show_email is defined else false %}
+{% set show_discord = p.show_discord if p.show_discord is defined else true %}
+{% set show_stats = p.show_stats if p.show_stats is defined else true %}
+{% set show_activity = p.show_activity if p.show_activity is defined else true %}
+{% set public_profile = p.public_profile if p.public_profile is defined else true %}
+{% set stats_data = stats if stats is defined and stats else {} %}
+{% set activity_data = activity if activity is defined and activity else [] %}
+{% set gallery_data = gallery if gallery is defined and gallery else [] %}
 
-    <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap"
-        rel="stylesheet"
-    />
+<style>
+    .font-orbitron {
+        font-family: 'Orbitron', sans-serif;
+    }
 
-    <style>
-        :root {
-            --bg-1: #020502;
-            --bg-2: #040a06;
-            --bg-3: #08140c;
+    .profile-shell {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+    }
 
-            --panel: rgba(7, 15, 10, 0.68);
-            --panel-soft: rgba(10, 20, 15, 0.42);
-            --panel-dark: rgba(0, 0, 0, 0.42);
+    .profile-grid {
+        display: grid;
+        grid-template-columns: 420px minmax(0, 1fr);
+        gap: 28px;
+        align-items: start;
+    }
 
-            --line: rgba(255, 255, 255, 0.075);
-            --line-strong: rgba(137, 190, 50, 0.22);
+    @media (max-width: 1180px) {
+        .profile-grid {
+            grid-template-columns: 1fr;
+        }
+    }
 
-            --text: #edf3ff;
-            --muted: #93a4c8;
-            --muted-2: #687798;
+    .profile-card {
+        background: linear-gradient(135deg, rgba(20, 30, 20, 0.48) 0%, rgba(5, 10, 5, 0.86) 100%);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-top: 1px solid rgba(137, 190, 50, 0.24);
+        border-left: 1px solid rgba(137, 190, 50, 0.18);
+        border-radius: 28px;
+        backdrop-filter: blur(32px);
+        -webkit-backdrop-filter: blur(32px);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+    }
 
-            --brand-yellow: #dce226;
-            --brand-yellow-rgb: 220, 226, 38;
+    .profile-banner {
+        height: 210px;
+        position: relative;
+        overflow: hidden;
+        background:
+            radial-gradient(circle at 20% 20%, rgba(220, 226, 38, 0.25), transparent 35%),
+            radial-gradient(circle at 80% 30%, rgba(137, 190, 50, 0.28), transparent 35%),
+            linear-gradient(135deg, rgba(4, 10, 6, 0.95), rgba(15, 30, 12, 0.9));
+    }
 
-            --brand-green: #89be32;
-            --brand-green-rgb: 137, 190, 50;
+    .profile-banner.has-image {
+        background-position: center;
+        background-size: cover;
+    }
 
-            --danger: #ff9f9f;
-            --danger-rgb: 255, 159, 159;
+    .profile-banner::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(to bottom, rgba(4, 10, 6, 0.15), rgba(4, 10, 6, 0.92)),
+            repeating-linear-gradient(
+                90deg,
+                rgba(255,255,255,0.025) 0px,
+                rgba(255,255,255,0.025) 1px,
+                transparent 1px,
+                transparent 80px
+            );
+    }
 
-            --success: #9fffc0;
-            --success-rgb: 159, 255, 192;
+    .profile-avatar-wrap {
+        width: 132px;
+        height: 132px;
+        border-radius: 999px;
+        padding: 4px;
+        background: linear-gradient(135deg, var(--brand-yellow), var(--brand-green));
+        box-shadow: 0 0 32px rgba(137, 190, 50, 0.35);
+        margin-top: -66px;
+        position: relative;
+        z-index: 2;
+    }
 
-            --discord: #5865f2;
-            --discord-rgb: 88, 101, 242;
+    .profile-avatar {
+        width: 100%;
+        height: 100%;
+        border-radius: 999px;
+        object-fit: cover;
+        border: 4px solid rgba(4, 10, 6, 0.96);
+        background: rgba(0,0,0,0.5);
+    }
 
-            --radius-xl: 32px;
-            --radius-lg: 26px;
-            --radius-md: 16px;
-            --radius-sm: 12px;
+    .profile-status-dot {
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: var(--brand-green);
+        border: 3px solid rgba(4, 10, 6, 1);
+        position: absolute;
+        right: 12px;
+        bottom: 12px;
+        box-shadow: 0 0 18px rgba(137, 190, 50, 0.75);
+    }
 
-            --shadow: 0 36px 100px rgba(0, 0, 0, 0.68);
-            --shadow-soft: 0 24px 70px rgba(0, 0, 0, 0.52);
+    .profile-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.045);
+        border: 1px solid rgba(255,255,255,0.08);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-family: 'Orbitron', sans-serif;
+    }
 
-            --transition: 360ms cubic-bezier(0.16, 1, 0.3, 1);
+    .profile-pill.green {
+        color: var(--brand-green);
+        background: rgba(var(--brand-green-rgb), 0.12);
+        border-color: rgba(var(--brand-green-rgb), 0.28);
+    }
+
+    .profile-stat {
+        padding: 18px;
+        border-radius: 20px;
+        background: rgba(255,255,255,0.035);
+        border: 1px solid rgba(255,255,255,0.07);
+        transition: all 0.3s ease;
+    }
+
+    .profile-stat:hover {
+        transform: translateY(-3px);
+        border-color: rgba(var(--brand-green-rgb), 0.35);
+        background: rgba(var(--brand-green-rgb), 0.055);
+    }
+
+    .profile-stat-value {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 26px;
+        font-weight: 800;
+        color: var(--text);
+        line-height: 1;
+    }
+
+    .profile-stat-label {
+        margin-top: 8px;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 9px;
+        color: var(--muted);
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+    }
+
+    .profile-section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+    }
+
+    .profile-section-title h2 {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--text);
+    }
+
+    .profile-section-title span {
+        height: 1px;
+        flex: 1;
+        background: linear-gradient(to right, rgba(var(--brand-green-rgb), 0.45), transparent);
+    }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 14px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .info-row:last-child {
+        border-bottom: 0;
+    }
+
+    .info-label {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+        flex: 0 0 auto;
+    }
+
+    .info-value {
+        color: var(--text);
+        font-size: 14px;
+        text-align: right;
+        overflow-wrap: anywhere;
+    }
+
+    .profile-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 8px;
+        border-radius: 999px;
+        background: rgba(0,0,0,0.28);
+        border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .profile-tab {
+        border: 0;
+        outline: 0;
+        cursor: pointer;
+        border-radius: 999px;
+        padding: 12px 18px;
+        background: transparent;
+        color: var(--muted);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        transition: all 0.25s ease;
+    }
+
+    .profile-tab.active,
+    .profile-tab:hover {
+        color: #fff;
+        background: rgba(var(--brand-green-rgb), 0.18);
+        box-shadow: inset 0 0 0 1px rgba(var(--brand-green-rgb), 0.28);
+    }
+
+    .tab-panel {
+        display: none;
+    }
+
+    .tab-panel.active {
+        display: block;
+        animation: fadeIn 0.35s ease-out forwards;
+    }
+
+    .timeline {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .timeline-item {
+        display: grid;
+        grid-template-columns: 42px 1fr;
+        gap: 14px;
+        padding: 16px;
+        border-radius: 20px;
+        background: rgba(255,255,255,0.035);
+        border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .timeline-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--brand-green);
+        background: rgba(var(--brand-green-rgb), 0.12);
+        border: 1px solid rgba(var(--brand-green-rgb), 0.22);
+    }
+
+    .gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    @media (max-width: 760px) {
+        .gallery-grid {
+            grid-template-columns: 1fr;
         }
 
-        * {
-            box-sizing: border-box;
-            scrollbar-width: none !important;
-            -ms-overflow-style: none !important;
+        .profile-tabs {
+            border-radius: 24px;
         }
 
-        ::-webkit-scrollbar {
-            display: none !important;
-            width: 0 !important;
-            height: 0 !important;
-            background: transparent !important;
-        }
-
-        html,
-        body {
-            margin: 0;
-            padding: 0;
+        .profile-tab {
             width: 100%;
-            min-height: 100%;
-            overflow: hidden;
-            background-color: var(--bg-1);
-            color: var(--text);
-            font-family: "Inter", sans-serif;
         }
-
-        body {
-            animation: pageIn 420ms ease-out forwards;
-        }
-
-        button,
-        a,
-        input,
-        label,
-        .no-drag,
-        .glass-card,
-        .quick-links {
-            -webkit-app-region: no-drag;
-        }
-
-        .drag-region {
-            -webkit-app-region: drag;
-        }
-
-        @keyframes pageIn {
-            from {
-                opacity: 0;
-                transform: translateY(12px) scale(0.99);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
-        @keyframes fadeZoom {
-            0% {
-                opacity: 0;
-                transform: scale(1);
-            }
-
-            10% {
-                opacity: 0.72;
-            }
-
-            33% {
-                opacity: 0.72;
-            }
-
-            45% {
-                opacity: 0;
-                transform: scale(1.055);
-            }
-
-            100% {
-                opacity: 0;
-                transform: scale(1.055);
-            }
-        }
-
-        @keyframes dotPulse {
-            from {
-                opacity: 0.52;
-                transform: scale(0.82);
-            }
-
-            to {
-                opacity: 1;
-                transform: scale(1.18);
-            }
-        }
-
-        @keyframes beam {
-            from {
-                transform: translateX(-28%);
-            }
-
-            to {
-                transform: translateX(28%);
-            }
-        }
-
-        .hero-bg {
-            position: fixed;
-            inset: 0;
-            z-index: -10;
-            overflow: hidden;
-            background:
-                radial-gradient(circle at 20% 10%, rgba(var(--brand-green-rgb), 0.11), transparent 34%),
-                radial-gradient(circle at 82% 18%, rgba(var(--brand-yellow-rgb), 0.075), transparent 30%),
-                linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 48%, #010201 100%);
-        }
-
-        .hero-bg .bg-slide {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            object-position: center;
-            filter: saturate(1.04) brightness(0.24) contrast(1.08);
-            opacity: 0;
-            animation: fadeZoom 24s infinite;
-        }
-
-        .hero-bg .slide-1 {
-            animation-delay: 0s;
-        }
-
-        .hero-bg .slide-2 {
-            animation-delay: 8s;
-        }
-
-        .hero-bg .slide-3 {
-            animation-delay: 16s;
-        }
-
-        .hero-overlay {
-            position: absolute;
-            inset: 0;
-            background:
-                radial-gradient(circle at 46% 34%, rgba(10, 20, 15, 0.18) 0%, rgba(4, 10, 6, 0.88) 58%, rgba(2, 5, 2, 0.98) 100%),
-                linear-gradient(180deg, rgba(2, 5, 2, 0.2) 0%, rgba(2, 5, 2, 0.96) 100%);
-        }
-
-        .hero-grid {
-            position: absolute;
-            inset: 0;
-            background:
-                linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
-            background-size: 46px 46px;
-            mask-image: radial-gradient(circle at center, black, transparent 76%);
-            opacity: 0.7;
-        }
-
-        .glass-nav {
-            background: rgba(7, 15, 10, 0.72);
-            backdrop-filter: blur(26px);
-            -webkit-backdrop-filter: blur(26px);
-            border: 1px solid rgba(255, 255, 255, 0.055);
-            border-top: 1px solid rgba(var(--brand-green-rgb), 0.24);
-            border-left: 1px solid rgba(var(--brand-green-rgb), 0.12);
-            box-shadow: 0 18px 46px rgba(0, 0, 0, 0.48);
-        }
-
-        .glass-card {
-            position: relative;
-            background:
-                linear-gradient(145deg, rgba(16, 28, 18, 0.46) 0%, rgba(3, 8, 4, 0.86) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.065);
-            border-top: 1px solid rgba(var(--brand-green-rgb), 0.22);
-            border-left: 1px solid rgba(var(--brand-green-rgb), 0.16);
-            border-radius: var(--radius-xl);
-            backdrop-filter: blur(34px);
-            -webkit-backdrop-filter: blur(34px);
-            box-shadow: var(--shadow);
-        }
-
-        .glass-card::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 16%;
-            right: 16%;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(var(--brand-green-rgb), 0.75), rgba(var(--brand-yellow-rgb), 0.5), transparent);
-            opacity: 0.75;
-            pointer-events: none;
-        }
-
-        .glass-card::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            border-radius: inherit;
-            background:
-                radial-gradient(circle at 18% 10%, rgba(var(--brand-green-rgb), 0.10), transparent 28%),
-                radial-gradient(circle at 84% 8%, rgba(var(--brand-yellow-rgb), 0.055), transparent 30%);
-            pointer-events: none;
-        }
-
-        .btn-primary,
-        .btn-secondary {
-            width: 100%;
-            min-height: 52px;
-            border-radius: var(--radius-sm);
-            padding: 12px 22px;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            transition: all 260ms ease;
-            text-decoration: none;
-            font-family: "Orbitron", sans-serif;
-            font-size: 11px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-        }
-
-        .btn-primary {
-            background:
-                linear-gradient(135deg, rgba(var(--brand-green-rgb), 0.2), rgba(var(--brand-green-rgb), 0.08));
-            color: var(--brand-green);
-            border: 1px solid rgba(var(--brand-green-rgb), 0.5);
-            box-shadow:
-                0 0 18px rgba(var(--brand-green-rgb), 0.12),
-                inset 0 0 18px rgba(var(--brand-green-rgb), 0.03);
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            background: rgba(var(--brand-green-rgb), 0.3);
-            color: #fff;
-            box-shadow:
-                0 0 28px rgba(var(--brand-green-rgb), 0.28),
-                inset 0 0 20px rgba(var(--brand-green-rgb), 0.08);
-            transform: translateY(-2px);
-        }
-
-        .btn-primary:disabled,
-        .btn-secondary:disabled {
-            opacity: 0.55;
-            cursor: not-allowed;
-            filter: grayscale(0.7);
-            transform: none;
-        }
-
-        .btn-secondary {
-            background:
-                linear-gradient(135deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018));
-            color: var(--text);
-            border: 1px solid rgba(255, 255, 255, 0.105);
-        }
-
-        .btn-secondary:hover:not(:disabled) {
-            background: rgba(255, 255, 255, 0.085);
-            border-color: rgba(255, 255, 255, 0.22);
-            transform: translateY(-2px);
-        }
-
-        .app-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            z-index: 50;
-            padding: 22px 28px;
-            pointer-events: none;
-        }
-
-        .header-shell {
-            width: 100%;
-            max-width: 1400px;
-            margin: 0 auto;
-            pointer-events: auto;
-        }
-
-        .header-nav {
-            padding: 12px 18px;
-            border-radius: 999px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 13px;
-        }
-
-        .brand-logo {
-            width: 44px;
-            height: 44px;
-            border-radius: 999px;
-            overflow: hidden;
-            border: 1px solid rgba(var(--brand-green-rgb), 0.72);
-            box-shadow:
-                0 0 16px rgba(var(--brand-green-rgb), 0.28),
-                inset 0 0 18px rgba(var(--brand-green-rgb), 0.08);
-            background: rgba(0, 0, 0, 0.55);
-            display: grid;
-            place-items: center;
-            color: var(--brand-green);
-            font-family: "Orbitron", sans-serif;
-            font-size: 13px;
-            font-weight: 900;
-            letter-spacing: 0.08em;
-        }
-
-        .brand-logo img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .brand-copy {
-            display: flex;
-            flex-direction: column;
-            line-height: 1;
-        }
-
-        .brand-copy strong {
-            font-family: "Orbitron", sans-serif;
-            font-size: 14px;
-            font-weight: 800;
-            letter-spacing: 0.16em;
-            color: var(--text);
-            text-transform: uppercase;
-        }
-
-        .brand-copy span {
-            margin-top: 6px;
-            font-family: "Orbitron", sans-serif;
-            font-size: 8px;
-            color: var(--brand-yellow);
-            text-transform: uppercase;
-            letter-spacing: 0.22em;
-            font-weight: 800;
-        }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .system-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            border-radius: 999px;
-            padding: 9px 14px;
-            border: 1px solid rgba(var(--brand-green-rgb), 0.28);
-            background: rgba(var(--brand-green-rgb), 0.075);
-            color: var(--brand-green);
-            font-family: "Orbitron", sans-serif;
-            font-size: 10px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-        }
-
-        .system-pill i {
-            display: block;
-            width: 7px;
-            height: 7px;
-            border-radius: 999px;
-            background: var(--brand-green);
-            box-shadow: 0 0 12px rgba(var(--brand-green-rgb), 0.9);
-            animation: dotPulse 1.8s infinite alternate;
-        }
-
-        .window-actions {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .window-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 999px;
-            border: 1px solid rgba(255, 255, 255, 0.095);
-            background: rgba(255, 255, 255, 0.04);
-            color: var(--muted);
-            cursor: pointer;
-            display: grid;
-            place-items: center;
-            transition: all 0.25s ease;
-        }
-
-        .window-btn:hover {
-            color: #fff;
-            background: rgba(255, 255, 255, 0.095);
-            transform: translateY(-1px);
-        }
-
-        .window-btn.danger:hover {
-            color: var(--danger);
-            border-color: rgba(var(--danger-rgb), 0.35);
-            background: rgba(var(--danger-rgb), 0.08);
-        }
-
-        .shell {
-            position: relative;
-            z-index: 10;
-            width: 100%;
-            min-height: 100vh;
-            padding: 118px 30px 72px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .layout {
-            width: min(1180px, 100%);
-            display: grid;
-            grid-template-columns: minmax(380px, 460px) minmax(420px, 1fr);
-            gap: 40px;
-            align-items: center;
-        }
-
-        .scene {
-            width: 100%;
-            min-height: 680px;
-            perspective: 1800px;
-        }
-
-        .parallax-wrapper {
-            width: 100%;
-            height: 100%;
-            transform-style: preserve-3d;
-            transition: transform 0.08s ease-out;
-        }
-
-        .flip-card {
-            position: relative;
-            width: 100%;
-            height: 680px;
-            transform-style: preserve-3d;
-            transition: transform 680ms cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-
-        .flip-card.is-flipped {
-            transform: rotateY(180deg);
-        }
-
-        .face {
-            position: absolute;
-            inset: 0;
-            overflow: hidden;
-            backface-visibility: hidden;
-        }
-
-        .face-back {
-            transform: rotateY(180deg);
-        }
-
-        .face-inner {
-            position: relative;
-            z-index: 2;
-            height: 100%;
-            padding: 36px 36px;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-        }
-
-        .chip-center {
-            width: fit-content;
-            margin: 0 auto 24px;
-            display: inline-flex;
-            align-items: center;
-            gap: 9px;
-            border-radius: 999px;
-            padding: 7px 16px;
-            font-size: 10px;
-            font-family: "Orbitron", sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.16em;
-            color: var(--brand-green);
-            border: 1px solid rgba(var(--brand-green-rgb), 0.24);
-            background: rgba(var(--brand-green-rgb), 0.075);
-            box-shadow: inset 0 0 14px rgba(var(--brand-green-rgb), 0.035);
-            font-weight: 800;
-        }
-
-        .status-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 999px;
-            background: var(--brand-green);
-            box-shadow: 0 0 10px rgba(var(--brand-green-rgb), 0.95);
-            animation: dotPulse 1.9s infinite alternate;
-        }
-
-        .eyebrow {
-            display: block;
-            color: var(--brand-yellow);
-            font-family: "Orbitron", sans-serif;
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.18em;
-            margin-bottom: 10px;
-            font-weight: 900;
-        }
-
-        h1 {
-            margin: 0 0 18px;
-            font-family: "Orbitron", sans-serif;
-            font-size: 34px;
-            line-height: 1.12;
-            font-weight: 900;
-            letter-spacing: 0.005em;
-            color: #fff;
-        }
-
-        h1 .accent {
-            color: var(--brand-green);
-            text-shadow: 0 0 18px rgba(var(--brand-green-rgb), 0.32);
-        }
-
-        .lead {
-            margin: 0 0 24px;
-            color: var(--muted);
-            font-size: 13px;
-            line-height: 1.66;
-            font-weight: 500;
-        }
-
-        .login-actions {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .discord-icon {
-            width: 20px;
-            height: 20px;
-            fill: currentColor;
-        }
-
-        .divider {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin: 4px 0 20px;
-            color: var(--muted);
-            font-size: 10px;
-            font-family: "Orbitron", sans-serif;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-        }
-
-        .divider::before,
-        .divider::after {
-            content: "";
-            height: 1px;
-            flex: 1;
-            background: rgba(255, 255, 255, 0.085);
-        }
-
+    }
+
+    .gallery-item {
+        min-height: 180px;
+        border-radius: 22px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.08);
+        background:
+            radial-gradient(circle at 30% 30%, rgba(var(--brand-green-rgb), 0.18), transparent 40%),
+            rgba(255,255,255,0.035);
+        position: relative;
+    }
+
+    .gallery-item img {
+        width: 100%;
+        height: 100%;
+        min-height: 180px;
+        object-fit: cover;
+        display: block;
+        filter: saturate(1.05) brightness(0.82);
+    }
+
+    .gallery-item-caption {
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(4,10,6,0.72);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255,255,255,0.08);
+        font-size: 12px;
+        color: var(--text);
+    }
+
+    .settings-form {
+        display: grid;
+        gap: 18px;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    @media (max-width: 760px) {
         .form-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 13px;
-            margin-bottom: 18px;
+            grid-template-columns: 1fr;
         }
-
-        .field {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .field label {
-            font-family: "Orbitron", sans-serif;
-            font-size: 9px;
-            letter-spacing: 0.17em;
-            text-transform: uppercase;
-            color: var(--brand-yellow);
-            font-weight: 900;
-        }
-
-        .field input {
-            width: 100%;
-            border-radius: var(--radius-md);
-            border: 1px solid rgba(255, 255, 255, 0.085);
-            background: rgba(0, 0, 0, 0.36);
-            color: var(--text);
-            outline: none;
-            padding: 15px 16px;
-            font-size: 14px;
-            font-weight: 700;
-            transition: 220ms ease;
-        }
-
-        .field input::placeholder {
-            color: rgba(147, 164, 200, 0.46);
-        }
-
-        .field input:focus {
-            border-color: rgba(var(--brand-green-rgb), 0.58);
-            box-shadow: 0 0 0 3px rgba(var(--brand-green-rgb), 0.075);
-            background: rgba(0, 0, 0, 0.48);
-        }
-
-        .remember-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            margin-bottom: 18px;
-        }
-
-        .check-wrap {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            color: var(--muted);
-            font-size: 12px;
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .check-wrap input {
-            width: 16px;
-            height: 16px;
-            accent-color: var(--brand-green);
-        }
-
-        .mini-link {
-            border: 0;
-            background: transparent;
-            color: var(--brand-yellow);
-            font-family: "Orbitron", sans-serif;
-            font-size: 9px;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            font-weight: 900;
-            cursor: pointer;
-            padding: 0;
-        }
-
-        .mini-link:hover {
-            color: #fff;
-        }
-
-        .card-grid-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin: 20px 0 12px;
-        }
-
-        .inner-card {
-            background: rgba(0, 0, 0, 0.28);
-            border: 1px solid rgba(255, 255, 255, 0.055);
-            border-radius: var(--radius-md);
-            padding: 16px 17px;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            transition: 260ms ease;
-        }
-
-        .inner-card:hover {
-            background: rgba(255, 255, 255, 0.04);
-            border-color: rgba(var(--brand-green-rgb), 0.24);
-            transform: translateY(-1px);
-        }
-
-        .inner-card.full-width {
-            margin-bottom: 12px;
-        }
-
-        .card-eyebrow {
-            font-family: "Orbitron", sans-serif;
-            font-size: 9px;
-            color: var(--brand-yellow);
-            text-transform: uppercase;
-            letter-spacing: 0.16em;
-            font-weight: 900;
-        }
-
-        .inner-card strong {
-            color: var(--text);
-            font-size: 14px;
-            font-weight: 800;
-            letter-spacing: 0.02em;
-        }
-
-        .inner-card span.desc {
-            color: var(--muted);
-            font-size: 12px;
-            line-height: 1.48;
-        }
-
-        .status-box {
-            margin-top: auto;
-            padding: 14px 17px;
-            border-radius: var(--radius-md);
-            background: rgba(0, 0, 0, 0.42);
-            border: 1px solid rgba(255, 255, 255, 0.065);
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-        }
-
-        .status-box svg {
-            flex: 0 0 auto;
-            margin-top: 1px;
-        }
-
-        .status-box p {
-            margin: 0;
-            color: var(--text);
-            font-size: 12px;
-            font-weight: 700;
-            line-height: 1.45;
-        }
-
-        .status-box.info {
-            border-color: rgba(var(--brand-green-rgb), 0.28);
-            background: rgba(var(--brand-green-rgb), 0.055);
-        }
-
-        .status-box.error {
-            border-color: rgba(var(--danger-rgb), 0.3);
-            background: rgba(var(--danger-rgb), 0.065);
-        }
-
-        .status-box.success {
-            border-color: rgba(var(--success-rgb), 0.28);
-            background: rgba(var(--success-rgb), 0.055);
-        }
-
-        .status-box.warning {
-            border-color: rgba(var(--brand-yellow-rgb), 0.28);
-            background: rgba(var(--brand-yellow-rgb), 0.055);
-        }
-
-        .flip-cta-wrap {
-            display: flex;
-            justify-content: center;
-            margin-top: 18px;
-        }
-
-        .flip-cta,
-        .back-button {
-            border: 1px solid transparent;
-            background: transparent;
-            color: var(--muted);
-            font-size: 10px;
-            font-family: "Orbitron", sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-            font-weight: 900;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 9px 15px;
-            border-radius: 999px;
-            transition: 260ms ease;
-        }
-
-        .flip-cta:hover,
-        .back-button:hover {
-            color: var(--text);
-            background: rgba(255, 255, 255, 0.055);
-        }
-
-        .flip-cta svg,
-        .back-button svg {
-            width: 14px;
-            height: 14px;
-        }
-
-        .back-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 14px;
-            margin-bottom: 24px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-        }
-
-        .back-button {
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(0, 0, 0, 0.3);
-            color: var(--text);
-        }
-
-        .patch-card {
-            background:
-                linear-gradient(145deg, rgba(16, 28, 18, 0.42), rgba(2, 6, 2, 0.72));
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-left: 2px solid var(--brand-green);
-            border-radius: var(--radius-md);
-            padding: 20px;
-            margin-bottom: 14px;
-            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
-        }
-
-        .patch-card.yellow {
-            border-left-color: var(--brand-yellow);
-        }
-
-        .markdown {
-            margin-top: 12px;
-            color: var(--muted);
-            font-size: 13px;
-            line-height: 1.62;
-        }
-
-        .markdown p {
-            margin: 0 0 12px;
-        }
-
-        .markdown ul {
-            margin: 8px 0 0 18px;
-            padding: 0;
-        }
-
-        .markdown li {
-            list-style: none;
-            position: relative;
-            margin-bottom: 9px;
-        }
-
-        .markdown li::before {
-            content: ">";
-            position: absolute;
-            left: -17px;
-            top: 1px;
-            color: var(--brand-yellow);
-            font-family: "Orbitron", sans-serif;
-            font-size: 11px;
-        }
-
-        .markdown strong {
-            color: var(--text);
-        }
-
-        .release-meta {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin-top: 18px;
-            padding-top: 16px;
-            border-top: 1px dashed rgba(255, 255, 255, 0.1);
-            font-family: "Orbitron", sans-serif;
-            font-size: 10px;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.13em;
-        }
-
-        .release-meta strong {
-            color: var(--brand-green);
-        }
-
-        .hero-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .preview-card {
-            padding: 34px;
-            position: relative;
-            overflow: hidden;
-            min-height: 280px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .preview-card::after {
-            content: "";
-            position: absolute;
-            right: -80px;
-            top: -80px;
-            width: 230px;
-            height: 230px;
-            border-radius: 999px;
-            background: rgba(var(--brand-green-rgb), 0.12);
-            filter: blur(20px);
-        }
-
-        .preview-card .eyebrow {
-            position: relative;
-            z-index: 2;
-        }
-
-        .preview-card h2 {
-            position: relative;
-            z-index: 2;
-            margin: 0;
-            font-family: "Orbitron", sans-serif;
-            font-size: clamp(34px, 5vw, 62px);
-            line-height: 0.98;
-            letter-spacing: -0.045em;
-            color: #fff;
-        }
-
-        .preview-card h2 span {
-            color: var(--brand-green);
-            text-shadow: 0 0 24px rgba(var(--brand-green-rgb), 0.26);
-        }
-
-        .preview-card p {
-            position: relative;
-            z-index: 2;
-            color: var(--muted);
-            font-size: 14px;
-            line-height: 1.72;
-            margin: 22px 0 0;
-            max-width: 560px;
-        }
-
-        .mini-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 14px;
-        }
-
-        .mini-stat {
-            padding: 18px;
-            border-radius: 22px;
-            background: rgba(0, 0, 0, 0.34);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-        }
-
-        .mini-stat small {
-            display: block;
-            color: var(--muted);
-            font-family: "Orbitron", sans-serif;
-            font-size: 9px;
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-            margin-bottom: 8px;
-        }
-
-        .mini-stat strong {
-            font-size: 20px;
-            color: #fff;
-        }
-
-        .quick-links {
-            display: flex;
-            justify-content: center;
-            gap: 34px;
-            padding-top: 2px;
-        }
-
-        .q-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            color: var(--muted);
-            text-decoration: none;
-            font-family: "Orbitron", sans-serif;
-            font-size: 10px;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            transition: 260ms ease;
-        }
-
-        .q-link svg {
-            width: 18px;
-            height: 18px;
-            opacity: 0.72;
-            transition: 260ms ease;
-        }
-
-        .q-link:hover {
-            color: var(--text);
-            transform: translateY(-2px);
-        }
-
-        .q-link:hover svg {
-            opacity: 1;
-            filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.35));
-        }
-
-        .q-link.green {
-            color: var(--brand-green);
-        }
-
-        .q-link.yellow {
-            color: var(--brand-yellow);
-        }
-
-        @media (max-width: 1180px) {
-            html,
-            body {
-                overflow: auto;
-                min-height: 100vh;
-            }
-
-            .shell {
-                min-height: 100vh;
-                height: auto;
-                align-items: flex-start;
-            }
-
-            .layout {
-                grid-template-columns: 1fr;
-                max-width: 760px;
-            }
-
-            .hero-panel {
-                display: none;
-            }
-
-            .scene {
-                min-height: 0;
-            }
-        }
-
-        @media (max-width: 760px) {
-            .app-header {
-                padding: 18px;
-            }
-
-            .header-nav {
-                border-radius: 28px;
-            }
-
-            .system-pill,
-            .window-actions {
-                display: none;
-            }
-
-            .brand-copy strong {
-                font-size: 12px;
-            }
-
-            .shell {
-                padding: 96px 18px 60px;
-            }
-
-            .flip-card {
-                height: auto;
-                min-height: 0;
-            }
-
-            .face {
-                position: relative;
-                min-height: 0;
-            }
-
-            .face-back {
-                transform: none;
-                display: none;
-                margin-top: 16px;
-            }
-
-            .flip-card.is-flipped {
-                transform: none;
-            }
-
-            .flip-card.is-flipped .face-front {
-                display: none;
-            }
-
-            .flip-card.is-flipped .face-back {
-                display: block;
-            }
-
-            .face-inner {
-                height: auto;
-                min-height: 0;
-                padding: 32px 24px;
-            }
-
-            h1 {
-                font-size: 29px;
-            }
-
-            .card-grid-2,
-            .mini-stats {
-                grid-template-columns: 1fr;
-            }
-
-            .quick-links {
-                gap: 18px;
-                flex-wrap: wrap;
-            }
-        }
-    </style>
-</head>
-
-<body>
-    <div class="hero-bg" aria-hidden="true">
-        <img class="bg-slide slide-1" src="./assets/eifellog-bg-1.jpg" alt="EifelLog Truck 1" onerror="this.style.display='none'" />
-        <img class="bg-slide slide-2" src="./assets/eifellog-bg-2.jpg" alt="EifelLog Truck 2" onerror="this.style.display='none'" />
-        <img class="bg-slide slide-3" src="./assets/eifellog-bg-3.jpg" alt="EifelLog Truck 3" onerror="this.style.display='none'" />
-        <div class="hero-overlay"></div>
-        <div class="hero-grid"></div>
+    }
+
+    .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .form-field.full {
+        grid-column: 1 / -1;
+    }
+
+    .form-label {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+    }
+
+    .form-input,
+    .form-textarea,
+    .form-select {
+        width: 100%;
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.09);
+        background: rgba(0,0,0,0.32);
+        color: var(--text);
+        padding: 13px 15px;
+        outline: none;
+        transition: all 0.25s ease;
+        font-size: 14px;
+    }
+
+    .form-input:focus,
+    .form-textarea:focus,
+    .form-select:focus {
+        border-color: rgba(var(--brand-green-rgb), 0.5);
+        box-shadow: 0 0 0 4px rgba(var(--brand-green-rgb), 0.08);
+    }
+
+    .form-textarea {
+        min-height: 140px;
+        resize: vertical;
+    }
+
+    .form-hint {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.6;
+    }
+
+    .switch-list {
+        display: grid;
+        gap: 12px;
+    }
+
+    .switch-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 15px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.035);
+        border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .switch-row strong {
+        color: var(--text);
+        font-size: 14px;
+    }
+
+    .switch-row p {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 4px;
+    }
+
+    .switch {
+        position: relative;
+        width: 54px;
+        height: 30px;
+        flex: 0 0 auto;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background: rgba(255,255,255,0.13);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 999px;
+        transition: 0.25s;
+    }
+
+    .slider::before {
+        content: "";
+        position: absolute;
+        width: 22px;
+        height: 22px;
+        left: 4px;
+        top: 3px;
+        background: rgba(255,255,255,0.75);
+        border-radius: 999px;
+        transition: 0.25s;
+    }
+
+    .switch input:checked + .slider {
+        background: rgba(var(--brand-green-rgb), 0.32);
+        border-color: rgba(var(--brand-green-rgb), 0.5);
+    }
+
+    .switch input:checked + .slider::before {
+        transform: translateX(24px);
+        background: var(--brand-green);
+        box-shadow: 0 0 18px rgba(var(--brand-green-rgb), 0.65);
+    }
+
+    .empty-state {
+        padding: 28px;
+        border-radius: 22px;
+        text-align: center;
+        background: rgba(255,255,255,0.035);
+        border: 1px dashed rgba(255,255,255,0.12);
+        color: var(--muted);
+    }
+
+    .copy-toast {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 999;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(12px);
+        transition: all 0.25s ease;
+        background: rgba(4,10,6,0.92);
+        color: var(--brand-green);
+        border: 1px solid rgba(var(--brand-green-rgb), 0.35);
+        border-radius: 16px;
+        padding: 13px 16px;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        box-shadow: 0 24px 70px rgba(0,0,0,0.45);
+    }
+
+    .copy-toast.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+</style>
+
+<section class="profile-shell">
+
+    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+        <div>
+            <div class="profile-pill green mb-4">
+                <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse"></span>
+                Public Driver Profile
+            </div>
+            <h1 class="font-orbitron text-3xl md:text-5xl font-black uppercase tracking-[0.12em] text-[var(--text)]">
+                {{ profile_name }}
+            </h1>
+            <p class="mt-4 max-w-3xl text-[var(--muted)] leading-relaxed">
+                Öffentliches Eifel LOG Fahrerprofil. Dieses Profil kann auch ohne Login geöffnet werden.
+            </p>
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+            <button type="button" onclick="copyProfileLink()" class="btn-secondary">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5"></path>
+                </svg>
+                Profil teilen
+            </button>
+
+            {% if own_profile %}
+                <button type="button" data-open-tab="settings" class="btn-primary">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.757.426 1.757 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.757-2.924 1.757-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.757-.426-1.757-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.607 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    Profil einstellen
+                </button>
+            {% endif %}
+        </div>
     </div>
 
-    <header class="app-header drag-region">
-        <div class="header-shell">
-            <nav class="glass-nav header-nav">
-                <div class="brand">
-                    <div class="brand-logo">
-                        <img src="./assets/eifellog-logo.png" alt="EifelLog Logo" onerror="this.remove()" />
-                        <span>EL</span>
-                    </div>
+    <div class="profile-grid">
 
-                    <div class="brand-copy">
-                        <strong>Eifel LOG</strong>
-                        <span>Tracker Node</span>
-                    </div>
+        <aside class="profile-card">
+            <div
+                class="profile-banner {% if banner %}has-image{% endif %}"
+                {% if banner %}style="background-image: url('{{ banner }}');"{% endif %}
+            ></div>
+
+            <div class="px-7 pb-7">
+                <div class="profile-avatar-wrap">
+                    <img src="{{ avatar }}" alt="{{ profile_name }}" class="profile-avatar" id="profileAvatarPreview">
+                    <span class="profile-status-dot"></span>
                 </div>
 
-                <div class="header-right no-drag">
-                    <div class="system-pill">
-                        <i></i>
-                        Secure Driver Node
-                    </div>
-
-                    <div class="window-actions">
-                        <button class="window-btn" type="button" onclick="EifelLogBridge.minimize()" aria-label="Minimieren">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M5 12h14"></path>
-                            </svg>
-                        </button>
-
-                        <button class="window-btn danger" type="button" onclick="EifelLogBridge.close()" aria-label="Schließen">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M18 6 6 18"></path>
-                                <path d="m6 6 12 12"></path>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </nav>
-        </div>
-    </header>
-
-    <main class="shell">
-        <div class="layout">
-            <section class="scene" aria-label="EifelLog Tracker Login">
-                <div class="parallax-wrapper" id="parallaxWrapper">
-                    <div class="flip-card" id="flipCard">
-                        <section class="face face-front glass-card" aria-label="Login">
-                            <div class="face-inner">
-                                <div class="chip-center">
-                                    <span class="status-dot"></span>
-                                    Driver Authentication
-                                </div>
-
-                                <span class="eyebrow">EifelLog Tracker</span>
-
-                                <h1>
-                                    Willkommen im<br />
-                                    <span class="accent">Driver Hub</span>
-                                </h1>
-
-                                <p class="lead">
-                                    Melde dich an, um den lokalen Tracker mit deinem EifelLog-Profil zu verbinden.
-                                    Danach werden Tourdaten, Telemetrie und Status synchronisiert.
-                                </p>
-
-                                <div class="login-actions">
-                                    <button type="button" class="btn-secondary" id="discordLoginButton">
-                                        <svg class="discord-icon" viewBox="0 0 24 24">
-                                            <path d="M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515a13.715 13.715 0 0 0-.618 1.264a18.27 18.27 0 0 0-5.629 0a12.64 12.64 0 0 0-.631-1.264A19.736 19.736 0 0 0 3.67 4.369C.533 9.046-.319 13.58.099 18.057a19.9 19.9 0 0 0 5.993 3.03a14.87 14.87 0 0 0 1.283-2.106a12.955 12.955 0 0 1-2.011-.964c.169-.124.334-.255.495-.389c3.88 1.823 8.082 1.823 11.916 0c.165.135.33.266.495.389c-.641.375-1.315.698-2.015.964c.365.757.795 1.46 1.287 2.106a19.857 19.857 0 0 0 6.001-3.03c.49-5.194-.838-9.687-3.226-13.688Z"></path>
-                                        </svg>
-                                        Discord Login
-                                    </button>
-                                </div>
-
-                                <div class="divider">
-                                    oder
-                                </div>
-
-                                <form id="loginForm" autocomplete="off">
-                                    <div class="form-grid">
-                                        <div class="field">
-                                            <label for="driverName">Fahrername</label>
-                                            <input
-                                                id="driverName"
-                                                name="driverName"
-                                                type="text"
-                                                placeholder="z. B. Lukxs"
-                                                minlength="3"
-                                                required
-                                            />
-                                        </div>
-
-                                        <div class="field">
-                                            <label for="accessCode">Tracker Code</label>
-                                            <input
-                                                id="accessCode"
-                                                name="accessCode"
-                                                type="password"
-                                                placeholder="Dein persönlicher Tracker-Code"
-                                                minlength="4"
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div class="remember-row">
-                                        <label class="check-wrap">
-                                            <input id="rememberLogin" type="checkbox" checked />
-                                            Eingeloggt bleiben
-                                        </label>
-
-                                        <button class="mini-link" type="button" id="helpButton">
-                                            Code erhalten?
-                                        </button>
-                                    </div>
-
-                                    <button type="submit" class="btn-primary" id="loginButton">
-                                        Tracker verbinden
-                                    </button>
-                                </form>
-
-                                <div class="card-grid-2">
-                                    <div class="inner-card">
-                                        <span class="card-eyebrow">Status</span>
-                                        <strong>Geschützt</strong>
-                                        <span class="desc">Der Tracker startet erst nach erfolgreichem Login.</span>
-                                    </div>
-
-                                    <div class="inner-card">
-                                        <span class="card-eyebrow">Sync</span>
-                                        <strong>Live</strong>
-                                        <span class="desc">Telemetrie wird später direkt an EifelLog gesendet.</span>
-                                    </div>
-                                </div>
-
-                                <div class="status-box info" id="statusCard">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand-green)" stroke-width="2">
-                                        <circle cx="12" cy="12" r="10"></circle>
-                                        <path d="M12 8v5"></path>
-                                        <path d="M12 17h.01"></path>
-                                    </svg>
-
-                                    <p id="loginStatus">
-                                        Bitte melde dich an, um den EifelLog Tracker freizuschalten.
-                                    </p>
-                                </div>
-
-                                <div class="flip-cta-wrap">
-                                    <button type="button" class="flip-cta" id="showDetailsButton">
-                                        System Info
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M5 12h14"></path>
-                                            <path d="m12 5 7 7-7 7"></path>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        </section>
-
-                        <section class="face face-back glass-card" aria-label="System Info">
-                            <div class="face-inner">
-                                <div class="back-header">
-                                    <span class="eyebrow" style="margin: 0;">System Briefing</span>
-
-                                    <button type="button" class="back-button" id="showLoginButton">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="m15 18-6-6 6-6"></path>
-                                        </svg>
-                                        Zurück
-                                    </button>
-                                </div>
-
-                                <div class="patch-card">
-                                    <span class="card-eyebrow">Tracker Login</span>
-
-                                    <div class="markdown">
-                                        <p>
-                                            Der <strong>EifelLog Tracker</strong> benötigt eine aktive Anmeldung,
-                                            damit Fahrten eindeutig deinem Fahrerprofil zugeordnet werden können.
-                                        </p>
-
-                                        <ul>
-                                            <li>Discord Login für normale Fahrer-Anmeldung.</li>
-                                            <li>Tracker Code als Fallback für lokale Tests.</li>
-                                            <li>Nach dem Login wird die Tracker-Oberfläche freigegeben.</li>
-                                            <li>Telemetrie startet erst nach erfolgreicher Authentifizierung.</li>
-                                        </ul>
-                                    </div>
-                                </div>
-
-                                <div class="patch-card yellow">
-                                    <span class="card-eyebrow">Security Node</span>
-
-                                    <div class="markdown">
-                                        <p>
-                                            Der Client sendet keine Tourdaten, solange keine gültige Sitzung aktiv ist.
-                                            Die finale Prüfung sollte immer serverseitig über deine Flask-API erfolgen.
-                                        </p>
-
-                                        <ul>
-                                            <li>Session Token lokal speichern.</li>
-                                            <li>API-Anfragen mit Bearer Token absichern.</li>
-                                            <li>Ungültige Sessions automatisch zurück zum Login schicken.</li>
-                                        </ul>
-                                    </div>
-
-                                    <div class="release-meta">
-                                        <span>CLIENT: <strong>WPF WebView2</strong></span>
-                                        <span>STATUS: <strong>LOGIN REQUIRED</strong></span>
-                                    </div>
-                                </div>
-
-                                <div class="inner-card full-width">
-                                    <span class="card-eyebrow">Hinweis</span>
-                                    <strong>WebView2 Bridge aktiv</strong>
-                                    <span class="desc">
-                                        Diese Seite sendet Login-Events an C# über <code>window.chrome.webview.postMessage</code>.
-                                    </span>
-                                </div>
-                            </div>
-                        </section>
-                    </div>
-                </div>
-            </section>
-
-            <aside class="hero-panel" aria-hidden="true">
-                <div class="glass-card preview-card">
-                    <span class="eyebrow">EifelLog Network</span>
-
-                    <h2>
-                        Dein lokaler<br />
-                        <span>Telemetry Hub</span>
+                <div class="mt-5">
+                    <h2 class="font-orbitron text-2xl font-black uppercase tracking-[0.08em] text-[var(--text)]">
+                        {{ profile_name }}
                     </h2>
+                    <p class="mt-2 text-sm text-[var(--muted)]">@{{ username }}</p>
 
-                    <p>
-                        Verbinde deinen Account, starte ETS2 oder ATS und synchronisiere deine Fahrten
-                        direkt mit dem EifelLog Dashboard.
+                    <div class="flex flex-wrap gap-2 mt-5">
+                        <span class="profile-pill green">{{ rank }}</span>
+                        {% if public_profile %}
+                            <span class="profile-pill">Public</span>
+                        {% else %}
+                            <span class="profile-pill">Privat</span>
+                        {% endif %}
+                    </div>
+
+                    <p class="mt-6 text-[var(--text)]/90 leading-relaxed">
+                        {{ status }}
                     </p>
                 </div>
 
-                <div class="mini-stats">
-                    <div class="mini-stat">
-                        <small>Auth</small>
-                        <strong>Secure</strong>
+                <div class="mt-7 pt-7 border-t border-white/10">
+                    <div class="profile-section-title">
+                        <h2>Driver Info</h2>
+                        <span></span>
                     </div>
 
-                    <div class="mini-stat">
-                        <small>Mode</small>
-                        <strong>Live</strong>
-                    </div>
+                    <div>
+                        <div class="info-row">
+                            <div class="info-label">Standort</div>
+                            <div class="info-value">{{ location }}</div>
+                        </div>
 
-                    <div class="mini-stat">
-                        <small>Game</small>
-                        <strong>ETS2</strong>
+                        <div class="info-row">
+                            <div class="info-label">Lieblings-LKW</div>
+                            <div class="info-value">{{ favorite_truck }}</div>
+                        </div>
+
+                        {% if show_discord and discord %}
+                            <div class="info-row">
+                                <div class="info-label">Discord</div>
+                                <div class="info-value">{{ discord }}</div>
+                            </div>
+                        {% endif %}
+
+                        {% if truckersmp_id %}
+                            <div class="info-row">
+                                <div class="info-label">TruckersMP</div>
+                                <div class="info-value">{{ truckersmp_id }}</div>
+                            </div>
+                        {% endif %}
+
+                        {% if steam %}
+                            <div class="info-row">
+                                <div class="info-label">Steam</div>
+                                <div class="info-value">{{ steam }}</div>
+                            </div>
+                        {% endif %}
+
+                        {% if website %}
+                            <div class="info-row">
+                                <div class="info-label">Website</div>
+                                <div class="info-value">
+                                    <a href="{{ website }}" target="_blank" class="text-[var(--brand-green)] hover:text-white transition">
+                                        Öffnen
+                                    </a>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        {% if show_email and p.email is defined and p.email %}
+                            <div class="info-row">
+                                <div class="info-label">E-Mail</div>
+                                <div class="info-value">{{ p.email }}</div>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
+            </div>
+        </aside>
 
-                <nav class="quick-links" aria-label="Quick Links">
-                    <a href="#" class="q-link green" id="openDashboardLink">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 12l2-2 7-7 7 7 2 2"></path>
-                            <path d="M5 10v10h14V10"></path>
-                            <path d="M10 20v-6h4v6"></path>
-                        </svg>
-                        Dashboard
-                    </a>
+        <div class="flex flex-col gap-7">
 
-                    <a href="#" class="q-link yellow" id="openDiscordLink">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515a13.715 13.715 0 0 0-.618 1.264a18.27 18.27 0 0 0-5.629 0a12.64 12.64 0 0 0-.631-1.264A19.736 19.736 0 0 0 3.67 4.369C.533 9.046-.319 13.58.099 18.057a19.9 19.9 0 0 0 5.993 3.03a14.87 14.87 0 0 0 1.283-2.106a12.955 12.955 0 0 1-2.011-.964c.169-.124.334-.255.495-.389c3.88 1.823 8.082 1.823 11.916 0c.165.135.33.266.495.389c-.641.375-1.315.698-2.015.964c.365.757.795 1.46 1.287 2.106a19.857 19.857 0 0 0 6.001-3.03c.49-5.194-.838-9.687-3.226-13.688Z"></path>
-                        </svg>
-                        Discord
-                    </a>
+            {% if show_stats %}
+                <div class="profile-card p-6 md:p-7">
+                    <div class="profile-section-title">
+                        <h2>Performance</h2>
+                        <span></span>
+                    </div>
 
-                    <a href="#" class="q-link" id="openSupportLink">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                        </svg>
-                        Support
-                    </a>
-                </nav>
-            </aside>
+                    <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                        <div class="profile-stat">
+                            <div class="profile-stat-value">{{ stats_data.km if stats_data.km is defined else "0" }}</div>
+                            <div class="profile-stat-label">Kilometer</div>
+                        </div>
+
+                        <div class="profile-stat">
+                            <div class="profile-stat-value">{{ stats_data.deliveries if stats_data.deliveries is defined else "0" }}</div>
+                            <div class="profile-stat-label">Lieferungen</div>
+                        </div>
+
+                        <div class="profile-stat">
+                            <div class="profile-stat-value">{{ stats_data.convoys if stats_data.convoys is defined else "0" }}</div>
+                            <div class="profile-stat-label">Konvois</div>
+                        </div>
+
+                        <div class="profile-stat">
+                            <div class="profile-stat-value">{{ stats_data.rating if stats_data.rating is defined else "0.0" }}</div>
+                            <div class="profile-stat-label">Rating</div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="profile-card p-5 md:p-7">
+                <div class="profile-tabs" role="tablist">
+                    <button class="profile-tab active" type="button" data-tab="overview">Übersicht</button>
+                    <button class="profile-tab" type="button" data-tab="activity">Aktivität</button>
+                    <button class="profile-tab" type="button" data-tab="gallery">Galerie</button>
+                    {% if own_profile %}
+                        <button class="profile-tab" type="button" data-tab="settings">Einstellungen</button>
+                    {% endif %}
+                </div>
+
+                <div class="mt-7">
+
+                    <div class="tab-panel active" id="tab-overview">
+                        <div class="profile-section-title">
+                            <h2>Über mich</h2>
+                            <span></span>
+                        </div>
+
+                        <p class="text-[var(--text)]/90 leading-8">
+                            {{ bio }}
+                        </p>
+
+                        <div class="grid md:grid-cols-2 gap-4 mt-7">
+                            <div class="profile-stat">
+                                <div class="profile-stat-value text-lg">
+                                    {{ p.member_since if p.member_since is defined and p.member_since else "Neu" }}
+                                </div>
+                                <div class="profile-stat-label">Mitglied seit</div>
+                            </div>
+
+                            <div class="profile-stat">
+                                <div class="profile-stat-value text-lg">
+                                    {{ p.last_seen if p.last_seen is defined and p.last_seen else "Unbekannt" }}
+                                </div>
+                                <div class="profile-stat-label">Zuletzt aktiv</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-panel" id="tab-activity">
+                        <div class="profile-section-title">
+                            <h2>Letzte Aktivitäten</h2>
+                            <span></span>
+                        </div>
+
+                        {% if show_activity and activity_data %}
+                            <div class="timeline">
+                                {% for item in activity_data %}
+                                    <div class="timeline-item">
+                                        <div class="timeline-icon">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10h10zm0 0h2m-2 0h-2m4 0V8a1 1 0 011-1h2.586a1 1 0 01.707.293l2.414 2.414A1 1 0 0122 10.414V16h-3"></path>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h3 class="font-orbitron text-sm font-bold uppercase tracking-[0.12em] text-[var(--text)]">
+                                                {{ item.title if item.title is defined else "Aktivität" }}
+                                            </h3>
+                                            <p class="mt-2 text-sm text-[var(--muted)] leading-relaxed">
+                                                {{ item.description if item.description is defined else "" }}
+                                            </p>
+                                            <p class="mt-3 text-[10px] font-orbitron tracking-[0.16em] uppercase text-[var(--brand-green)]">
+                                                {{ item.date if item.date is defined else "" }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="empty-state">
+                                Noch keine öffentlichen Aktivitäten vorhanden.
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="tab-panel" id="tab-gallery">
+                        <div class="profile-section-title">
+                            <h2>Galerie</h2>
+                            <span></span>
+                        </div>
+
+                        {% if gallery_data %}
+                            <div class="gallery-grid">
+                                {% for image in gallery_data %}
+                                    <div class="gallery-item">
+                                        <img src="{{ image.url if image.url is defined else image }}" alt="{{ image.title if image.title is defined else 'Profil Bild' }}">
+                                        {% if image.title is defined and image.title %}
+                                            <div class="gallery-item-caption">{{ image.title }}</div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="empty-state">
+                                Dieses Profil hat noch keine öffentlichen Bilder hochgeladen.
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    {% if own_profile %}
+                        <div class="tab-panel" id="tab-settings">
+                            <div class="profile-section-title">
+                                <h2>Profil einstellen</h2>
+                                <span></span>
+                            </div>
+
+                            <form class="settings-form" method="POST" action="" enctype="multipart/form-data">
+                                <input type="hidden" name="form_type" value="profile_settings">
+
+                                <div class="form-grid">
+                                    <div class="form-field">
+                                        <label class="form-label" for="display_name">Anzeigename</label>
+                                        <input class="form-input" id="display_name" name="display_name" type="text" maxlength="40" value="{{ profile_name }}" placeholder="Dein Anzeigename">
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label class="form-label" for="username">Benutzername</label>
+                                        <input class="form-input" id="username" name="username" type="text" maxlength="32" value="{{ username }}" placeholder="username">
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label class="form-label" for="rank">Rang</label>
+                                        <select class="form-select" id="rank" name="rank">
+                                            <option value="Driver" {% if rank == "Driver" %}selected{% endif %}>Driver</option>
+                                            <option value="Senior Driver" {% if rank == "Senior Driver" %}selected{% endif %}>Senior Driver</option>
+                                            <option value="Convoy Lead" {% if rank == "Convoy Lead" %}selected{% endif %}>Convoy Lead</option>
+                                            <option value="Dispatcher" {% if rank == "Dispatcher" %}selected{% endif %}>Dispatcher</option>
+                                            <option value="Management" {% if rank == "Management" %}selected{% endif %}>Management</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label class="form-label" for="location">Standort</label>
+                                        <input class="form-input" id="location" name="location" type="text" maxlength="60" value="{{ location if location != 'Nicht angegeben' else '' }}" placeholder="z.B. Deutschland">
+                                    </div>
+
+                                    <div class="form-field full">
+                                        <label class="form-label" for="status">Status</label>
+                                        <input class="form-input" id="status" name="status" type="text" maxlength="120" value="{{ status }}" placeholder="Kurzer Profilstatus">
+                                    </div>
+
+                                    <div class="form-field full">
+                                        <label class="form-label" for="bio">Über mich</label>
+                                        <textarea class="form-textarea" id="bio" name="bio" maxlength="900" placeholder="Schreibe etwas über dich, deine Touren und deinen Fahrstil.">{{ bio if bio != 'Dieses Profil wurde noch nicht ausgefüllt.' else '' }}</textarea>
+                                        <div class="form-hint">
+                                            <span id="bioCount">0</span>/900 Zeichen
+                                        </div>
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label class="form-label" for="favorite_truck">Lieblings-LKW</label>
+                                        <input class="form-input" id="favorite_truck" name="favorite_truck" type="text" maxlength="80" value="{{ favorite_truck if favorite_truck != 'Nicht angegeben' else '' }}" placeholder="z.B. Scania S">
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label class="form-label" for="discord">Discord</label>
+                                        <input class="form-input" id="discord" name="discord" type="text" maxlength="80" value="{{ discord }}" placeholder="Name#0000 oder Username">
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label class="form-label" for="truckersmp_id">TruckersMP ID</label>
+                                        <input class="form-input" id="truckersmp_id" name="truckersmp_id" type="text" maxlength="40" value="{{ truckersmp_id }}" placeholder="TruckersMP ID">
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label class="form-label" for="steam">Steam</label>
+                                        <input class="form-input" id="steam" name="steam" type="text" maxlength="120" value="{{ steam }}" placeholder="Steam Profil oder Name">
+                                    </div>
+
+                                    <div class="form-field full">
+                                        <label class="form-label" for="website">Website</label>
+                                        <input class="form-input" id="website" name="website" type="url" maxlength="180" value="{{ website }}" placeholder="https://...">
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label class="form-label" for="avatar_url">Avatar URL</label>
+                                        <input class="form-input" id="avatar_url" name="avatar_url" type="url" value="{{ avatar if avatar != url_for('static', filename='eifellog.jpg') else '' }}" placeholder="https://...">
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label class="form-label" for="avatar_file">Avatar hochladen</label>
+                                        <input class="form-input" id="avatar_file" name="avatar_file" type="file" accept="image/*">
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label class="form-label" for="banner_url">Banner URL</label>
+                                        <input class="form-input" id="banner_url" name="banner_url" type="url" value="{{ banner }}" placeholder="https://...">
+                                    </div>
+
+                                    <div class="form-field">
+                                        <label class="form-label" for="banner_file">Banner hochladen</label>
+                                        <input class="form-input" id="banner_file" name="banner_file" type="file" accept="image/*">
+                                    </div>
+                                </div>
+
+                                <div class="mt-2">
+                                    <div class="profile-section-title">
+                                        <h2>Sichtbarkeit</h2>
+                                        <span></span>
+                                    </div>
+
+                                    <div class="switch-list">
+                                        <label class="switch-row">
+                                            <div>
+                                                <strong>Profil öffentlich anzeigen</strong>
+                                                <p>Wenn aktiv, kann jeder dein Profil ohne Login öffnen.</p>
+                                            </div>
+                                            <span class="switch">
+                                                <input type="checkbox" name="public_profile" value="1" {% if public_profile %}checked{% endif %}>
+                                                <span class="slider"></span>
+                                            </span>
+                                        </label>
+
+                                        <label class="switch-row">
+                                            <div>
+                                                <strong>Statistiken anzeigen</strong>
+                                                <p>Kilometer, Lieferungen, Konvois und Rating öffentlich anzeigen.</p>
+                                            </div>
+                                            <span class="switch">
+                                                <input type="checkbox" name="show_stats" value="1" {% if show_stats %}checked{% endif %}>
+                                                <span class="slider"></span>
+                                            </span>
+                                        </label>
+
+                                        <label class="switch-row">
+                                            <div>
+                                                <strong>Aktivitäten anzeigen</strong>
+                                                <p>Letzte öffentliche Touren und Aktionen im Profil anzeigen.</p>
+                                            </div>
+                                            <span class="switch">
+                                                <input type="checkbox" name="show_activity" value="1" {% if show_activity %}checked{% endif %}>
+                                                <span class="slider"></span>
+                                            </span>
+                                        </label>
+
+                                        <label class="switch-row">
+                                            <div>
+                                                <strong>Discord anzeigen</strong>
+                                                <p>Deinen Discord-Namen öffentlich im Profil anzeigen.</p>
+                                            </div>
+                                            <span class="switch">
+                                                <input type="checkbox" name="show_discord" value="1" {% if show_discord %}checked{% endif %}>
+                                                <span class="slider"></span>
+                                            </span>
+                                        </label>
+
+                                        <label class="switch-row">
+                                            <div>
+                                                <strong>E-Mail anzeigen</strong>
+                                                <p>Nur aktivieren, wenn deine E-Mail öffentlich sichtbar sein soll.</p>
+                                            </div>
+                                            <span class="switch">
+                                                <input type="checkbox" name="show_email" value="1" {% if show_email %}checked{% endif %}>
+                                                <span class="slider"></span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="flex flex-col sm:flex-row gap-3 sm:justify-end pt-4">
+                                    <button type="reset" class="btn-secondary">
+                                        Zurücksetzen
+                                    </button>
+
+                                    <button type="submit" class="btn-primary">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        Einstellungen speichern
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    {% endif %}
+
+                </div>
+            </div>
+
         </div>
-    </main>
+    </div>
 
-    <script>
-        const scene = document.querySelector(".scene");
-        const parallaxWrapper = document.getElementById("parallaxWrapper");
-        const flipCard = document.getElementById("flipCard");
+</section>
 
-        const loginForm = document.getElementById("loginForm");
-        const loginButton = document.getElementById("loginButton");
-        const discordLoginButton = document.getElementById("discordLoginButton");
+<div class="copy-toast" id="copyToast">
+    Profil-Link kopiert
+</div>
 
-        const driverNameInput = document.getElementById("driverName");
-        const accessCodeInput = document.getElementById("accessCode");
-        const rememberLoginInput = document.getElementById("rememberLogin");
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const tabs = document.querySelectorAll('.profile-tab');
+        const panels = document.querySelectorAll('.tab-panel');
+        const openButtons = document.querySelectorAll('[data-open-tab]');
+        const bio = document.getElementById('bio');
+        const bioCount = document.getElementById('bioCount');
+        const avatarUrl = document.getElementById('avatar_url');
+        const avatarFile = document.getElementById('avatar_file');
+        const avatarPreview = document.getElementById('profileAvatarPreview');
 
-        const statusCard = document.getElementById("statusCard");
-        const loginStatus = document.getElementById("loginStatus");
-
-        const showDetailsButton = document.getElementById("showDetailsButton");
-        const showLoginButton = document.getElementById("showLoginButton");
-        const helpButton = document.getElementById("helpButton");
-
-        const openDashboardLink = document.getElementById("openDashboardLink");
-        const openDiscordLink = document.getElementById("openDiscordLink");
-        const openSupportLink = document.getElementById("openSupportLink");
-
-        window.EifelLogBridge = {
-            send(type, payload = null) {
-                const message = payload === null
-                    ? type
-                    : JSON.stringify({ type, payload });
-
-                if (window.chrome && window.chrome.webview) {
-                    window.chrome.webview.postMessage(message);
-                    return true;
-                }
-
-                console.warn("WebView2 Bridge nicht verfügbar:", type, payload);
-                return false;
-            },
-
-            drag() {
-                this.send("window:drag");
-            },
-
-            minimize() {
-                this.send("tracker:minimize");
-            },
-
-            close() {
-                this.send("tracker:close");
-            },
-
-            openExternal(url) {
-                this.send("external:open", { url });
-            },
-
-            authDiscord() {
-                this.send("auth:discord");
-            },
-
-            authLogin(payload) {
-                this.send("auth:login", payload);
-            },
-
-            navigate(page) {
-                this.send("navigation:go", { page });
-            }
-        };
-
-        function setStatus(message, type = "info") {
-            statusCard.className = "status-box " + type;
-            loginStatus.textContent = message;
-        }
-
-        function setLoading(isLoading) {
-            loginButton.disabled = isLoading;
-            discordLoginButton.disabled = isLoading;
-
-            if (isLoading) {
-                loginButton.textContent = "Verbinde...";
-                return;
-            }
-
-            loginButton.textContent = "Tracker verbinden";
-        }
-
-        function showDetails() {
-            if (!parallaxWrapper || !flipCard) return;
-
-            parallaxWrapper.style.transform = "rotateX(0deg) rotateY(0deg)";
-            flipCard.classList.add("is-flipped");
-        }
-
-        function showLogin() {
-            if (!flipCard) return;
-
-            flipCard.classList.remove("is-flipped");
-        }
-
-        function goToTracker() {
-            window.location.href = "./index.html";
-        }
-
-        function storeSession(payload) {
-            const session = {
-                driverName: payload.driverName,
-                loginMethod: payload.loginMethod,
-                loggedInAt: new Date().toISOString()
-            };
-
-            if (payload.remember) {
-                localStorage.setItem("eifellog_tracker_session", JSON.stringify(session));
-            } else {
-                sessionStorage.setItem("eifellog_tracker_session", JSON.stringify(session));
-            }
-        }
-
-        function getExistingSession() {
-            try {
-                return (
-                    localStorage.getItem("eifellog_tracker_session") ||
-                    sessionStorage.getItem("eifellog_tracker_session")
-                );
-            } catch {
-                return null;
-            }
-        }
-
-        if (scene && parallaxWrapper && flipCard) {
-            scene.addEventListener("mousemove", (event) => {
-                if (flipCard.classList.contains("is-flipped")) {
-                    parallaxWrapper.style.transform = "rotateX(0deg) rotateY(0deg)";
-                    return;
-                }
-
-                const rect = scene.getBoundingClientRect();
-                const x = event.clientX - rect.left;
-                const y = event.clientY - rect.top;
-
-                const rotateX = ((y / rect.height) - 0.5) * 7;
-                const rotateY = ((x / rect.width) - 0.5) * -7;
-
-                parallaxWrapper.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+        function openTab(tabName) {
+            tabs.forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.tab === tabName);
             });
 
-            scene.addEventListener("mouseleave", () => {
-                parallaxWrapper.style.transform = "rotateX(0deg) rotateY(0deg)";
+            panels.forEach(panel => {
+                panel.classList.toggle('active', panel.id === `tab-${tabName}`);
             });
         }
 
-        discordLoginButton.addEventListener("click", () => {
-            setStatus("Discord Login wird gestartet...", "warning");
-            setLoading(true);
-
-            const bridgeAvailable = EifelLogBridge.authDiscord();
-
-            if (!bridgeAvailable) {
-                setTimeout(() => {
-                    const payload = {
-                        driverName: "Discord Fahrer",
-                        loginMethod: "discord-dev",
-                        remember: true
-                    };
-
-                    storeSession(payload);
-                    setStatus("Dev-Modus: Discord Login simuliert. Tracker wird geöffnet.", "success");
-
-                    setTimeout(goToTracker, 700);
-                }, 700);
-
-                return;
-            }
-
-            setTimeout(() => {
-                setLoading(false);
-                setStatus("Warte auf Discord-Antwort vom Tracker Client.", "warning");
-            }, 1200);
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => openTab(tab.dataset.tab));
         });
 
-        loginForm.addEventListener("submit", (event) => {
-            event.preventDefault();
-
-            const driverName = driverNameInput.value.trim();
-            const accessCode = accessCodeInput.value.trim();
-            const remember = rememberLoginInput.checked;
-
-            if (driverName.length < 3) {
-                setStatus("Bitte gib einen gültigen Fahrernamen ein.", "error");
-                driverNameInput.focus();
-                return;
-            }
-
-            if (accessCode.length < 4) {
-                setStatus("Bitte gib einen gültigen Tracker-Code ein.", "error");
-                accessCodeInput.focus();
-                return;
-            }
-
-            const payload = {
-                driverName,
-                accessCode,
-                remember,
-                loginMethod: "tracker-code"
-            };
-
-            setLoading(true);
-            setStatus("Zugangsdaten werden geprüft...", "warning");
-
-            const bridgeAvailable = EifelLogBridge.authLogin(payload);
-
-            if (!bridgeAvailable) {
-                setTimeout(() => {
-                    storeSession(payload);
-                    setStatus("Dev-Modus: Login akzeptiert. Tracker wird geöffnet.", "success");
-                    setTimeout(goToTracker, 750);
-                }, 850);
-
-                return;
-            }
-
-            setTimeout(() => {
-                setLoading(false);
-                setStatus("Login-Anfrage wurde an den C# Client gesendet.", "warning");
-            }, 1200);
-        });
-
-        helpButton.addEventListener("click", () => {
-            setStatus("Deinen Tracker-Code bekommst du im EifelLog Dashboard oder beim Management.", "warning");
-        });
-
-        showDetailsButton.addEventListener("click", showDetails);
-        showLoginButton.addEventListener("click", showLogin);
-
-        openDashboardLink.addEventListener("click", (event) => {
-            event.preventDefault();
-            EifelLogBridge.openExternal("https://eifellog.de/dashboard");
-            setStatus("Dashboard-Link wurde an den Client übergeben.", "info");
-        });
-
-        openDiscordLink.addEventListener("click", (event) => {
-            event.preventDefault();
-            EifelLogBridge.openExternal("https://discord.gg/K47NwSbJuE");
-            setStatus("Discord-Link wurde an den Client übergeben.", "info");
-        });
-
-        openSupportLink.addEventListener("click", (event) => {
-            event.preventDefault();
-            EifelLogBridge.openExternal("https://eifellog.de/support");
-            setStatus("Support-Link wurde an den Client übergeben.", "info");
-        });
-
-        document.querySelectorAll(".drag-region").forEach((region) => {
-            region.addEventListener("mousedown", (event) => {
-                if (event.button !== 0) return;
-
-                if (event.target.closest("button, a, input, label, .no-drag")) {
-                    return;
-                }
-
-                EifelLogBridge.drag();
-            });
-        });
-
-        window.addEventListener("keydown", (event) => {
-            if (event.key === "Escape") {
-                showLogin();
-            }
-        });
-
-        window.EifelLogAuth = {
-            loginSuccess(payload = {}) {
-                setLoading(false);
-
-                storeSession({
-                    driverName: payload.driverName || driverNameInput.value.trim() || "EifelLog Fahrer",
-                    loginMethod: payload.loginMethod || "client",
-                    remember: rememberLoginInput.checked
+        openButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                openTab(button.dataset.openTab);
+                document.querySelector('.profile-tabs')?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
                 });
-
-                setStatus("Login erfolgreich. Tracker wird geöffnet.", "success");
-                setTimeout(goToTracker, 700);
-            },
-
-            loginFailed(message = "Login fehlgeschlagen. Bitte prüfe deine Daten.") {
-                setLoading(false);
-                setStatus(message, "error");
-            },
-
-            logout() {
-                localStorage.removeItem("eifellog_tracker_session");
-                sessionStorage.removeItem("eifellog_tracker_session");
-                setStatus("Du wurdest ausgeloggt.", "warning");
-            }
-        };
-
-        window.addEventListener("DOMContentLoaded", () => {
-            const existingSession = getExistingSession();
-
-            if (existingSession) {
-                setStatus("Gespeicherte Sitzung gefunden. Tracker wird geöffnet.", "success");
-                setTimeout(goToTracker, 600);
-                return;
-            }
-
-            setStatus("Bitte melde dich an, um den EifelLog Tracker freizuschalten.", "info");
+            });
         });
-    </script>
-</body>
-</html>
+
+        function updateBioCount() {
+            if (!bio || !bioCount) return;
+            bioCount.textContent = bio.value.length;
+        }
+
+        if (bio) {
+            updateBioCount();
+            bio.addEventListener('input', updateBioCount);
+        }
+
+        if (avatarUrl && avatarPreview) {
+            avatarUrl.addEventListener('input', () => {
+                if (avatarUrl.value.trim().length > 5) {
+                    avatarPreview.src = avatarUrl.value.trim();
+                }
+            });
+        }
+
+        if (avatarFile && avatarPreview) {
+            avatarFile.addEventListener('change', () => {
+                const file = avatarFile.files && avatarFile.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = event => {
+                    avatarPreview.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+    });
+
+    function copyProfileLink() {
+        const toast = document.getElementById('copyToast');
+        const link = window.location.href;
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(link);
+        } else {
+            const input = document.createElement('input');
+            input.value = link;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            input.remove();
+        }
+
+        if (toast) {
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2200);
+        }
+    }
+</script>
+{% endblock %}
