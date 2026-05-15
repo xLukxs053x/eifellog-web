@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Eifel LOG - Virtuelle Spedition{% endblock %}</title>
+    
+    <link rel="icon" href="{{ url_for('static', filename='eifellog.jpg') }}" type="image/jpeg">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        /* Farbpalette aus deinem Logo */
+        :root {
+            --eifel-yellow: #dce226;
+            --eifel-light-green: #89be32;
+            --eifel-dark-green: #106f2e;
+        }
+
+        /* Dunkler, moderner Hintergrund */
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #062b1a 100%);
+            background-attachment: fixed;
+            color: white;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Glassmorphism Effekt */
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Button Styling mit Farbverlauf */
+        .glass-button {
+            background: linear-gradient(90deg, var(--eifel-light-green), var(--eifel-dark-green));
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .glass-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(16, 111, 46, 0.4);
+            filter: brightness(1.1);
+        }
+        
+        /* --- Fade Animationen --- */
+        .fade-enter {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+        .fade-leave {
+            animation: fadeOut 0.3s ease-in forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-15px); }
+        }
+        
+        /* Hover-Effekt für Navigations-Links */
+        .nav-link {
+            position: relative;
+            transition: color 0.3s;
+        }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: -4px;
+            left: 0;
+            background-color: var(--eifel-yellow);
+            transition: width 0.3s ease;
+        }
+        .nav-link:hover::after {
+            width: 100%;
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const links = document.querySelectorAll('a:not([target="_blank"]):not([href^="#"])');
+            links.forEach(link => {
+                link.addEventListener('click', e => {
+                    if (link.hostname === window.location.hostname) {
+                        e.preventDefault();
+                        const href = link.href;
+                        // Trigger Fade-Out
+                        document.body.classList.remove('fade-enter');
+                        document.body.classList.add('fade-leave');
+                        // Nach Animation weiterleiten
+                        setTimeout(() => {
+                            window.location = href;
+                        }, 300); 
+                    }
+                });
+            });
+        });
+    </script>
+</head>
+<body class="fade-enter antialiased flex flex-col overflow-x-hidden">
+
+    <nav class="glass sticky top-0 z-50 px-6 py-3 mx-4 mt-4 rounded-2xl flex justify-between items-center transition-all">
+        <a href="/" class="flex items-center gap-3 group">
+            <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG" class="h-12 w-12 rounded-full border-2 border-[#dce226] shadow-[0_0_15px_rgba(220,226,38,0.3)] group-hover:rotate-12 transition-transform duration-300">
+            <div class="flex flex-col leading-tight">
+                <span class="text-2xl font-bold tracking-wider text-white" style="font-family: cursive;">Eifel</span>
+                <span class="text-sm font-black font-sans uppercase text-[#89be32] tracking-widest -mt-1">LOG</span>
+            </div>
+        </a>
+        
+        <div class="hidden md:flex gap-8 font-medium text-gray-200">
+            <a href="/" class="nav-link hover:text-white">Home</a>
+            <a href="/about" class="nav-link hover:text-white">Über uns</a>
+            <a href="#" class="nav-link hover:text-white">Fuhrpark</a>
+        </div>
+        
+        <div>
+            <a href="/hub" class="glass-button px-5 py-2.5 rounded-xl font-bold text-white flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path></svg>
+                Driver Hub
+            </a>
+        </div>
+    </nav>
+
+    <main class="flex-grow container mx-auto px-4 py-12">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="glass mt-auto py-6 text-center text-sm text-gray-400">
+        <p>&copy; 2026 EifelLog. All rights reserved.</p>
+    </footer>
+
+</body>
+</html>
