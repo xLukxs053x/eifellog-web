@@ -255,6 +255,16 @@ def dashboard():
                            user_documents=user_documents)
 
 
+# --- STANDARD ROUTEN ---
+
+@app.route('/downloads')
+def downloads():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+
+    return render_template('download.html')
+
+
 # --- API ROUTEN ---
 
 @app.route('/api/sign_policy', methods=['POST'])
@@ -280,6 +290,7 @@ def sign_policy():
     
     return jsonify({"success": True})
 
+    
 
 if __name__ == '__main__':
     print("Starte Eifel LOG Server mit MongoDB und Eventlet auf Port 5005...")
