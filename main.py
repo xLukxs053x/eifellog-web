@@ -18,5 +18,5 @@ def hub():
     return "<h1>Willkommen im Driver Hub! (spätere Implementierung baue hub)</h1>"
 
 if __name__ == '__main__':
-    # Startet den Webserver
-    app.run(debug=True, port=6000)
+    # Läuft lokal auf Port 6000
+    app.run(host='127.0.0.1', port=6000)
