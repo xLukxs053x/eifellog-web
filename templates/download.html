@@ -4,7 +4,6 @@
 
 {% block content %}
 
-{% set github_latest = "https://github.com/xLukxs053x/EifelLog-Tracking/releases/latest" %}
 {% set github_repo = "xLukxs053x/EifelLog-Tracking" %}
 
 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 mt-6">
@@ -53,7 +52,7 @@
                             EifelLog Fahrer-App
                         </h2>
                         <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed">
-                            Installiere immer die neueste Version aus dem offiziellen GitHub Release.
+                            Installiere immer die neueste Version. Der Download-Button lädt das aktuelle Setup direkt herunter.
                         </p>
 
                         <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-5">
@@ -77,66 +76,15 @@
 
                 <div class="flex flex-col gap-3 w-full lg:w-auto">
                     <a id="setup-download-btn"
-                       href="{{ github_latest }}"
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       class="inline-flex items-center justify-center px-6 py-4 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/50 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:-translate-y-0.5 transition-all text-xs font-orbitron uppercase tracking-widest shadow-[0_0_25px_rgba(137,190,50,0.08)]">
+                       href="#"
+                       class="inline-flex items-center justify-center px-6 py-4 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/50 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:-translate-y-0.5 transition-all text-xs font-orbitron uppercase tracking-widest shadow-[0_0_25px_rgba(137,190,50,0.08)] opacity-60 cursor-not-allowed"
+                       aria-disabled="true">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
                         </svg>
-                        Setup herunterladen
-                    </a>
-
-                    <a id="setup-direct-download-btn"
-                       href="{{ github_latest }}"
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       class="inline-flex items-center justify-center px-6 py-3 rounded-2xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/40 text-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/20 hover:-translate-y-0.5 transition-all text-[10px] font-orbitron uppercase tracking-widest">
-                        Jetzt Setup downloaden
-                    </a>
-
-                    <a href="{{ github_latest }}"
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       class="inline-flex items-center justify-center px-6 py-3 rounded-2xl bg-white/5 border border-white/10 hover:border-white/30 hover:bg-white/10 transition-all text-[10px] font-orbitron uppercase tracking-widest text-white">
-                        GitHub Release öffnen
+                        Setup wird gesucht...
                     </a>
                 </div>
-            </div>
-        </div>
-
-        <div class="glass-card p-6 bg-gradient-to-br from-[var(--brand-green)]/10 to-black/60 border border-[var(--brand-green)]/20">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-5">
-                <div class="flex items-start gap-4">
-                    <div class="w-12 h-12 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center text-[var(--brand-green)] shrink-0">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                        </svg>
-                    </div>
-
-                    <div>
-                        <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">
-                            Schnellinstallation
-                        </span>
-                        <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mt-1">
-                            Setup direkt herunterladen
-                        </h2>
-                        <p class="text-sm text-[var(--muted)] font-inter mt-2 leading-relaxed">
-                            Sobald im neuesten GitHub Release ein Setup als <strong class="text-white">.exe</strong>, <strong class="text-white">.msi</strong> oder <strong class="text-white">.zip</strong> vorhanden ist, lädt dieser Button es direkt herunter.
-                        </p>
-                    </div>
-                </div>
-
-                <a id="setup-card-download-btn"
-                   href="{{ github_latest }}"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   class="inline-flex items-center justify-center px-6 py-4 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/50 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:-translate-y-0.5 transition-all text-xs font-orbitron uppercase tracking-widest shrink-0">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
-                    </svg>
-                    Download Setup
-                </a>
             </div>
         </div>
 
@@ -162,10 +110,7 @@
                         class="doc-modal-trigger p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-green)]/60 hover:bg-white/[0.07] transition-all group text-left"
                         data-title="Frachtterminal.doc"
                         data-type="DOC"
-                        data-version="Wird geladen..."
-                        data-size="Wird geladen..."
                         data-file="Frachtterminal.doc"
-                        data-description="Informationen und Abläufe für das EifelLog Frachtterminal."
                         data-content='
                             <p><strong>Frachtterminal</strong></p>
                             <p>Dieses Dokument enthält wichtige Informationen für Fahrer rund um das Frachtterminal, die Nutzung der Aufträge und den Umgang mit Tourdaten.</p>
@@ -210,10 +155,7 @@
                         class="doc-modal-trigger p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-yellow)]/60 hover:bg-white/[0.07] transition-all group text-left"
                         data-title="nutzungsbedingunen.doc"
                         data-type="DOC"
-                        data-version="Wird geladen..."
-                        data-size="Wird geladen..."
                         data-file="nutzungsbedingunen.doc"
-                        data-description="Nutzungsbedingungen für die Verwendung von EifelLog."
                         data-content='
                             <p><strong>Nutzungsbedingungen</strong></p>
                             <p>Dieses Dokument beschreibt die grundlegenden Regeln für die Nutzung von EifelLog und den verantwortungsvollen Umgang mit dem System.</p>
@@ -317,19 +259,6 @@
                     <span class="text-gray-400 font-inter">Dateien:</span>
                     <span id="release-status-files" class="text-white font-orbitron font-bold text-xs uppercase">Lädt...</span>
                 </div>
-
-                <div class="pt-4 border-t border-white/10">
-                    <a id="status-setup-download-btn"
-                       href="{{ github_latest }}"
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       class="inline-flex w-full items-center justify-center px-5 py-3 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/40 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 transition-all text-[10px] font-orbitron uppercase tracking-widest">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
-                        </svg>
-                        Setup downloaden
-                    </a>
-                </div>
             </div>
         </div>
 
@@ -390,10 +319,9 @@
 
         <div class="border-t border-white/10 p-6 md:p-8 pt-5 shrink-0 bg-black/20">
             <a id="doc-modal-download"
-               href="{{ github_latest }}"
-               target="_blank"
-               rel="noopener noreferrer"
-               class="btn-primary w-full justify-center">
+               href="#"
+               class="btn-primary w-full justify-center opacity-50 cursor-not-allowed"
+               aria-disabled="true">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
                 </svg>
@@ -406,17 +334,12 @@
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const repo = '{{ github_repo }}';
-        const githubLatest = '{{ github_latest }}';
         const releaseApiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
 
         const setupVersion = document.getElementById('setup-version');
         const setupSize = document.getElementById('setup-size');
         const setupStatus = document.getElementById('setup-status');
-
         const setupDownloadBtn = document.getElementById('setup-download-btn');
-        const setupDirectDownloadBtn = document.getElementById('setup-direct-download-btn');
-        const setupCardDownloadBtn = document.getElementById('setup-card-download-btn');
-        const statusSetupDownloadBtn = document.getElementById('status-setup-download-btn');
 
         const releaseStatusVersion = document.getElementById('release-status-version');
         const releaseStatusFiles = document.getElementById('release-status-files');
@@ -486,61 +409,46 @@
             }) || null;
         }
 
-        function updateSetupButtons(url, filename, isDirectDownload) {
-            const buttons = [
-                setupDownloadBtn,
-                setupDirectDownloadBtn,
-                setupCardDownloadBtn,
-                statusSetupDownloadBtn
-            ];
-
-            buttons.forEach(button => {
-                if (!button) return;
-
-                button.href = url;
-                button.target = '_blank';
-                button.rel = 'noopener noreferrer';
-
-                if (isDirectDownload && filename) {
-                    button.setAttribute('download', filename);
-                    button.classList.remove('opacity-60', 'cursor-not-allowed');
-                } else {
-                    button.removeAttribute('download');
-                }
-            });
+        function setSetupButtonLoading() {
+            setupDownloadBtn.href = '#';
+            setupDownloadBtn.removeAttribute('download');
+            setupDownloadBtn.setAttribute('aria-disabled', 'true');
+            setupDownloadBtn.classList.add('opacity-60', 'cursor-not-allowed');
+            setupDownloadBtn.innerHTML = `
+                <svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Setup wird gesucht...
+            `;
         }
 
-        function setSetupButtonText(text) {
-            if (setupDownloadBtn) {
-                setupDownloadBtn.innerHTML = `
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
-                    </svg>
-                    ${text}
-                `;
-            }
+        function setSetupButtonReady(asset) {
+            setupDownloadBtn.href = asset.browser_download_url;
+            setupDownloadBtn.setAttribute('download', asset.name || 'EifelLog-Setup');
+            setupDownloadBtn.removeAttribute('aria-disabled');
+            setupDownloadBtn.classList.remove('opacity-60', 'cursor-not-allowed');
 
-            if (setupDirectDownloadBtn) {
-                setupDirectDownloadBtn.textContent = text;
-            }
+            setupDownloadBtn.innerHTML = `
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
+                </svg>
+                Setup herunterladen
+            `;
+        }
 
-            if (setupCardDownloadBtn) {
-                setupCardDownloadBtn.innerHTML = `
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
-                    </svg>
-                    ${text}
-                `;
-            }
+        function setSetupButtonUnavailable() {
+            setupDownloadBtn.href = '#';
+            setupDownloadBtn.removeAttribute('download');
+            setupDownloadBtn.setAttribute('aria-disabled', 'true');
+            setupDownloadBtn.classList.add('opacity-60', 'cursor-not-allowed');
 
-            if (statusSetupDownloadBtn) {
-                statusSetupDownloadBtn.innerHTML = `
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
-                    </svg>
-                    ${text}
-                `;
-            }
+            setupDownloadBtn.innerHTML = `
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z"></path>
+                </svg>
+                Setup nicht verfügbar
+            `;
         }
 
         function setUnavailableState() {
@@ -553,14 +461,15 @@
             releaseStatusVersion.textContent = '-';
             releaseStatusFiles.textContent = '0 Dateien';
 
-            updateSetupButtons(githubLatest, '', false);
-            setSetupButtonText('Release öffnen');
+            setSetupButtonUnavailable();
 
             docFrachtterminalVersion.textContent = 'Version: -';
             docFrachtterminalSize.textContent = 'Größe: -';
             docNutzungVersion.textContent = 'Version: -';
             docNutzungSize.textContent = 'Größe: -';
         }
+
+        setSetupButtonLoading();
 
         fetch(releaseApiUrl, {
             headers: {
@@ -590,8 +499,7 @@
                 setupStatus.classList.remove('text-[var(--brand-yellow)]');
                 setupStatus.classList.add('text-[var(--brand-green)]');
 
-                updateSetupButtons(setupAsset.browser_download_url, setupAsset.name || 'EifelLog-Setup', true);
-                setSetupButtonText('Setup herunterladen');
+                setSetupButtonReady(setupAsset);
             } else {
                 setupVersion.textContent = latestVersion;
                 setupSize.textContent = '-';
@@ -599,8 +507,7 @@
                 setupStatus.classList.remove('text-[var(--brand-green)]');
                 setupStatus.classList.add('text-[var(--brand-yellow)]');
 
-                updateSetupButtons(githubLatest, '', false);
-                setSetupButtonText('Release öffnen');
+                setSetupButtonUnavailable();
             }
 
             assets.forEach(asset => {
@@ -658,6 +565,7 @@
             if (asset && asset.browser_download_url) {
                 docModalDownload.href = asset.browser_download_url;
                 docModalDownload.setAttribute('download', asset.name || file);
+                docModalDownload.removeAttribute('aria-disabled');
                 docModalDownload.classList.remove('opacity-50', 'cursor-not-allowed');
                 docModalDownload.innerHTML = `
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -666,14 +574,15 @@
                     Dokument herunterladen
                 `;
             } else {
-                docModalDownload.href = githubLatest;
+                docModalDownload.href = '#';
                 docModalDownload.removeAttribute('download');
-                docModalDownload.classList.add('opacity-50');
+                docModalDownload.setAttribute('aria-disabled', 'true');
+                docModalDownload.classList.add('opacity-50', 'cursor-not-allowed');
                 docModalDownload.innerHTML = `
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4m-1-9h5m0 0v5m0-5L10 14"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z"></path>
                     </svg>
-                    Release öffnen
+                    Dokument nicht verfügbar
                 `;
             }
 
@@ -700,6 +609,18 @@
 
         document.querySelectorAll('.doc-modal-trigger').forEach(button => {
             button.addEventListener('click', () => openDocModal(button));
+        });
+
+        setupDownloadBtn.addEventListener('click', event => {
+            if (setupDownloadBtn.getAttribute('aria-disabled') === 'true') {
+                event.preventDefault();
+            }
+        });
+
+        docModalDownload.addEventListener('click', event => {
+            if (docModalDownload.getAttribute('aria-disabled') === 'true') {
+                event.preventDefault();
+            }
         });
 
         docModalClose.addEventListener('click', closeDocModal);
