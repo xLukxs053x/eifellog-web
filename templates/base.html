@@ -5,42 +5,88 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Eifel LOG - Virtuelle Spedition{% endblock %}</title>
     
+    <!-- Favicon -->
     <link rel="icon" href="{{ url_for('static', filename='eifellog.jpg') }}" type="image/jpeg">
     
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
-        /* Farbpalette aus deinem Logo */
+        /* Farbpalette */
         :root {
             --eifel-yellow: #dce226;
             --eifel-light-green: #89be32;
             --eifel-dark-green: #106f2e;
         }
 
-        /* Dunkler, moderner Hintergrund */
         body {
-            background: linear-gradient(135deg, #0f172a 0%, #062b1a 100%);
-            background-attachment: fixed;
             color: white;
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            /* Hintergrundfarbe als Fallback, falls Bilder laden */
+            background-color: #0f172a; 
         }
 
-        /* Glassmorphism Effekt */
+        /* --- Hintergrund Slideshow --- */
+        .slideshow-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -10;
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            animation: crossfade 18s infinite ease-in-out;
+        }
+
+        /* Animations-Verzögerung für die 3 Bilder (jeweils 6 Sekunden versetzt) */
+        .slide:nth-child(1) { animation-delay: 0s; }
+        .slide:nth-child(2) { animation-delay: 6s; }
+        .slide:nth-child(3) { animation-delay: 12s; }
+
+        /* Dunkles Overlay, damit der Glassmorphism-Effekt und Text gut wirken */
+        .bg-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(6, 43, 26, 0.85) 100%);
+        }
+
+        @keyframes crossfade {
+            0% { opacity: 1; }
+            25% { opacity: 1; }
+            33.33% { opacity: 0; }
+            91.66% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        /* --- UI Elemente --- */
         .glass {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
 
-        /* Button Styling mit Farbverlauf */
         .glass-button {
             background: linear-gradient(90deg, var(--eifel-light-green), var(--eifel-dark-green));
             transition: all 0.3s ease;
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
+        
         .glass-button:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 20px rgba(16, 111, 46, 0.4);
@@ -84,17 +130,19 @@
     </style>
 
     <script>
+        // Fade-out Effekt für interne Links
         document.addEventListener('DOMContentLoaded', () => {
-            const links = document.querySelectorAll('a:not([target="_blank"]):not([href^="#"])');
+            const links = document.querySelectorAll('a:not([target="_blank"]):not([href^="#"]):not(.no-fade)');
             links.forEach(link => {
                 link.addEventListener('click', e => {
+                    // Mobile-Menü-Toggle ausschließen
+                    if(link.closest('#mobile-menu-btn')) return;
+
                     if (link.hostname === window.location.hostname) {
                         e.preventDefault();
                         const href = link.href;
-                        // Trigger Fade-Out
                         document.body.classList.remove('fade-enter');
                         document.body.classList.add('fade-leave');
-                        // Nach Animation weiterleiten
                         setTimeout(() => {
                             window.location = href;
                         }, 300); 
@@ -102,39 +150,86 @@
                 });
             });
         });
+
+        // Mobile Menü Toggle
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('hidden');
+            menu.classList.toggle('flex');
+        }
     </script>
 </head>
 <body class="fade-enter antialiased flex flex-col overflow-x-hidden">
 
-    <nav class="glass sticky top-0 z-50 px-6 py-3 mx-4 mt-4 rounded-2xl flex justify-between items-center transition-all">
-        <a href="/" class="flex items-center gap-3 group">
-            <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG" class="h-12 w-12 rounded-full border-2 border-[#dce226] shadow-[0_0_15px_rgba(220,226,38,0.3)] group-hover:rotate-12 transition-transform duration-300">
-            <div class="flex flex-col leading-tight">
-                <span class="text-2xl font-bold tracking-wider text-white" style="font-family: cursive;">Eifel</span>
-                <span class="text-sm font-black font-sans uppercase text-[#89be32] tracking-widest -mt-1">LOG</span>
-            </div>
-        </a>
-        
-        <div class="hidden md:flex gap-8 font-medium text-gray-200">
-            <a href="/" class="nav-link hover:text-white">Home</a>
-            <a href="/about" class="nav-link hover:text-white">Über uns</a>
-            <a href="#" class="nav-link hover:text-white">Fuhrpark</a>
-        </div>
-        
-        <div>
-            <a href="/hub" class="glass-button px-5 py-2.5 rounded-xl font-bold text-white flex items-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path></svg>
-                Driver Hub
+    <!-- Hintergrund Slideshow -->
+    <div class="slideshow-container">
+        <div class="slide" style="background-image: url('{{ url_for('static', filename='eifelog1.jpg') }}');"></div>
+        <div class="slide" style="background-image: url('{{ url_for('static', filename='eifelog2.jpg') }}');"></div>
+        <div class="slide" style="background-image: url('{{ url_for('static', filename='eifelog3.jpg') }}');"></div>
+        <div class="bg-overlay"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="glass sticky top-0 z-50 px-4 md:px-6 py-3 mx-4 mt-4 rounded-2xl transition-all">
+        <div class="flex justify-between items-center">
+            <!-- Logo Brand -->
+            <a href="/" class="flex items-center gap-3 group">
+                <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo" class="h-10 w-10 md:h-12 md:w-12 rounded-full border-2 border-[#dce226] shadow-[0_0_15px_rgba(220,226,38,0.3)] group-hover:rotate-12 transition-transform duration-300">
+                <div class="flex flex-col leading-tight">
+                    <span class="text-xl md:text-2xl font-bold tracking-wider text-white" style="font-family: cursive;">Eifel</span>
+                    <span class="text-xs md:text-sm font-black font-sans uppercase text-[#89be32] tracking-widest -mt-1">LOG</span>
+                </div>
             </a>
+            
+            <!-- Desktop Menu -->
+            <div class="hidden md:flex gap-8 font-medium text-gray-200">
+                <a href="/" class="nav-link hover:text-white">Home</a>
+                <a href="/about" class="nav-link hover:text-white">Über uns</a>
+                <a href="/fleet" class="nav-link hover:text-white">Fuhrpark</a>
+            </div>
+            
+            <!-- Desktop Button -->
+            <div class="hidden md:block">
+                <a href="/hub" class="glass-button px-5 py-2.5 rounded-xl font-bold text-white flex items-center gap-2 text-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path></svg>
+                    Driver Hub
+                </a>
+            </div>
+
+            <!-- Mobile Menu Toggle Button -->
+            <div class="md:hidden flex items-center">
+                <button onclick="toggleMobileMenu()" id="mobile-menu-btn" class="text-gray-200 hover:text-white focus:outline-none">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Menu (Hidden by default) -->
+        <div id="mobile-menu" class="hidden flex-col gap-4 mt-4 pb-2 md:hidden">
+            <a href="/" class="text-gray-200 hover:text-white font-medium pl-2">Home</a>
+            <a href="/about" class="text-gray-200 hover:text-white font-medium pl-2">Über uns</a>
+            <a href="/fleet" class="text-gray-200 hover:text-white font-medium pl-2">Fuhrpark</a>
+            <div class="pt-2 border-t border-gray-600/50">
+                <a href="/hub" class="glass-button w-full px-5 py-2.5 rounded-xl font-bold text-white flex items-center justify-center gap-2 mt-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path></svg>
+                    Driver Hub
+                </a>
+            </div>
         </div>
     </nav>
 
-    <main class="flex-grow container mx-auto px-4 py-12">
-        {% block content %}{% endblock %}
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto px-4 py-8 md:py-12 relative z-10">
+        <div class="glass p-6 md:p-8 rounded-2xl">
+            {% block content %}{% endblock %}
+        </div>
     </main>
 
-    <footer class="glass mt-auto py-6 text-center text-sm text-gray-400">
-        <p>&copy; 2026 EifelLog. All rights reserved.</p>
+    <!-- Footer -->
+    <footer class="glass mt-auto py-6 text-center text-sm text-gray-400 relative z-10 rounded-t-2xl mx-4 md:mx-auto md:w-full md:rounded-none">
+        <p>&copy; 2026 Eifel LOG. Alle Rechte vorbehalten.</p>
     </footer>
 
 </body>
