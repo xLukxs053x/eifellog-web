@@ -1,4 +1,8 @@
+import eventlet
 from flask import Flask, render_template
+
+# Wichtig für Eventlet: Optimiert die Hintergrundprozesse
+eventlet.monkey_patch()
 
 app = Flask(__name__)
 
@@ -7,7 +11,7 @@ app = Flask(__name__)
 def home():
     return render_template('index.html')
 
-# Route für eine reine "Über uns" Seite (falls du später Tabs willst)
+# Route für eine reine "Über uns" Seite
 @app.route('/about')
 def about():
     return render_template('about.html')
@@ -19,6 +23,8 @@ def hub():
     return render_template('hub.html')
 
 if __name__ == '__main__':
-    # debug=True startet den Server bei Code-Änderungen automatisch neu
-    # Läuft lokal auf Port 6000
-    app.run(host='127.0.0.1', port=5005, debug=True)
+    print("Starte Eifel LOG Server mit Eventlet auf Port 5005...")
+    
+    # '0.0.0.0' macht den Server nach außen hin sichtbar (public)
+    # Port 5005 bleibt bestehen
+    eventlet.wsgi.server(eventlet.listen(('0.0.0.0', 5005)), app)
