@@ -4,6 +4,9 @@
 
 {% block content %}
 
+{% set github_latest = "https://github.com/xLukxs053x/EifelLog-Tracking/releases/latest" %}
+{% set github_repo = "xLukxs053x/EifelLog-Tracking" %}
+
 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 mt-6">
     <div>
         <span class="font-orbitron text-[10px] font-bold text-[var(--muted)] tracking-[0.2em] uppercase">
@@ -13,7 +16,7 @@
             Downloads
         </h1>
         <p class="text-sm text-[var(--muted)] font-inter mt-2 max-w-2xl">
-            Lade dir hier die aktuellen EifelLog-Dateien direkt aus dem offiziellen GitHub Release herunter.
+            Lade dir hier das aktuelle EifelLog Setup herunter und öffne wichtige Fahrer-Dokumente direkt im Hub.
         </p>
     </div>
 
@@ -22,9 +25,6 @@
         Zurück zum Dashboard
     </a>
 </div>
-
-{% set github_latest = "https://github.com/xLukxs053x/EifelLog-Tracking/releases/latest" %}
-{% set github_download_base = "https://github.com/xLukxs053x/EifelLog-Tracking/releases/latest/download" %}
 
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-10 mb-10">
 
@@ -37,67 +37,102 @@
                 </svg>
             </div>
 
-            <div class="flex items-start gap-4">
-                <div class="w-14 h-14 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 flex items-center justify-center text-[var(--brand-green)] shrink-0 shadow-[0_0_25px_rgba(137,190,50,0.08)]">
-                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                </div>
-
-                <div class="min-w-0">
-                    <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">
-                        Offizielle Dateien
-                    </span>
-                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">
-                        GitHub Release Downloads
-                    </h2>
-                    <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed">
-                        Alle Dateien werden direkt aus dem aktuellsten GitHub Release von EifelLog geladen.
-                        Wenn eine Datei im Release ersetzt wird, zeigt dieser Bereich automatisch auf die neueste Version.
-                    </p>
-                </div>
-            </div>
-
-            <div class="mt-6 bg-black/30 rounded-2xl border border-white/5 p-4">
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">
-                            Aktuelles Release
-                        </p>
-                        <p class="text-sm text-white font-inter break-all">
-                            {{ github_latest }}
-                        </p>
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+                <div class="flex items-start gap-4">
+                    <div class="w-14 h-14 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 flex items-center justify-center text-[var(--brand-green)] shrink-0 shadow-[0_0_25px_rgba(137,190,50,0.08)]">
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"></path>
+                        </svg>
                     </div>
+
+                    <div class="min-w-0">
+                        <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">
+                            Aktuelles Setup
+                        </span>
+                        <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">
+                            EifelLog Fahrer-App
+                        </h2>
+                        <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed">
+                            Installiere immer die neueste Version aus dem offiziellen GitHub Release.
+                        </p>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-5">
+                            <div class="bg-black/30 border border-white/5 rounded-2xl p-3">
+                                <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">Version</p>
+                                <p id="setup-version" class="text-sm font-orbitron font-bold text-white">Lädt...</p>
+                            </div>
+
+                            <div class="bg-black/30 border border-white/5 rounded-2xl p-3">
+                                <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">Größe</p>
+                                <p id="setup-size" class="text-sm font-orbitron font-bold text-white">Lädt...</p>
+                            </div>
+
+                            <div class="bg-black/30 border border-white/5 rounded-2xl p-3 col-span-2 sm:col-span-1">
+                                <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">Status</p>
+                                <p id="setup-status" class="text-sm font-orbitron font-bold text-[var(--brand-yellow)]">Prüfe...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3 w-full lg:w-auto">
+                    <a id="setup-download-btn"
+                       href="{{ github_latest }}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="inline-flex items-center justify-center px-6 py-4 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/50 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:-translate-y-0.5 transition-all text-xs font-orbitron uppercase tracking-widest">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
+                        </svg>
+                        Setup herunterladen
+                    </a>
 
                     <a href="{{ github_latest }}"
                        target="_blank"
                        rel="noopener noreferrer"
-                       class="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-white/5 border border-white/10 hover:border-white/30 hover:bg-white/10 transition-all text-xs font-orbitron uppercase tracking-widest text-white shrink-0">
-                        GitHub öffnen
+                       class="inline-flex items-center justify-center px-6 py-3 rounded-2xl bg-white/5 border border-white/10 hover:border-white/30 hover:bg-white/10 transition-all text-[10px] font-orbitron uppercase tracking-widest text-white">
+                        GitHub Release öffnen
                     </a>
                 </div>
             </div>
         </div>
 
         <div class="glass-card p-6">
-            <div class="flex items-center justify-between gap-4 mb-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
                     <h2 class="font-orbitron font-bold text-lg text-white tracking-wide">
-                        Dateien
+                        Fahrer-Dokumente
                     </h2>
                     <p class="text-xs text-[var(--muted)] font-inter mt-1">
-                        Klicke auf „Download“, um die Datei direkt herunterzuladen.
+                        Dokumente werden im Modal geöffnet. Von dort kannst du sie bei Bedarf herunterladen.
                     </p>
                 </div>
 
-                <span class="hidden sm:inline-flex px-3 py-1 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 text-[var(--brand-green)] text-[10px] font-orbitron uppercase tracking-widest">
-                    Latest Release
+                <span class="inline-flex w-fit px-3 py-1 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 text-[var(--brand-green)] text-[10px] font-orbitron uppercase tracking-widest">
+                    Dokument Center
                 </span>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                <div class="p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-green)]/60 hover:bg-white/[0.07] transition-all group">
+                <button type="button"
+                        class="doc-modal-trigger p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-green)]/60 hover:bg-white/[0.07] transition-all group text-left"
+                        data-title="Frachtterminal.doc"
+                        data-type="DOC"
+                        data-version="Wird geladen..."
+                        data-size="Wird geladen..."
+                        data-file="Frachtterminal.doc"
+                        data-description="Informationen und Abläufe für das EifelLog Frachtterminal."
+                        data-content='
+                            <p><strong>Frachtterminal</strong></p>
+                            <p>Dieses Dokument enthält wichtige Informationen für Fahrer rund um das Frachtterminal, die Nutzung der Aufträge und den Umgang mit Tourdaten.</p>
+                            <p class="mt-4"><strong>Für Fahrer wichtig:</strong></p>
+                            <ul class="list-disc pl-5 mt-2 space-y-1">
+                                <li>Prüfe vor jeder Fahrt, ob deine Tour korrekt eingetragen wurde.</li>
+                                <li>Achte auf vollständige Angaben bei Fracht, Strecke und Abschluss.</li>
+                                <li>Melde Fehler oder fehlende Tourdaten direkt beim Support oder Dispatcher.</li>
+                            </ul>
+                        '>
                     <div class="flex items-start gap-4">
                         <div class="w-12 h-12 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center text-[var(--brand-green)] shrink-0 group-hover:scale-105 transition-transform">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,25 +145,42 @@
                                 Frachtterminal.doc
                             </h3>
                             <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">
-                                Dokument für das EifelLog Frachtterminal.
+                                Abläufe und Informationen für Fahrer.
                             </p>
 
-                            <div class="mt-4 flex items-center gap-3">
-                                <a href="{{ github_download_base }}/Frachtterminal.doc"
-                                   download
-                                   class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/40 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 transition-all text-[10px] font-orbitron uppercase tracking-widest">
-                                    Download
-                                </a>
-
-                                <span class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
-                                    DOC
+                            <div class="mt-4 flex flex-wrap items-center gap-2">
+                                <span class="px-2 py-1 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 text-[var(--brand-green)] text-[9px] font-orbitron uppercase tracking-widest">
+                                    Öffnen
+                                </span>
+                                <span id="doc-frachtterminal-version" class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                                    Version: ...
+                                </span>
+                                <span id="doc-frachtterminal-size" class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                                    Größe: ...
                                 </span>
                             </div>
                         </div>
                     </div>
-                </div>
+                </button>
 
-                <div class="p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-yellow)]/60 hover:bg-white/[0.07] transition-all group">
+                <button type="button"
+                        class="doc-modal-trigger p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-yellow)]/60 hover:bg-white/[0.07] transition-all group text-left"
+                        data-title="nutzungsbedingunen.doc"
+                        data-type="DOC"
+                        data-version="Wird geladen..."
+                        data-size="Wird geladen..."
+                        data-file="nutzungsbedingunen.doc"
+                        data-description="Nutzungsbedingungen für die Verwendung von EifelLog."
+                        data-content='
+                            <p><strong>Nutzungsbedingungen</strong></p>
+                            <p>Dieses Dokument beschreibt die grundlegenden Regeln für die Nutzung von EifelLog und den verantwortungsvollen Umgang mit dem System.</p>
+                            <p class="mt-4"><strong>Für Fahrer wichtig:</strong></p>
+                            <ul class="list-disc pl-5 mt-2 space-y-1">
+                                <li>Nutze EifelLog nur für korrekte und nachvollziehbare Fahrten.</li>
+                                <li>Trage keine falschen oder manipulierten Tourdaten ein.</li>
+                                <li>Behandle interne Daten und Dokumente vertraulich.</li>
+                            </ul>
+                        '>
                     <div class="flex items-start gap-4">
                         <div class="w-12 h-12 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 flex items-center justify-center text-[var(--brand-yellow)] shrink-0 group-hover:scale-105 transition-transform">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -141,51 +193,23 @@
                                 nutzungsbedingunen.doc
                             </h3>
                             <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">
-                                Nutzungsbedingungen für die Verwendung von EifelLog.
+                                Regeln und Bedingungen für die Nutzung.
                             </p>
 
-                            <div class="mt-4 flex items-center gap-3">
-                                <a href="{{ github_download_base }}/nutzungsbedingunen.doc"
-                                   download
-                                   class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/40 text-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/20 transition-all text-[10px] font-orbitron uppercase tracking-widest">
-                                    Download
-                                </a>
-
-                                <span class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
-                                    DOC
+                            <div class="mt-4 flex flex-wrap items-center gap-2">
+                                <span class="px-2 py-1 rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/20 text-[var(--brand-yellow)] text-[9px] font-orbitron uppercase tracking-widest">
+                                    Öffnen
+                                </span>
+                                <span id="doc-nutzung-version" class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                                    Version: ...
+                                </span>
+                                <span id="doc-nutzung-size" class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                                    Größe: ...
                                 </span>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[#5865F2]/60 hover:bg-white/[0.07] transition-all group md:col-span-2">
-                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div class="flex items-start gap-4">
-                            <div class="w-12 h-12 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/25 flex items-center justify-center text-[#5865F2] shrink-0 group-hover:scale-105 transition-transform">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 17l4 4m0 0l4-4m-4 4V3m-7 8H3a2 2 0 00-2 2v6a2 2 0 002 2h18a2 2 0 002-2v-6a2 2 0 00-2-2h-2"></path>
-                                </svg>
-                            </div>
-
-                            <div>
-                                <h3 class="font-orbitron font-bold text-sm text-white">
-                                    Alle Release-Dateien anzeigen
-                                </h3>
-                                <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">
-                                    Öffnet die GitHub Release-Seite mit allen verfügbaren Dateien, Versionen und Änderungen.
-                                </p>
-                            </div>
-                        </div>
-
-                        <a href="{{ github_latest }}"
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           class="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-[#5865F2]/10 border border-[#5865F2]/40 text-[#8ea0ff] hover:bg-[#5865F2]/20 transition-all text-[10px] font-orbitron uppercase tracking-widest shrink-0">
-                            Release öffnen
-                        </a>
-                    </div>
-                </div>
+                </button>
 
             </div>
         </div>
@@ -196,35 +220,35 @@
 
         <div class="glass-card p-6">
             <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4 flex items-center justify-between">
-                Hinweise
+                Für Fahrer
                 <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse"></span>
             </h2>
 
             <div class="space-y-4">
                 <div class="border-l-2 border-[var(--brand-green)] pl-3">
                     <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
-                        Direkter Download
+                        Vor der Fahrt
                     </p>
                     <p class="text-sm font-inter text-gray-300 leading-relaxed">
-                        Die Download-Buttons nutzen direkt das aktuellste GitHub Release.
+                        Prüfe, ob du die aktuelle App-Version nutzt, bevor du neue Touren einträgst.
                     </p>
                 </div>
 
                 <div class="border-l-2 border-[var(--brand-yellow)] pl-3">
                     <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
-                        Wichtig
+                        Nach der Fahrt
                     </p>
                     <p class="text-sm font-inter text-gray-300 leading-relaxed">
-                        Die Dateien müssen im GitHub Release exakt so heißen wie hier angegeben.
+                        Kontrolliere deine Angaben im Fahrtenbuch, damit Kilometer, Fracht und Einnahmen sauber erfasst werden.
                     </p>
                 </div>
 
                 <div class="border-l-2 border-[#5865F2] pl-3">
                     <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
-                        Quelle
+                        Support
                     </p>
-                    <p class="text-sm font-inter text-gray-300 leading-relaxed break-all">
-                        xLukxs053x/EifelLog-Tracking
+                    <p class="text-sm font-inter text-gray-300 leading-relaxed">
+                        Bei Problemen mit Setup, Login oder Tourdaten melde dich beim Support-Team.
                     </p>
                 </div>
             </div>
@@ -243,17 +267,331 @@
 
                 <div class="flex justify-between items-center text-sm">
                     <span class="text-gray-400 font-inter">Release:</span>
-                    <span class="text-[var(--brand-green)] font-orbitron font-bold text-xs uppercase">Latest</span>
+                    <span id="release-status-version" class="text-[var(--brand-green)] font-orbitron font-bold text-xs uppercase">Lädt...</span>
                 </div>
 
                 <div class="flex justify-between items-center text-sm border-t border-white/10 pt-3">
-                    <span class="text-gray-400 font-inter">Dokumente:</span>
-                    <span class="text-white font-orbitron font-bold text-xs uppercase">2 Dateien</span>
+                    <span class="text-gray-400 font-inter">Dateien:</span>
+                    <span id="release-status-files" class="text-white font-orbitron font-bold text-xs uppercase">Lädt...</span>
                 </div>
             </div>
         </div>
 
     </div>
 </div>
+
+<div id="doc-modal" class="fixed inset-0 z-[200] hidden items-center justify-center bg-black/80 backdrop-blur-2xl transition-opacity duration-300 opacity-0 px-4 py-6">
+    <div id="doc-modal-panel" class="glass-card max-w-2xl w-full max-h-[90vh] overflow-hidden border border-white/10 border-t-[var(--brand-green)]/50 shadow-[0_0_60px_rgba(137,190,50,0.12)] mx-auto relative flex flex-col transform transition-all duration-300 scale-95 translate-y-4">
+
+        <div class="p-6 md:p-8 pb-5 border-b border-white/10 shrink-0">
+            <div class="flex justify-between items-start gap-4">
+                <div class="flex items-start gap-3 min-w-0">
+                    <div class="w-11 h-11 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center text-[var(--brand-green)] shrink-0">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+
+                    <div class="min-w-0">
+                        <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Dokument Viewer</span>
+                        <h2 id="doc-modal-title" class="text-xl md:text-2xl font-orbitron font-bold text-white tracking-wide mt-1 break-words">
+                            Dokument
+                        </h2>
+                    </div>
+                </div>
+
+                <button id="doc-modal-close" class="p-2 text-[var(--muted)] hover:text-white hover:bg-white/10 rounded-full border border-white/10 bg-white/5 transition-colors cursor-pointer shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="px-6 md:px-8 pt-5 shrink-0">
+            <div class="bg-black/40 border border-white/5 p-4 rounded-2xl text-xs font-orbitron text-[var(--muted)] uppercase tracking-wider grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <span class="block text-white/40 mb-1">Typ:</span>
+                    <span id="doc-modal-type" class="text-white">DOC</span>
+                </div>
+
+                <div>
+                    <span class="block text-white/40 mb-1">Version:</span>
+                    <span id="doc-modal-version" class="text-[var(--brand-green)]">-</span>
+                </div>
+
+                <div>
+                    <span class="block text-white/40 mb-1">Größe:</span>
+                    <span id="doc-modal-size" class="text-[var(--brand-yellow)]">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="px-6 md:px-8 py-5 overflow-y-auto flex-grow custom-scrollbar">
+            <div id="doc-modal-content" class="bg-black/30 border border-white/5 rounded-2xl p-6 text-sm text-gray-300 font-inter leading-relaxed space-y-4">
+            </div>
+        </div>
+
+        <div class="border-t border-white/10 p-6 md:p-8 pt-5 shrink-0 bg-black/20">
+            <a id="doc-modal-download"
+               href="{{ github_latest }}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="btn-primary w-full justify-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
+                </svg>
+                Dokument herunterladen
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const repo = '{{ github_repo }}';
+        const githubLatest = '{{ github_latest }}';
+        const releaseApiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
+
+        const setupVersion = document.getElementById('setup-version');
+        const setupSize = document.getElementById('setup-size');
+        const setupStatus = document.getElementById('setup-status');
+        const setupDownloadBtn = document.getElementById('setup-download-btn');
+
+        const releaseStatusVersion = document.getElementById('release-status-version');
+        const releaseStatusFiles = document.getElementById('release-status-files');
+
+        const docFrachtterminalVersion = document.getElementById('doc-frachtterminal-version');
+        const docFrachtterminalSize = document.getElementById('doc-frachtterminal-size');
+        const docNutzungVersion = document.getElementById('doc-nutzung-version');
+        const docNutzungSize = document.getElementById('doc-nutzung-size');
+
+        const docModal = document.getElementById('doc-modal');
+        const docModalPanel = document.getElementById('doc-modal-panel');
+        const docModalClose = document.getElementById('doc-modal-close');
+        const docModalTitle = document.getElementById('doc-modal-title');
+        const docModalType = document.getElementById('doc-modal-type');
+        const docModalVersion = document.getElementById('doc-modal-version');
+        const docModalSize = document.getElementById('doc-modal-size');
+        const docModalContent = document.getElementById('doc-modal-content');
+        const docModalDownload = document.getElementById('doc-modal-download');
+
+        const knownAssets = {
+            'Frachtterminal.doc': null,
+            'nutzungsbedingunen.doc': null
+        };
+
+        let latestVersion = 'Latest';
+
+        function formatBytes(bytes) {
+            if (!bytes || Number.isNaN(bytes)) return '-';
+
+            const mb = bytes / (1024 * 1024);
+
+            if (mb >= 1) {
+                return `${mb.toFixed(2)} MB`;
+            }
+
+            const kb = bytes / 1024;
+            return `${kb.toFixed(1)} KB`;
+        }
+
+        function findSetupAsset(assets) {
+            if (!Array.isArray(assets)) return null;
+
+            const setupKeywords = ['setup', 'installer', 'install', 'eifellog'];
+            const setupExtensions = ['.exe', '.msi', '.zip'];
+
+            return assets.find(asset => {
+                const name = (asset.name || '').toLowerCase();
+                const hasSetupKeyword = setupKeywords.some(keyword => name.includes(keyword));
+                const hasSetupExtension = setupExtensions.some(extension => name.endsWith(extension));
+
+                return hasSetupExtension && hasSetupKeyword;
+            }) || assets.find(asset => {
+                const name = (asset.name || '').toLowerCase();
+                return name.endsWith('.exe') || name.endsWith('.msi');
+            }) || assets.find(asset => {
+                const name = (asset.name || '').toLowerCase();
+                return name.endsWith('.zip');
+            }) || null;
+        }
+
+        function setUnavailableState() {
+            setupVersion.textContent = '-';
+            setupSize.textContent = '-';
+            setupStatus.textContent = 'Kein Release';
+            setupStatus.classList.remove('text-[var(--brand-green)]');
+            setupStatus.classList.add('text-[var(--brand-yellow)]');
+
+            releaseStatusVersion.textContent = '-';
+            releaseStatusFiles.textContent = '0 Dateien';
+
+            setupDownloadBtn.href = githubLatest;
+            setupDownloadBtn.innerHTML = `
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4m-1-9h5m0 0v5m0-5L10 14"></path>
+                </svg>
+                Release öffnen
+            `;
+
+            docFrachtterminalVersion.textContent = 'Version: -';
+            docFrachtterminalSize.textContent = 'Größe: -';
+            docNutzungVersion.textContent = 'Version: -';
+            docNutzungSize.textContent = 'Größe: -';
+        }
+
+        fetch(releaseApiUrl, {
+            headers: {
+                'Accept': 'application/vnd.github+json'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Kein Release gefunden');
+            }
+
+            return response.json();
+        })
+        .then(release => {
+            const assets = Array.isArray(release.assets) ? release.assets : [];
+            latestVersion = release.tag_name || release.name || 'Latest';
+
+            releaseStatusVersion.textContent = latestVersion;
+            releaseStatusFiles.textContent = `${assets.length} Dateien`;
+
+            const setupAsset = findSetupAsset(assets);
+
+            if (setupAsset) {
+                setupVersion.textContent = latestVersion;
+                setupSize.textContent = formatBytes(setupAsset.size);
+                setupStatus.textContent = 'Bereit';
+                setupStatus.classList.remove('text-[var(--brand-yellow)]');
+                setupStatus.classList.add('text-[var(--brand-green)]');
+
+                setupDownloadBtn.href = setupAsset.browser_download_url;
+                setupDownloadBtn.setAttribute('download', setupAsset.name || '');
+            } else {
+                setupVersion.textContent = latestVersion;
+                setupSize.textContent = '-';
+                setupStatus.textContent = 'Setup fehlt';
+                setupDownloadBtn.href = githubLatest;
+            }
+
+            assets.forEach(asset => {
+                if (asset.name === 'Frachtterminal.doc') {
+                    knownAssets['Frachtterminal.doc'] = asset;
+                    docFrachtterminalVersion.textContent = `Version: ${latestVersion}`;
+                    docFrachtterminalSize.textContent = `Größe: ${formatBytes(asset.size)}`;
+                }
+
+                if (asset.name === 'nutzungsbedingunen.doc') {
+                    knownAssets['nutzungsbedingunen.doc'] = asset;
+                    docNutzungVersion.textContent = `Version: ${latestVersion}`;
+                    docNutzungSize.textContent = `Größe: ${formatBytes(asset.size)}`;
+                }
+            });
+
+            if (!knownAssets['Frachtterminal.doc']) {
+                docFrachtterminalVersion.textContent = `Version: ${latestVersion}`;
+                docFrachtterminalSize.textContent = 'Größe: Datei fehlt';
+            }
+
+            if (!knownAssets['nutzungsbedingunen.doc']) {
+                docNutzungVersion.textContent = `Version: ${latestVersion}`;
+                docNutzungSize.textContent = 'Größe: Datei fehlt';
+            }
+        })
+        .catch(error => {
+            console.warn('GitHub Release konnte nicht geladen werden:', error);
+            setUnavailableState();
+        });
+
+        function lockBodyScroll() {
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function unlockBodyScroll() {
+            if (docModal.classList.contains('hidden')) {
+                document.body.classList.remove('overflow-hidden');
+            }
+        }
+
+        function openDocModal(button) {
+            const title = button.getAttribute('data-title') || 'Dokument';
+            const type = button.getAttribute('data-type') || 'DOC';
+            const file = button.getAttribute('data-file') || '';
+            const content = button.getAttribute('data-content') || '';
+            const asset = knownAssets[file];
+
+            docModalTitle.textContent = title;
+            docModalType.textContent = type;
+            docModalVersion.textContent = latestVersion || '-';
+            docModalSize.textContent = asset ? formatBytes(asset.size) : '-';
+            docModalContent.innerHTML = content;
+
+            if (asset && asset.browser_download_url) {
+                docModalDownload.href = asset.browser_download_url;
+                docModalDownload.setAttribute('download', asset.name || file);
+                docModalDownload.classList.remove('opacity-50', 'cursor-not-allowed');
+                docModalDownload.textContent = '';
+                docModalDownload.innerHTML = `
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
+                    </svg>
+                    Dokument herunterladen
+                `;
+            } else {
+                docModalDownload.href = githubLatest;
+                docModalDownload.removeAttribute('download');
+                docModalDownload.classList.add('opacity-50');
+                docModalDownload.innerHTML = `
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4m-1-9h5m0 0v5m0-5L10 14"></path>
+                    </svg>
+                    Release öffnen
+                `;
+            }
+
+            lockBodyScroll();
+            docModal.classList.remove('hidden');
+            docModal.classList.add('flex');
+
+            setTimeout(() => {
+                docModal.classList.remove('opacity-0');
+                docModalPanel.classList.remove('scale-95', 'translate-y-4');
+            }, 10);
+        }
+
+        function closeDocModal() {
+            docModal.classList.add('opacity-0');
+            docModalPanel.classList.add('scale-95', 'translate-y-4');
+
+            setTimeout(() => {
+                docModal.classList.add('hidden');
+                docModal.classList.remove('flex');
+                unlockBodyScroll();
+            }, 300);
+        }
+
+        document.querySelectorAll('.doc-modal-trigger').forEach(button => {
+            button.addEventListener('click', () => openDocModal(button));
+        });
+
+        docModalClose.addEventListener('click', closeDocModal);
+
+        docModal.addEventListener('click', event => {
+            if (event.target === docModal) {
+                closeDocModal();
+            }
+        });
+
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !docModal.classList.contains('hidden')) {
+                closeDocModal();
+            }
+        });
+    });
+</script>
 
 {% endblock %}
