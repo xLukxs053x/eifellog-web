@@ -2,7 +2,7 @@ import os
 import requests
 import eventlet
 from datetime import datetime
-from flask import Flask, render_template, redirect, request, session, url_for, flash
+from flask import Flask, render_template, redirect, request, session, url_for, flash, jsonify
 from dotenv import load_dotenv
 from pymongo import MongoClient
 
@@ -49,7 +49,7 @@ ROLE_GESCHAEFTSLEITUNG = '1473721587122438322'
 ROLE_FUHRPARKMANAGEMENT = '1473758338465398899'
 ROLE_BUCHHALTUNG = '1473730533593845951'
 
-# Alle Rollen, die den Hub betreten dürfen
+# Alle Rollen, die das Dashboard betreten dürfen
 ALLOWED_HUB_ROLES = [
     ROLE_FAHRER, 
     ROLE_PROJEKTLEITUNG, 
@@ -60,7 +60,7 @@ ALLOWED_HUB_ROLES = [
 
 
 # ==========================================
-# ROUTES
+# ROUTES - ÖFFENTLICH
 # ==========================================
 
 @app.route('/')
@@ -133,7 +133,7 @@ def callback():
         'last_login': datetime.utcnow()
     }
 
-    # In MongoDB speichern oder aktualisieren (upsert=True bedeutet: Wenn er nicht existiert -> erstellen, sonst -> updaten)
+    # In MongoDB speichern oder aktualisieren (upsert=True)
     users_collection.update_one(
         {'discord_id': discord_id},
         {'$set': db_user_data},
@@ -149,7 +149,8 @@ def callback():
     }
 
     flash("Erfolgreich eingeloggt!", "success")
-    return redirect(url_for('hub'))
+    # Nach Login direkt aufs Dashboard leiten
+    return redirect(url_for('dashboard'))
 
 @app.route('/logout')
 def logout():
@@ -158,13 +159,26 @@ def logout():
     return redirect(url_for('home'))
 
 
-# --- DRIVER HUB ---
+# --- DRIVER HUB (LOGIN PORTAL) ---
 
 @app.route('/hub')
 def hub():
-    # 1. Prüfen ob der Nutzer überhaupt eingeloggt ist
+    # Wenn der User schon eingeloggt ist, direkt zum Dashboard
+    if 'user' in session:
+        return redirect(url_for('dashboard'))
+        
+    # Ansonsten die Login-Seite anzeigen
+    return render_template('hub.html')
+
+
+# --- DASHBOARD (GESCHÜTZTER BEREICH) ---
+
+@app.route('/dashboard')
+def dashboard():
+    # 1. Prüfen ob eingeloggt
     if 'user' not in session:
-        return redirect(url_for('login'))
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for('hub'))
         
     user = session['user']
     user_roles = user.get('roles', [])
@@ -173,16 +187,61 @@ def hub():
     has_permission = any(role in user_roles for role in ALLOWED_HUB_ROLES)
     
     if not has_permission:
-        flash("Zugriff verweigert! Du benötigst die Rolle 'Fahrer' oder eine Team-Rolle, um den Hub zu betreten.", "error")
+        flash("Zugriff verweigert! Du benötigst eine anerkannte Rolle (z.B. Fahrer), um das Dashboard zu betreten.", "error")
         return redirect(url_for('home'))
 
-    # Optional: Aktuelle Daten aus der DB laden (falls sich Ränge während der Session geändert haben)
-    # db_user = users_collection.find_one({'discord_id': user['id']})
+    # 3. User aus Datenbank laden (für Policy Signatur Check)
+    db_user = users_collection.find_one({'discord_id': user['id']})
+    
+    # Checken ob "policy_signed" fehlt oder False ist
+    if db_user:
+        needs_signature = not db_user.get('policy_signed', False)
+    else:
+        needs_signature = True
+        
+    # 4. Höchste/Wichtigste Rolle für das Dokumenten-Modal ermitteln
+    primary_role_name = "Fahrer"
+    if ROLE_GESCHAEFTSLEITUNG in user_roles:
+        primary_role_name = "Geschäftsleitung"
+    elif ROLE_PROJEKTLEITUNG in user_roles:
+        primary_role_name = "Projektleitung"
+    elif ROLE_FUHRPARKMANAGEMENT in user_roles:
+        primary_role_name = "Fuhrparkmanagement"
+    elif ROLE_BUCHHALTUNG in user_roles:
+        primary_role_name = "Buchhaltung"
 
-    # Wenn alles passt: Hub anzeigen und Nutzerdaten ans Template übergeben
-    return render_template('hub.html', current_user=user)
+    return render_template('dashboard.html', 
+                           current_user=user, 
+                           needs_signature=needs_signature,
+                           primary_role_name=primary_role_name)
+
+
+# --- API ROUTEN ---
+
+@app.route('/api/sign_policy', methods=['POST'])
+def sign_policy():
+    if 'user' not in session:
+        return jsonify({"success": False, "error": "Not logged in"}), 401
+        
+    data = request.get_json()
+    signature = data.get('signature')
+    
+    if not signature:
+        return jsonify({"success": False, "error": "No signature provided"}), 400
+
+    # In der Datenbank updaten
+    users_collection.update_one(
+        {'discord_id': session['user']['id']},
+        {'$set': {
+            'policy_signed': True,
+            'policy_signature': signature,
+            'policy_signed_at': datetime.utcnow()
+        }}
+    )
+    
+    return jsonify({"success": True})
 
 
 if __name__ == '__main__':
     print("Starte Eifel LOG Server mit MongoDB und Eventlet auf Port 5005...")
-    eventlet.wsgi.server(eventlet.listen(('0.0.0.0', 5005)), app) 
+    eventlet.wsgi.server(eventlet.listen(('0.0.0.0', 5005)), app)
