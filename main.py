@@ -12,11 +12,13 @@ def home():
 def about():
     return render_template('about.html')
 
-# Route für den Driver Hub (als Platzhalter)
+# Route für den Driver Hub
 @app.route('/hub')
 def hub():
-    return "<h1>Willkommen im Driver Hub! (spätere Implementierung baue hub)</h1>"
+    # Lädt jetzt ein richtiges Template für den Hub
+    return render_template('hub.html')
 
 if __name__ == '__main__':
+    # debug=True startet den Server bei Code-Änderungen automatisch neu
     # Läuft lokal auf Port 6000
-    app.run(host='127.0.0.1', port=6000)
+    app.run(host='127.0.0.1', port=6000, debug=True)
