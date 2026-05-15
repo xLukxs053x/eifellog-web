@@ -1,0 +1,523 @@
+{% extends "base.html" %}
+
+{% block title %}EifelLog - Fuhrpark{% endblock %}
+
+{% block content %}
+
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 mt-6">
+    <div>
+        <span class="font-orbitron text-[10px] font-bold text-[var(--muted)] tracking-[0.2em] uppercase">
+            EifelLog Hub
+        </span>
+        <h1 class="text-2xl md:text-3xl font-orbitron font-bold text-white mt-1">
+            Fuhrpark
+        </h1>
+        <p class="text-sm text-[var(--muted)] font-inter mt-2 max-w-2xl">
+            Deutsche Werkskunst trifft schwedische Ingenieurskunst: MAN und Scania bilden das Rückgrat der EifelLog-Flotte.
+        </p>
+    </div>
+
+    <a href="{{ url_for('dashboard') if url_for is defined else '/dashboard' }}"
+       class="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/10 transition-all text-xs font-orbitron uppercase tracking-widest text-[var(--text)]">
+        Zurück zum Dashboard
+    </a>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 relative z-10">
+    <div class="glass-card p-6 flex flex-col justify-center">
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <svg class="w-4 h-4 text-[var(--brand-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zm10 0a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10h2m8 0H9m4 0h2m4 0h2v-5l-3-4h-5"></path>
+            </svg>
+            Flotte
+        </h3>
+        <p class="text-3xl font-bold text-white mt-1">24 <span class="text-sm text-[var(--brand-green)] font-normal">LKW</span></p>
+    </div>
+
+    <div class="glass-card p-6 flex flex-col justify-center">
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <svg class="w-4 h-4 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2M5 21H3m4-13h10M7 13h10M7 17h10"></path>
+            </svg>
+            Marken
+        </h3>
+        <p class="text-3xl font-bold text-white mt-1">2 <span class="text-sm text-[var(--brand-yellow)] font-normal">Hersteller</span></p>
+    </div>
+
+    <div class="glass-card p-6 flex flex-col justify-center">
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <svg class="w-4 h-4 text-[#5865F2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+            </svg>
+            Einsatz
+        </h3>
+        <p class="text-3xl font-bold text-white mt-1">EU <span class="text-sm text-[var(--muted)] font-normal">Fernverkehr</span></p>
+    </div>
+
+    <div class="glass-card p-6 flex flex-col justify-center relative overflow-hidden">
+        <div class="absolute bottom-0 left-0 h-1 bg-[var(--brand-green)] w-full shadow-[0_0_10px_rgba(137,190,50,0.8)]"></div>
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            Status
+        </h3>
+        <p class="text-3xl font-bold text-white mt-1">Aktiv <span class="text-sm text-[var(--brand-green)] font-normal">bereit</span></p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-10 mb-10">
+
+    <div class="xl:col-span-2 flex flex-col gap-6">
+
+        <div class="glass-card p-6 relative overflow-hidden border-t border-[var(--brand-green)]/30">
+            <div class="absolute -right-12 -top-12 opacity-5 text-white">
+                <svg class="w-64 h-64" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20,8h-3V6c0-1.1-0.9-2-2-2H3C1.9,4,1,4.9,1,6v11h2c0,1.66,1.34,3,3,3s3-1.34,3-3h6c0,1.66,1.34,3,3,3s3-1.34,3-3h2v-5L20,8z M6,18.5c-0.83,0-1.5-0.67-1.5-1.5s0.67-1.5,1.5-1.5s1.5,0.67,1.5,1.5S6.83,18.5,6,18.5z M18,18.5c-0.83,0-1.5-0.67-1.5-1.5s0.67-1.5,1.5-1.5s1.5,0.67,1.5,1.5S18.83,18.5,18,18.5z M17,12h-4V6h2c1.1,0,2,0.9,2,2V12z"/>
+                </svg>
+            </div>
+
+            <div class="relative z-10">
+                <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">
+                    EifelLog Fleet Division
+                </span>
+                <h2 class="font-orbitron font-bold text-2xl text-white tracking-wide mt-2">
+                    Schwerlast, Fernverkehr und Präsenz auf der Straße
+                </h2>
+                <p class="text-sm text-[var(--muted)] font-inter mt-4 leading-relaxed max-w-3xl">
+                    Der Fuhrpark von EifelLog steht für zuverlässige Langstrecken, saubere Dokumentation und ein starkes Auftreten.
+                    MAN bringt deutsche Werkskunst aus München in die Flotte, während Scania mit schwedischer Ingenieurskunst aus Södertälje den V8-Charakter und die Langstrecken-DNA liefert.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                    <div class="bg-black/30 border border-white/5 rounded-2xl p-4">
+                        <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-2">
+                            Flottenauftrag
+                        </p>
+                        <p class="text-sm text-gray-300 font-inter leading-relaxed">
+                            Transporte mit klarer Linienführung, gepflegten Zugmaschinen und zuverlässiger Tourenerfassung.
+                        </p>
+                    </div>
+
+                    <div class="bg-black/30 border border-white/5 rounded-2xl p-4">
+                        <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-2">
+                            Schwerpunkt
+                        </p>
+                        <p class="text-sm text-gray-300 font-inter leading-relaxed">
+                            Fernverkehr, Frachtterminal-Anbindung, Event-Konvois und repräsentative Speditionsfahrten.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <div class="glass-card p-6 relative overflow-hidden border border-white/10 hover:border-[var(--brand-green)]/40 transition-all group">
+                <div class="absolute -right-8 -top-8 opacity-5 text-white">
+                    <svg class="w-40 h-40" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M3 6h12v8h2.5L20 10h-3V6h1.5L22 11v5h-2a3 3 0 01-6 0H9a3 3 0 01-6 0H1V8a2 2 0 012-2zm3 12a1 1 0 100-2 1 1 0 000 2zm11 0a1 1 0 100-2 1 1 0 000 2z"/>
+                    </svg>
+                </div>
+
+                <div class="relative z-10">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">
+                                Deutschland
+                            </span>
+                            <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">
+                                MAN Truck & Bus
+                            </h2>
+                        </div>
+
+                        <span class="px-3 py-1 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 text-[var(--brand-green)] text-[9px] font-orbitron uppercase tracking-widest">
+                            München
+                        </span>
+                    </div>
+
+                    <p class="text-sm text-[var(--muted)] font-inter mt-4 leading-relaxed">
+                        MAN steht in der EifelLog-Flotte für kontrollierte Kraft, klare Linien und deutsche Nutzfahrzeug-Tradition.
+                        Die Fahrzeuge eignen sich besonders für planbare Fernverkehrsrouten und schwere Aufträge.
+                    </p>
+
+                    <div class="mt-5 space-y-3">
+                        <div class="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                            <span class="text-gray-400 font-inter">Rolle:</span>
+                            <span class="text-white font-orbitron text-xs uppercase">Arbeitsmaschine</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                            <span class="text-gray-400 font-inter">Einsatz:</span>
+                            <span class="text-[var(--brand-green)] font-orbitron text-xs uppercase">Fernverkehr</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-gray-400 font-inter">Flottenbild:</span>
+                            <span class="text-white font-orbitron text-xs uppercase">Stabil & Präzise</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card p-6 relative overflow-hidden border border-white/10 hover:border-[var(--brand-yellow)]/40 transition-all group">
+                <div class="absolute -right-8 -top-8 opacity-5 text-white">
+                    <svg class="w-40 h-40" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2l2.39 4.84L19.73 7.6l-3.86 3.76.91 5.31L12 14.16l-4.78 2.51.91-5.31L4.27 7.6l5.34-.76L12 2z"></path>
+                    </svg>
+                </div>
+
+                <div class="relative z-10">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase">
+                                Schweden
+                            </span>
+                            <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">
+                                Scania
+                            </h2>
+                        </div>
+
+                        <span class="px-3 py-1 rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/20 text-[var(--brand-yellow)] text-[9px] font-orbitron uppercase tracking-widest">
+                            Södertälje
+                        </span>
+                    </div>
+
+                    <p class="text-sm text-[var(--muted)] font-inter mt-4 leading-relaxed">
+                        Scania bringt schwedische Ingenieurskunst, Langstrecken-Komfort und starke Präsenz in den Fuhrpark.
+                        Besonders die S- und R-Baureihen stehen für Prestige, Kraft und Konvoi-Tauglichkeit.
+                    </p>
+
+                    <div class="mt-5 space-y-3">
+                        <div class="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                            <span class="text-gray-400 font-inter">Rolle:</span>
+                            <span class="text-white font-orbitron text-xs uppercase">Flaggschiff</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                            <span class="text-gray-400 font-inter">Einsatz:</span>
+                            <span class="text-[var(--brand-yellow)] font-orbitron text-xs uppercase">Langstrecke</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-gray-400 font-inter">Flottenbild:</span>
+                            <span class="text-white font-orbitron text-xs uppercase">Kraft & Stil</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="glass-card p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide">
+                        Fahrzeugklassen
+                    </h2>
+                    <p class="text-xs text-[var(--muted)] font-inter mt-1">
+                        Repräsentative Einteilung der EifelLog-Flotte.
+                    </p>
+                </div>
+
+                <span class="inline-flex w-fit px-3 py-1 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 text-[var(--brand-green)] text-[10px] font-orbitron uppercase tracking-widest">
+                    Einsatzbereit
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <div class="p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-green)]/60 hover:bg-white/[0.07] transition-all group">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center text-[var(--brand-green)] shrink-0 group-hover:scale-105 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 13h13v5H3v-5zm13 0h3l2 3v2h-5v-5zM5 18a2 2 0 104 0m8 0a2 2 0 104 0M3 9h10"></path>
+                            </svg>
+                        </div>
+
+                        <div class="min-w-0 flex-1">
+                            <h3 class="font-orbitron font-bold text-sm text-white truncate">
+                                MAN TGX
+                            </h3>
+                            <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">
+                                Solide Zugmaschine für Linienverkehr, Frachtrouten und regelmäßige Touren.
+                            </p>
+
+                            <div class="mt-4 flex flex-wrap items-center gap-2">
+                                <span class="px-2 py-1 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 text-[var(--brand-green)] text-[9px] font-orbitron uppercase tracking-widest">
+                                    Standard
+                                </span>
+                                <span class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                                    10 Fahrzeuge
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-green)]/60 hover:bg-white/[0.07] transition-all group">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center text-[var(--brand-green)] shrink-0 group-hover:scale-105 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                            </svg>
+                        </div>
+
+                        <div class="min-w-0 flex-1">
+                            <h3 class="font-orbitron font-bold text-sm text-white truncate">
+                                MAN Individual
+                            </h3>
+                            <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">
+                                Repräsentative MAN-Einheiten für besondere Touren, Konvois und Events.
+                            </p>
+
+                            <div class="mt-4 flex flex-wrap items-center gap-2">
+                                <span class="px-2 py-1 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 text-[var(--brand-green)] text-[9px] font-orbitron uppercase tracking-widest">
+                                    Premium
+                                </span>
+                                <span class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                                    4 Fahrzeuge
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-yellow)]/60 hover:bg-white/[0.07] transition-all group">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 flex items-center justify-center text-[var(--brand-yellow)] shrink-0 group-hover:scale-105 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+
+                        <div class="min-w-0 flex-1">
+                            <h3 class="font-orbitron font-bold text-sm text-white truncate">
+                                Scania S-Serie
+                            </h3>
+                            <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">
+                                Langstrecken-Flaggschiffe mit starkem Auftritt und Komfort für große Touren.
+                            </p>
+
+                            <div class="mt-4 flex flex-wrap items-center gap-2">
+                                <span class="px-2 py-1 rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/20 text-[var(--brand-yellow)] text-[9px] font-orbitron uppercase tracking-widest">
+                                    Flaggschiff
+                                </span>
+                                <span class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                                    6 Fahrzeuge
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-yellow)]/60 hover:bg-white/[0.07] transition-all group">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 flex items-center justify-center text-[var(--brand-yellow)] shrink-0 group-hover:scale-105 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 1v8m0 0v1"></path>
+                            </svg>
+                        </div>
+
+                        <div class="min-w-0 flex-1">
+                            <h3 class="font-orbitron font-bold text-sm text-white truncate">
+                                Scania R-Serie
+                            </h3>
+                            <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">
+                                Kraftvolle Arbeitstiere für schwere Ladungen, lange Distanzen und flexible Einsätze.
+                            </p>
+
+                            <div class="mt-4 flex flex-wrap items-center gap-2">
+                                <span class="px-2 py-1 rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/20 text-[var(--brand-yellow)] text-[9px] font-orbitron uppercase tracking-widest">
+                                    Heavy Duty
+                                </span>
+                                <span class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                                    4 Fahrzeuge
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="glass-card p-6">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide">
+                        Flottenübersicht
+                    </h2>
+                    <p class="text-xs text-[var(--muted)] font-inter mt-1">
+                        Repräsentative Fahrzeugliste für den EifelLog-Fuhrpark.
+                    </p>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-white/10 text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                            <th class="pb-3 px-2">Hersteller</th>
+                            <th class="pb-3 px-2">Modell</th>
+                            <th class="pb-3 px-2">Rolle</th>
+                            <th class="pb-3 px-2">Standort</th>
+                            <th class="pb-3 px-2 text-center">Status</th>
+                        </tr>
+                    </thead>
+
+                    <tbody class="text-sm font-inter text-gray-300">
+                        <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <td class="py-4 px-2 font-orbitron text-[var(--brand-green)] text-xs uppercase">MAN</td>
+                            <td class="py-4 px-2 text-white">TGX Fernverkehr</td>
+                            <td class="py-4 px-2">Standard-Zugmaschine</td>
+                            <td class="py-4 px-2">München / Deutschland</td>
+                            <td class="py-4 px-2 text-center">
+                                <span class="px-2 py-1 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 text-[var(--brand-green)] text-[9px] font-orbitron uppercase tracking-widest">
+                                    Aktiv
+                                </span>
+                            </td>
+                        </tr>
+
+                        <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <td class="py-4 px-2 font-orbitron text-[var(--brand-green)] text-xs uppercase">MAN</td>
+                            <td class="py-4 px-2 text-white">TGX Individual</td>
+                            <td class="py-4 px-2">Event & Konvoi</td>
+                            <td class="py-4 px-2">München / Deutschland</td>
+                            <td class="py-4 px-2 text-center">
+                                <span class="px-2 py-1 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 text-[var(--brand-green)] text-[9px] font-orbitron uppercase tracking-widest">
+                                    Aktiv
+                                </span>
+                            </td>
+                        </tr>
+
+                        <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <td class="py-4 px-2 font-orbitron text-[var(--brand-yellow)] text-xs uppercase">Scania</td>
+                            <td class="py-4 px-2 text-white">S-Serie</td>
+                            <td class="py-4 px-2">Langstrecken-Flaggschiff</td>
+                            <td class="py-4 px-2">Södertälje / Schweden</td>
+                            <td class="py-4 px-2 text-center">
+                                <span class="px-2 py-1 rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/20 text-[var(--brand-yellow)] text-[9px] font-orbitron uppercase tracking-widest">
+                                    Aktiv
+                                </span>
+                            </td>
+                        </tr>
+
+                        <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <td class="py-4 px-2 font-orbitron text-[var(--brand-yellow)] text-xs uppercase">Scania</td>
+                            <td class="py-4 px-2 text-white">R-Serie</td>
+                            <td class="py-4 px-2">Heavy Duty</td>
+                            <td class="py-4 px-2">Södertälje / Schweden</td>
+                            <td class="py-4 px-2 text-center">
+                                <span class="px-2 py-1 rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/20 text-[var(--brand-yellow)] text-[9px] font-orbitron uppercase tracking-widest">
+                                    Aktiv
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="flex flex-col gap-6">
+
+        <div class="glass-card p-6">
+            <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4 flex items-center justify-between">
+                Flottenkodex
+                <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse"></span>
+            </h2>
+
+            <div class="space-y-4">
+                <div class="border-l-2 border-[var(--brand-green)] pl-3">
+                    <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
+                        Pflege
+                    </p>
+                    <p class="text-sm font-inter text-gray-300 leading-relaxed">
+                        Jeder Fahrer hält sein Fahrzeug sauber, einsatzbereit und repräsentativ für EifelLog.
+                    </p>
+                </div>
+
+                <div class="border-l-2 border-[var(--brand-yellow)] pl-3">
+                    <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
+                        Fahrweise
+                    </p>
+                    <p class="text-sm font-inter text-gray-300 leading-relaxed">
+                        Ruhiges, sicheres und professionelles Fahren steht über Geschwindigkeit und Risiko.
+                    </p>
+                </div>
+
+                <div class="border-l-2 border-[#5865F2] pl-3">
+                    <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
+                        Auftreten
+                    </p>
+                    <p class="text-sm font-inter text-gray-300 leading-relaxed">
+                        Bei Konvois und Events gilt ein einheitliches Auftreten mit klarer Kommunikation.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card p-6 bg-gradient-to-br from-black/40 to-black/80">
+            <h2 class="font-orbitron font-bold text-sm text-[var(--muted)] uppercase tracking-widest mb-4">
+                Markenverteilung
+            </h2>
+
+            <div class="space-y-5">
+                <div>
+                    <div class="flex justify-between items-center text-sm mb-2">
+                        <span class="text-gray-400 font-inter">MAN</span>
+                        <span class="text-[var(--brand-green)] font-orbitron text-xs uppercase">14 Fahrzeuge</span>
+                    </div>
+                    <div class="h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div class="h-full bg-[var(--brand-green)] w-[58%] shadow-[0_0_10px_rgba(137,190,50,0.7)]"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center text-sm mb-2">
+                        <span class="text-gray-400 font-inter">Scania</span>
+                        <span class="text-[var(--brand-yellow)] font-orbitron text-xs uppercase">10 Fahrzeuge</span>
+                    </div>
+                    <div class="h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div class="h-full bg-[var(--brand-yellow)] w-[42%] shadow-[0_0_10px_rgba(220,226,38,0.7)]"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card p-6">
+            <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">
+                Werkstattstatus
+            </h2>
+
+            <div class="space-y-3">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-400 font-inter">Wartung:</span>
+                    <span class="text-[var(--brand-green)] font-orbitron font-bold text-xs uppercase">Planmäßig</span>
+                </div>
+
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-400 font-inter">Ausfälle:</span>
+                    <span class="text-white font-orbitron font-bold text-xs uppercase">0 gemeldet</span>
+                </div>
+
+                <div class="flex justify-between items-center text-sm border-t border-white/10 pt-3">
+                    <span class="text-gray-400 font-inter">Bereitschaft:</span>
+                    <span class="text-[var(--brand-yellow)] font-orbitron font-bold text-xs uppercase">Hoch</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card p-6 border border-white/10 bg-gradient-to-br from-[var(--brand-green)]/10 to-black/60">
+            <h2 class="font-orbitron font-bold text-sm text-[var(--brand-green)] uppercase tracking-widest mb-3">
+                Dispatcher Hinweis
+            </h2>
+
+            <p class="text-sm text-gray-300 font-inter leading-relaxed">
+                Für lange Touren werden bevorzugt Scania S-Serie und MAN TGX eingesetzt. Bei Event-Fahrten entscheidet der Dispatcher über ein einheitliches Markenbild.
+            </p>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

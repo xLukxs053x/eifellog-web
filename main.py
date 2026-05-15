@@ -264,6 +264,12 @@ def downloads():
 
     return render_template('download.html')
 
+@app.route('/fuhrpark')
+def fuhrpark():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+
+    return render_template('fuhrpark.html')
 
 # --- API ROUTEN ---
 
