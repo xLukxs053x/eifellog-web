@@ -1,109 +1,347 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eifel LOG - Central Hub</title>
+    <meta name="description" content="Eifel LOG - Virtuelle ETS2 Spedition. Ohne Zwang, mit echter Leidenschaft.">
 
-{% block title %}EifelLog - Home{% endblock %}
+    <link rel="icon" href="{{ url_for('static', filename='eifellog.jpg') }}" type="image/jpeg">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='eifellog.jpg') }}" type="image/jpeg">
 
-{% block content %}
-<!-- Hero Section -->
-<div class="glass rounded-3xl p-8 md:p-16 max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-10 md:gap-16 mb-16 relative overflow-hidden">
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Sci-Fi & Clean Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Background Ambient Glows -->
-    <div class="hidden md:block absolute -top-24 -right-24 w-96 h-96 bg-[#dce226] rounded-full mix-blend-screen filter blur-[120px] opacity-20 pointer-events-none"></div>
-    <div class="absolute -bottom-24 -left-24 w-72 h-72 bg-[#106f2e] rounded-full mix-blend-screen filter blur-[100px] opacity-30 pointer-events-none"></div>
-    
-    <!-- Logo Image (Auf Mobile oben, auf Desktop rechts) -->
-    <div class="flex-1 flex justify-center z-10 w-full md:w-auto order-first md:order-last mb-2 md:mb-0">
-        <div class="relative group">
-            <!-- Pulsierendes Hintergrundleuchten -->
-            <div class="absolute inset-0 bg-gradient-to-tr from-[#dce226] to-[#89be32] rounded-full blur-2xl opacity-40 group-hover:opacity-60 transition duration-500 animate-pulse"></div>
-            <!-- Eigentliches Logo -->
-            <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo" class="relative rounded-full border-4 border-white/10 w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 object-cover transform group-hover:scale-105 transition duration-500 shadow-2xl">
-        </div>
+    <style>
+        :root {
+            /* Dunkler Background, leicht grünlich abgetönt */
+            --bg-1: #040a06;
+            --bg-2: #08140c;
+            --panel: rgba(10, 20, 15, 0.45);
+            --line: rgba(255, 255, 255, 0.08);
+            --text: #edf3ff;
+            --muted: #93a4c8;
+            
+            /* Eifel LOG Farben */
+            --brand-yellow: #dce226;
+            --brand-green: #89be32;
+            --brand-green-rgb: 137, 190, 50; /* Für Transparenzen */
+            
+            --danger: #ff9f9f;
+            --shadow: 0 36px 100px rgba(0, 0, 0, 0.6);
+        }
+
+        /* === GLOBAL SCROLLBAR HIDE === */
+        ::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+            background: transparent !important;
+        }
+
+        * {
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+        }
+
+        body {
+            background-color: var(--bg-1);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* === BACKGROUND SLIDESHOW === */
+        .hero-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+            background-color: var(--bg-1);
+        }
+
+        .hero-bg .bg-slide {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            filter: saturate(1.1) brightness(0.35);
+            opacity: 0;
+            animation: fadeZoom 24s infinite;
+        }
+        
+        /* Slide Timing für 3 Eifel-Log LKW Bilder */
+        .hero-bg .slide-1 { animation-delay: 0s; }
+        .hero-bg .slide-2 { animation-delay: 8s; }
+        .hero-bg .slide-3 { animation-delay: 16s; }
+
+        @keyframes fadeZoom {
+            0%   { opacity: 0; transform: scale(1); }
+            10%  { opacity: 1; }
+            33%  { opacity: 1; }
+            45%  { opacity: 0; transform: scale(1.05); }
+            100% { opacity: 0; transform: scale(1.05); }
+        }
+
+        .hero-overlay {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 30%, rgba(10, 20, 15, 0.3) 0%, rgba(4, 10, 6, 0.95) 100%);
+        }
+
+        /* === CARDS (Glassmorphism) === */
+        .glass-card {
+            background: linear-gradient(135deg, rgba(20, 30, 20, 0.4) 0%, rgba(5, 10, 5, 0.8) 100%);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-top: 1px solid rgba(137, 190, 50, 0.2); /* Grüner Akzent oben */
+            border-left: 1px solid rgba(137, 190, 50, 0.2);
+            border-radius: 28px;
+            backdrop-filter: blur(32px);
+            -webkit-backdrop-filter: blur(32px);
+            box-shadow: var(--shadow);
+        }
+
+        .info-card {
+            background: rgba(10, 20, 15, 0.5);
+            border-radius: 20px;
+            border-left: 1px solid rgba(255,255,255,0.06);
+            border-top: 1px solid rgba(255,255,255,0.06);
+            backdrop-filter: blur(16px);
+            transition: all 0.3s ease;
+        }
+
+        .info-card:hover {
+            border-color: rgba(137, 190, 50, 0.3);
+            transform: translateY(-4px);
+            background: rgba(15, 25, 20, 0.7);
+            box-shadow: 0 10px 30px rgba(137, 190, 50, 0.1);
+        }
+
+        /* === BUTTONS === */
+        .btn-primary,
+        .btn-secondary {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            border-radius: 12px;
+            padding: 14px 28px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            background: rgba(var(--brand-green-rgb), 0.15);
+            color: var(--brand-green);
+            border: 1px solid rgba(var(--brand-green-rgb), 0.5);
+            box-shadow: 0 0 15px rgba(var(--brand-green-rgb), 0.1);
+        }
+
+        .btn-primary:hover {
+            background: rgba(var(--brand-green-rgb), 0.3);
+            color: #fff;
+            box-shadow: 0 0 25px rgba(var(--brand-green-rgb), 0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.03);
+            color: var(--text);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.08);
+            border-color: rgba(255,255,255,0.25);
+            transform: translateY(-2px);
+        }
+
+        /* === TYPOGRAPHY === */
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        .text-brand-yellow { color: var(--brand-yellow); }
+        .text-brand-green { color: var(--brand-green); }
+        .glow-text { text-shadow: 0 0 25px rgba(137, 190, 50, 0.5); }
+        
+        /* === STATUS BADGE === */
+        .status-badge {
+            background: rgba(137, 190, 50, 0.1);
+            border: 1px solid rgba(137, 190, 50, 0.3);
+            color: var(--brand-green);
+        }
+
+    </style>
+</head>
+
+<body>
+    <!-- Hintergrund Slideshow -->
+    <div class="hero-bg" aria-hidden="true">
+        <img class="bg-slide slide-1" src="{{ url_for('static', filename='eifelog1.jpg') }}" alt="EifelLOG Truck 1">
+        <img class="bg-slide slide-2" src="{{ url_for('static', filename='eifelog2.jpg') }}" alt="EifelLOG Truck 2">
+        <img class="bg-slide slide-3" src="{{ url_for('static', filename='eifelog3.jpg') }}" alt="EifelLOG Truck 3">
+        <div class="hero-overlay"></div>
     </div>
 
-    <!-- Text Content -->
-    <div class="flex-1 z-10 text-center md:text-left flex flex-col items-center md:items-start">
-        <div class="inline-block glass px-4 py-1.5 rounded-full text-xs md:text-sm font-bold tracking-wide text-[#89be32] mb-6 border border-[#89be32]/30 uppercase shadow-lg">
-            ETS2 Virtuelle Spedition
-        </div>
-        
-        <h1 class="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-6 leading-tight">
-            Willkommen bei <br class="hidden md:block">
-            <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#dce226] to-[#89be32] drop-shadow-sm">Eifel LOG</span>
-        </h1>
-        
-        <p class="text-base md:text-lg text-gray-300 mb-8 leading-relaxed max-w-2xl">
-            Wir bringen deine Fracht sicher ans Ziel. Werde Teil einer professionellen und entspannten ETS2 Community. Kein Zwang, nur die reine Leidenschaft fürs Fahren.
-        </p>
-        
-        <!-- Buttons (Auf Mobile untereinander, auf Desktop nebeneinander) -->
-        <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <a href="/hub" class="glass-button px-8 py-3.5 rounded-xl font-bold text-lg text-white text-center shadow-lg w-full sm:w-auto">
-                Jetzt Bewerben
-            </a>
-            <a href="#about" class="glass px-8 py-3.5 rounded-xl font-bold text-lg text-white hover:bg-white/10 transition-colors text-center w-full sm:w-auto">
-                Mehr erfahren
-            </a>
-        </div>
-    </div>
-</div>
+    <!-- MAIN CONTENT (Ohne Navigation) -->
+    <main class="relative z-10 pt-16 pb-16 min-h-screen flex flex-col items-center justify-center">
+        <div class="max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-8 flex-grow flex flex-col">
+            
+            <!-- Hero Section -->
+            <section class="mb-12 flex-grow flex flex-col justify-center mt-10">
+                
+                <div class="flex flex-col sm:flex-row sm:items-end justify-between pb-4 mb-4">
+                    <div>
+                        <span class="font-orbitron text-[10px] font-bold text-brand-green tracking-[0.2em] uppercase">Virtuelle ETS2 Spedition</span>
+                        <h1 class="text-3xl font-orbitron font-bold text-[var(--text)] mt-1 drop-shadow-lg flex items-center gap-4">
+                            <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Logo" class="w-12 h-12 rounded-full border border-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.4)]">
+                            Eifel LOG Hub
+                        </h1>
+                    </div>
+                    
+                    <div class="mt-4 sm:mt-0 flex items-center gap-4">
+                        <span class="status-badge px-4 py-2 rounded-full text-[9px] font-orbitron font-bold uppercase tracking-wider backdrop-blur-md flex items-center gap-2 shadow-[0_0_15px_rgba(137,190,50,0.2)]">
+                            <span class="w-1.5 h-1.5 rounded-full bg-[var(--brand-green)] shadow-[0_0_10px_rgba(137,190,50,0.8)] animate-pulse"></span>
+                            Systems Online
+                        </span>
+                    </div>
+                </div>
 
-<!-- About Section -->
-<section id="about" class="glass rounded-3xl p-8 md:p-12 max-w-6xl mx-auto relative z-10">
-    <!-- Header -->
-    <div class="flex flex-col md:flex-row items-center md:items-start gap-4 mb-10 text-center md:text-left">
-        <div class="h-1.5 w-16 bg-gradient-to-r from-[#dce226] to-[#89be32] rounded-full mt-3 hidden md:block"></div>
-        <h2 class="text-3xl md:text-4xl font-bold text-white tracking-wide">Über uns</h2>
-        <div class="h-1 w-16 bg-gradient-to-r from-[#dce226] to-[#89be32] rounded-full mt-2 md:hidden"></div>
-    </div>
-    
-    <div class="grid lg:grid-cols-2 gap-10 lg:gap-16 text-gray-300 leading-relaxed">
-        
-        <!-- Text Column -->
-        <div class="space-y-6 text-base md:text-lg">
-            <p>
-                <strong class="text-white font-semibold">Eifel LOG</strong> ist nicht einfach nur eine Spedition – wir sind eine Gemeinschaft leidenschaftlicher virtueller Trucker. Gegründet mit dem Ziel, den Asphalt von Euro Truck Simulator 2 gemeinsam zu befahren, legen wir größten Wert auf ein familiäres Miteinander.
+                <!-- Main Glass Panel -->
+                <div class="glass-card p-10 md:p-16 flex flex-col justify-center relative overflow-hidden">
+                    
+                    <p class="font-orbitron text-[11px] font-bold text-brand-yellow tracking-[0.25em] uppercase mb-4 drop-shadow-md">
+                        Real Life geht vor.
+                    </p>
+                    
+                    <h2 class="text-5xl md:text-6xl lg:text-7xl font-orbitron font-extrabold mb-6 glow-text leading-[1.05] text-[var(--text)] tracking-tight">
+                        Fahre mit Leidenschaft.<br>
+                        <span class="text-brand-green">Gemeinsam stark.</span>
+                    </h2>
+                    
+                    <p class="text-base md:text-lg text-[var(--muted)] mb-10 max-w-2xl leading-relaxed font-inter">
+                        Wir sind Eifel LOG – eine Gemeinschaft virtueller Trucker. Kein Zwang, keine unrealistischen Pflichtkilometer. Nur die reine Leidenschaft für den Asphalt im Euro Truck Simulator 2 und ein starkes Miteinander.
+                    </p>
+
+                    <div class="flex flex-wrap gap-3 mb-10">
+                        <span class="px-4 py-2 rounded-xl border border-white/5 bg-black/40 text-[var(--text)] text-[9px] font-orbitron font-bold uppercase tracking-wider shadow-inner">Ohne Zwang</span>
+                        <span class="px-4 py-2 rounded-xl border border-white/5 bg-black/40 text-[var(--text)] text-[9px] font-orbitron font-bold uppercase tracking-wider shadow-inner">Familiär</span>
+                        <span class="px-4 py-2 rounded-xl border border-white/5 bg-black/40 text-[var(--text)] text-[9px] font-orbitron font-bold uppercase tracking-wider shadow-inner">Eigener Hub</span>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-4 mt-auto">
+                        <!-- Verlinke hier deine Routen, z.B. /hub oder /apply -->
+                        <a href="/hub" class="btn-primary">
+                            Driver Hub Starten
+                            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="w-4 h-4 ml-1"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        </a>
+                        <a href="#info" class="btn-secondary">Mehr Erfahren</a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Info Cards Section -->
+            <section id="info" class="mb-16">
+                <div class="grid md:grid-cols-3 gap-6">
+                    
+                    <!-- Card 1 -->
+                    <article class="info-card p-8 flex flex-col">
+                        <div class="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
+                            <div>
+                                <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Philosophie</p>
+                                <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Real Life First</h3>
+                            </div>
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--brand-green)" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="flex-grow">
+                            <p class="text-sm text-[var(--muted)] leading-relaxed font-inter">Wir haben keine strengen Online-Pflichten oder Mindestkilometer. Das echte Leben geht immer vor. Fahr, wenn du Zeit und Lust hast.</p>
+                        </div>
+                    </article>
+
+                    <!-- Card 2 -->
+                    <article class="info-card p-8 flex flex-col">
+                        <div class="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
+                            <div>
+                                <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Netzwerk</p>
+                                <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Starke Community</h3>
+                            </div>
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--brand-yellow)" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="flex-grow">
+                            <p class="text-sm text-[var(--muted)] leading-relaxed font-inter">Regelmäßige Konvois, ein aktiver Discord-Server und gegenseitige Hilfe unter Kollegen stehen bei uns an der Tagesordnung.</p>
+                        </div>
+                    </article>
+
+                    <!-- Card 3 -->
+                    <article class="info-card p-8 flex flex-col">
+                        <div class="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
+                            <div>
+                                <p class="font-orbitron text-[8px] font-bold text-[var(--muted)] tracking-[0.15em] uppercase mb-1">Technik</p>
+                                <h3 class="text-lg font-orbitron font-bold text-[var(--text)] tracking-wide">Moderne Systeme</h3>
+                            </div>
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--brand-green)" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        <div class="flex-grow">
+                            <p class="text-sm text-[var(--muted)] leading-relaxed font-inter">Mit unserem eigenen, komplett neu entwickelten Driver Hub protokollierst du deine Fahrten, behältst Statistiken im Blick und steuerst deine Finanzen.</p>
+                        </div>
+                    </article>
+
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="relative z-10 border-t border-[var(--line)] py-8 bg-[var(--bg-2)]/80 backdrop-blur-xl mt-auto w-full">
+        <div class="max-w-[1400px] mx-auto px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-2 h-2 rounded-full bg-[var(--brand-green)] opacity-80"></div>
+                <p class="font-orbitron tracking-[0.2em] uppercase text-[10px] font-bold text-[var(--text)]">
+                    Eifel LOG A/S
+                </p>
+            </div>
+            <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest text-center md:text-left">
+                Wir bringen deine Fracht sicher ans Ziel.
             </p>
-            <p>
-                Egal ob Schwerlast durch die rauen Serpentinen Norwegens, eilige Kühler-Transporte quer durch Deutschland oder klassisches Stückgut durch die namensgebende Eifel – bei uns steht der Spaß am Fahren im absoluten Vordergrund. Wir verzichten bewusst auf unrealistische Pflichtkilometer oder starre Online-Zeiten.
+            <p class="text-[10px] font-inter text-[var(--muted)]">
+                &copy; 2026 Eifel LOG. All systems nominal.
             </p>
         </div>
-        
-        <!-- Features Card -->
-        <div class="glass p-6 md:p-8 rounded-2xl bg-black/30 border-l-4 border-[#89be32] hover:bg-black/40 transition-colors duration-300">
-            <h3 class="text-white font-bold text-2xl mb-6 text-center md:text-left">Was uns ausmacht</h3>
-            <ul class="space-y-6">
-                <!-- List Item 1 -->
-                <li class="flex items-start gap-4">
-                    <div class="bg-[#106f2e]/30 p-2.5 rounded-xl flex-shrink-0 border border-[#89be32]/20">
-                        <svg class="w-6 h-6 text-[#dce226]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                    </div>
-                    <div>
-                        <strong class="block text-white mb-1 text-lg">Real Life geht vor</strong>
-                        <span class="text-sm md:text-base text-gray-400">Wir haben keine strengen Online-Pflichten. Fahr, wenn du Zeit und Lust hast.</span>
-                    </div>
-                </li>
-                <!-- List Item 2 -->
-                <li class="flex items-start gap-4">
-                    <div class="bg-[#106f2e]/30 p-2.5 rounded-xl flex-shrink-0 border border-[#89be32]/20">
-                        <svg class="w-6 h-6 text-[#dce226]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                    </div>
-                    <div>
-                        <strong class="block text-white mb-1 text-lg">Starke Community</strong>
-                        <span class="text-sm md:text-base text-gray-400">Regelmäßige Konvois, aktiver Discord und gegenseitige Hilfe unter Kollegen.</span>
-                    </div>
-                </li>
-                <!-- List Item 3 -->
-                <li class="flex items-start gap-4">
-                    <div class="bg-[#106f2e]/30 p-2.5 rounded-xl flex-shrink-0 border border-[#89be32]/20">
-                        <svg class="w-6 h-6 text-[#dce226]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                    </div>
-                    <div>
-                        <strong class="block text-white mb-1 text-lg">Moderne Systeme</strong>
-                        <span class="text-sm md:text-base text-gray-400">Unser eigener Driver Hub für deine Tourenabrechnung und Statistiken.</span>
-                    </div>
-                </li>
-            </ul>
-        </div>
-    </div>
-</section>
-{% endblock %}
+    </footer>
+
+    <!-- Anti-Cheat Script (Optionaler Schutz vor Rechtsklick, F12 etc.) -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Smooth Scroll für Anchor Links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    document.querySelector(this.getAttribute('href')).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                });
+            });
+        });
+    </script>
+
+</body>
+</html>
