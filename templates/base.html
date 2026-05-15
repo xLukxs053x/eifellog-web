@@ -10,90 +10,164 @@
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Sci-Fi & Clean Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
-        /* Farbpalette */
+        /* === FARBPALETTE & VARIABLEN === */
         :root {
-            --eifel-yellow: #dce226;
-            --eifel-light-green: #89be32;
-            --eifel-dark-green: #106f2e;
+            --bg-1: #040a06;
+            --bg-2: #08140c;
+            --panel: rgba(10, 20, 15, 0.45);
+            --line: rgba(255, 255, 255, 0.08);
+            --text: #edf3ff;
+            --muted: #93a4c8;
+            
+            /* Eifel LOG Farben */
+            --brand-yellow: #dce226;
+            --brand-green: #89be32;
+            --brand-green-rgb: 137, 190, 50; 
+            
+            --danger: #ff9f9f;
+            --shadow: 0 36px 100px rgba(0, 0, 0, 0.6);
+        }
+
+        /* === GLOBAL SCROLLBAR HIDE === */
+        ::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+            background: transparent !important;
+        }
+
+        * {
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
         }
 
         body {
-            color: white;
+            background-color: var(--bg-1);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
             min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            /* Hintergrundfarbe als Fallback, falls Bilder laden */
-            background-color: #0f172a; 
         }
 
-        /* --- Hintergrund Slideshow --- */
-        .slideshow-container {
+        /* === HINTERGRUND SLIDESHOW === */
+        .hero-bg {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            inset: 0;
             z-index: -10;
+            overflow: hidden;
+            background-color: var(--bg-1);
         }
 
-        .slide {
+        .hero-bg .bg-slide {
             position: absolute;
-            top: 0;
-            left: 0;
+            inset: 0;
             width: 100%;
             height: 100%;
-            background-size: cover;
-            background-position: center;
+            object-fit: cover;
+            object-position: center;
+            filter: saturate(1.1) brightness(0.35);
             opacity: 0;
-            animation: crossfade 18s infinite ease-in-out;
+            animation: fadeZoom 24s infinite;
+        }
+        
+        .hero-bg .slide-1 { animation-delay: 0s; }
+        .hero-bg .slide-2 { animation-delay: 8s; }
+        .hero-bg .slide-3 { animation-delay: 16s; }
+
+        @keyframes fadeZoom {
+            0%   { opacity: 0; transform: scale(1); }
+            10%  { opacity: 1; }
+            33%  { opacity: 1; }
+            45%  { opacity: 0; transform: scale(1.05); }
+            100% { opacity: 0; transform: scale(1.05); }
         }
 
-        /* Animations-Verzögerung für die 3 Bilder (jeweils 6 Sekunden versetzt) */
-        .slide:nth-child(1) { animation-delay: 0s; }
-        .slide:nth-child(2) { animation-delay: 6s; }
-        .slide:nth-child(3) { animation-delay: 12s; }
-
-        /* Dunkles Overlay, damit der Glassmorphism-Effekt und Text gut wirken */
-        .bg-overlay {
+        .hero-overlay {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(6, 43, 26, 0.85) 100%);
+            inset: 0;
+            background: radial-gradient(circle at 50% 30%, rgba(10, 20, 15, 0.3) 0%, rgba(4, 10, 6, 0.95) 100%);
         }
 
-        @keyframes crossfade {
-            0% { opacity: 1; }
-            25% { opacity: 1; }
-            33.33% { opacity: 0; }
-            91.66% { opacity: 0; }
-            100% { opacity: 1; }
+        /* === UI ELEMENTE & GLASSMORPHISM === */
+        .glass-nav {
+            background: rgba(10, 20, 15, 0.6);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-top: 1px solid rgba(137, 190, 50, 0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
 
-        /* --- UI Elemente --- */
-        .glass {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        .glass-card {
+            background: linear-gradient(135deg, rgba(20, 30, 20, 0.4) 0%, rgba(5, 10, 5, 0.8) 100%);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-top: 1px solid rgba(137, 190, 50, 0.2);
+            border-left: 1px solid rgba(137, 190, 50, 0.2);
+            border-radius: 28px;
+            backdrop-filter: blur(32px);
+            -webkit-backdrop-filter: blur(32px);
+            box-shadow: var(--shadow);
         }
 
-        .glass-button {
-            background: linear-gradient(90deg, var(--eifel-light-green), var(--eifel-dark-green));
+        /* === BUTTONS === */
+        .btn-primary,
+        .btn-secondary {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            border-radius: 12px;
+            padding: 12px 24px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
             transition: all 0.3s ease;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            text-decoration: none;
         }
         
-        .glass-button:hover {
+        .btn-primary {
+            background: rgba(var(--brand-green-rgb), 0.15);
+            color: var(--brand-green);
+            border: 1px solid rgba(var(--brand-green-rgb), 0.5);
+            box-shadow: 0 0 15px rgba(var(--brand-green-rgb), 0.1);
+        }
+
+        .btn-primary:hover {
+            background: rgba(var(--brand-green-rgb), 0.3);
+            color: #fff;
+            box-shadow: 0 0 25px rgba(var(--brand-green-rgb), 0.3);
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(16, 111, 46, 0.4);
-            filter: brightness(1.1);
+        }
+
+        /* Hover-Effekt für Navigations-Links */
+        .nav-link {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--muted);
+            transition: all 0.3s ease;
+            padding: 8px 16px;
+            border-radius: 8px;
+        }
+        .nav-link:hover {
+            color: var(--text);
+            background: rgba(255,255,255,0.05);
         }
         
-        /* --- Fade Animationen --- */
+        /* === FADE ANIMATIONEN FÜR SEITENWECHSEL === */
         .fade-enter {
             animation: fadeIn 0.4s ease-out forwards;
         }
@@ -108,25 +182,6 @@
             from { opacity: 1; transform: translateY(0); }
             to { opacity: 0; transform: translateY(-15px); }
         }
-        
-        /* Hover-Effekt für Navigations-Links */
-        .nav-link {
-            position: relative;
-            transition: color 0.3s;
-        }
-        .nav-link::after {
-            content: '';
-            position: absolute;
-            width: 0;
-            height: 2px;
-            bottom: -4px;
-            left: 0;
-            background-color: var(--eifel-yellow);
-            transition: width 0.3s ease;
-        }
-        .nav-link:hover::after {
-            width: 100%;
-        }
     </style>
 
     <script>
@@ -135,7 +190,6 @@
             const links = document.querySelectorAll('a:not([target="_blank"]):not([href^="#"]):not(.no-fade)');
             links.forEach(link => {
                 link.addEventListener('click', e => {
-                    // Mobile-Menü-Toggle ausschließen
                     if(link.closest('#mobile-menu-btn')) return;
 
                     if (link.hostname === window.location.hostname) {
@@ -162,74 +216,107 @@
 <body class="fade-enter antialiased flex flex-col overflow-x-hidden">
 
     <!-- Hintergrund Slideshow -->
-    <div class="slideshow-container">
-        <div class="slide" style="background-image: url('{{ url_for('static', filename='eifelog1.jpg') }}');"></div>
-        <div class="slide" style="background-image: url('{{ url_for('static', filename='eifelog2.jpg') }}');"></div>
-        <div class="slide" style="background-image: url('{{ url_for('static', filename='eifelog3.jpg') }}');"></div>
-        <div class="bg-overlay"></div>
+    <div class="hero-bg" aria-hidden="true">
+        <img class="bg-slide slide-1" src="{{ url_for('static', filename='eifelog1.jpg') }}" alt="EifelLOG Truck 1">
+        <img class="bg-slide slide-2" src="{{ url_for('static', filename='eifelog2.jpg') }}" alt="EifelLOG Truck 2">
+        <img class="bg-slide slide-3" src="{{ url_for('static', filename='eifelog3.jpg') }}" alt="EifelLOG Truck 3">
+        <div class="hero-overlay"></div>
     </div>
 
     <!-- Navigation -->
-    <nav class="glass sticky top-0 z-50 px-4 md:px-6 py-3 mx-4 mt-4 rounded-2xl transition-all">
-        <div class="flex justify-between items-center">
-            <!-- Logo Brand -->
-            <a href="/" class="flex items-center gap-3 group">
-                <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo" class="h-10 w-10 md:h-12 md:w-12 rounded-full border-2 border-[#dce226] shadow-[0_0_15px_rgba(220,226,38,0.3)] group-hover:rotate-12 transition-transform duration-300">
-                <div class="flex flex-col leading-tight">
-                    <span class="text-xl md:text-2xl font-bold tracking-wider text-white" style="font-family: cursive;">Eifel</span>
-                    <span class="text-xs md:text-sm font-black font-sans uppercase text-[#89be32] tracking-widest -mt-1">LOG</span>
+    <header class="fixed top-0 left-0 w-full z-50 px-4 py-4 md:py-6 pointer-events-none">
+        <div class="max-w-[1400px] mx-auto pointer-events-auto">
+            <nav class="glass-nav px-4 md:px-6 py-3 rounded-full flex justify-between items-center transition-all">
+                
+                <!-- Logo Brand -->
+                <a href="/" class="flex items-center gap-3 group shrink-0">
+                    <div class="w-10 h-10 rounded-full overflow-hidden border border-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.3)] group-hover:shadow-[0_0_25px_rgba(137,190,50,0.6)] transition-all duration-300">
+                        <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo" class="w-full h-full object-cover">
+                    </div>
+                    <div class="hidden sm:flex flex-col leading-none">
+                        <span class="text-sm font-orbitron font-bold tracking-widest text-[var(--text)] uppercase">Eifel LOG</span>
+                        <span class="text-[8px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-[0.2em] mt-1">Network Node</span>
+                    </div>
+                </a>
+                
+                <!-- Desktop Menu -->
+                <div class="hidden lg:flex items-center gap-2">
+                    <a href="/" class="nav-link">Home</a>
+                    <a href="/about" class="nav-link">Über uns</a>
+                    <a href="/fleet" class="nav-link">Fuhrpark</a>
                 </div>
-            </a>
-            
-            <!-- Desktop Menu -->
-            <div class="hidden md:flex gap-8 font-medium text-gray-200">
-                <a href="/" class="nav-link hover:text-white">Home</a>
-                <a href="/about" class="nav-link hover:text-white">Über uns</a>
-                <a href="/fleet" class="nav-link hover:text-white">Fuhrpark</a>
-            </div>
-            
-            <!-- Desktop Button -->
-            <div class="hidden md:block">
-                <a href="/hub" class="glass-button px-5 py-2.5 rounded-xl font-bold text-white flex items-center gap-2 text-sm">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path></svg>
-                    Driver Hub
-                </a>
-            </div>
+                
+                <!-- Desktop Button -->
+                <div class="hidden lg:flex shrink-0">
+                    <a href="/hub" class="btn-primary">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path></svg>
+                        Driver Hub
+                    </a>
+                </div>
 
-            <!-- Mobile Menu Toggle Button -->
-            <div class="md:hidden flex items-center">
-                <button onclick="toggleMobileMenu()" id="mobile-menu-btn" class="text-gray-200 hover:text-white focus:outline-none">
-                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
-                    </svg>
-                </button>
-            </div>
-        </div>
+                <!-- Mobile Menu Toggle Button -->
+                <div class="lg:hidden flex items-center">
+                    <button onclick="toggleMobileMenu()" id="mobile-menu-btn" class="w-10 h-10 rounded-full bg-black/50 border border-white/10 text-[var(--text)] flex items-center justify-center focus:outline-none">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                        </svg>
+                    </button>
+                </div>
+            </nav>
 
-        <!-- Mobile Menu (Hidden by default) -->
-        <div id="mobile-menu" class="hidden flex-col gap-4 mt-4 pb-2 md:hidden">
-            <a href="/" class="text-gray-200 hover:text-white font-medium pl-2">Home</a>
-            <a href="/about" class="text-gray-200 hover:text-white font-medium pl-2">Über uns</a>
-            <a href="/fleet" class="text-gray-200 hover:text-white font-medium pl-2">Fuhrpark</a>
-            <div class="pt-2 border-t border-gray-600/50">
-                <a href="/hub" class="glass-button w-full px-5 py-2.5 rounded-xl font-bold text-white flex items-center justify-center gap-2 mt-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path></svg>
+            <!-- Mobile Menu (Hidden by default) -->
+            <div id="mobile-menu" class="hidden flex-col gap-3 mt-4 p-6 glass-nav rounded-3xl lg:hidden pointer-events-auto">
+                <a href="/" class="nav-link text-center w-full bg-white/5 border border-white/5">Home</a>
+                <a href="/about" class="nav-link text-center w-full bg-white/5 border border-white/5">Über uns</a>
+                <a href="/fleet" class="nav-link text-center w-full bg-white/5 border border-white/5">Fuhrpark</a>
+                <div class="h-px w-full bg-white/10 my-2"></div>
+                <a href="/hub" class="btn-primary w-full justify-center">
                     Driver Hub
                 </a>
             </div>
         </div>
-    </nav>
+    </header>
 
     <!-- Main Content -->
-    <main class="flex-grow container mx-auto px-4 py-8 md:py-12 relative z-10">
-        <div class="glass p-6 md:p-8 rounded-2xl">
+    <main class="relative z-10 pt-32 pb-16 min-h-screen flex flex-col">
+        <div class="max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-8 flex-grow flex flex-col">
+            
+            <!-- Optional: Flask Flash Messages können hier gerendert werden -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="w-full mb-8 space-y-3 z-20">
+                        {% for category, message in messages %}
+                            <div class="px-5 py-4 rounded-xl flex items-center gap-3 border bg-black/40 backdrop-blur-md {% if category == 'error' %}border-[var(--danger)]/30 text-[var(--danger)]{% else %}border-[var(--brand-green)]/30 text-[var(--brand-green)]{% endif %}">
+                                <span class="font-orbitron text-[10px] font-bold uppercase tracking-widest">System Alert:</span>
+                                <span class="text-sm font-inter text-[var(--text)]">{{ message }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Injection Block für den Content der Unterseiten -->
             {% block content %}{% endblock %}
+
         </div>
     </main>
 
     <!-- Footer -->
-    <footer class="glass mt-auto py-6 text-center text-sm text-gray-400 relative z-10 rounded-t-2xl mx-4 md:mx-auto md:w-full md:rounded-none">
-        <p>&copy; 2026 Eifel LOG. Alle Rechte vorbehalten.</p>
+    <footer class="relative z-10 border-t border-[var(--line)] py-8 bg-[var(--bg-2)]/80 backdrop-blur-xl mt-auto w-full">
+        <div class="max-w-[1400px] mx-auto px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-2 h-2 rounded-full bg-[var(--brand-green)] opacity-80 animate-pulse"></div>
+                <p class="font-orbitron tracking-[0.2em] uppercase text-[10px] font-bold text-[var(--text)]">
+                    Eifel LOG
+                </p>
+            </div>
+            <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest text-center md:text-left">
+                Wir bringen deine Fracht sicher ans Ziel.
+            </p>
+            <p class="text-[10px] font-inter text-[var(--muted)]">
+                &copy; 2026 Eifel LOG. All systems nominal.
+            </p>
+        </div>
     </footer>
 
 </body>
