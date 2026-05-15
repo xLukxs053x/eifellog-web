@@ -41,21 +41,27 @@ db = mongo_client['eifellog_db']
 users_collection = db['users']
 
 # ==========================================
-# EIFEL LOG ROLLEN IDs
+# EIFEL LOG ROLLEN IDs (aus .env)
 # ==========================================
-ROLE_FAHRER = '1473721587101339681'
-ROLE_PROJEKTLEITUNG = '1473721587122438321'
-ROLE_GESCHAEFTSLEITUNG = '1473721587122438322'
-ROLE_FUHRPARKMANAGEMENT = '1473758338465398899'
-ROLE_BUCHHALTUNG = '1473730533593845951'
+ROLE_FAHRER = os.getenv('ROLE_FAHRER')
+ROLE_GESCHAEFTSLEITUNG = os.getenv('ROLE_GESCHAEFTSLEITUNG')
+ROLE_PROJEKTLEITUNG = os.getenv('ROLE_PROJEKTLEITUNG')
+ROLE_FUHRPARKMANAGEMENT = os.getenv('ROLE_FUHRPARKMANAGEMENT')
+ROLE_BUCHHALTUNG = os.getenv('ROLE_BUCHHALTUNG')
+ROLE_HR_CONTROLLING = os.getenv('ROLE_HR_CONTROLLING')
+ROLE_DISPOSITION = os.getenv('ROLE_DISPOSITION')
+ROLE_PERSONALMANAGEMENT = os.getenv('ROLE_PERSONALMANAGEMENT')
 
 # Alle Rollen, die das Dashboard betreten dürfen
 ALLOWED_HUB_ROLES = [
     ROLE_FAHRER, 
-    ROLE_PROJEKTLEITUNG, 
     ROLE_GESCHAEFTSLEITUNG, 
+    ROLE_PROJEKTLEITUNG, 
     ROLE_FUHRPARKMANAGEMENT, 
-    ROLE_BUCHHALTUNG
+    ROLE_BUCHHALTUNG,
+    ROLE_HR_CONTROLLING,
+    ROLE_DISPOSITION,
+    ROLE_PERSONALMANAGEMENT
 ]
 
 
@@ -199,16 +205,22 @@ def dashboard():
     else:
         needs_signature = True
         
-    # 4. Höchste/Wichtigste Rolle für das Dokumenten-Modal ermitteln
+    # 4. Höchste/Wichtigste Rolle für das Dokumenten-Modal ermitteln (Hierarchisch absteigend)
     primary_role_name = "Fahrer"
     if ROLE_GESCHAEFTSLEITUNG in user_roles:
         primary_role_name = "Geschäftsleitung"
     elif ROLE_PROJEKTLEITUNG in user_roles:
         primary_role_name = "Projektleitung"
-    elif ROLE_FUHRPARKMANAGEMENT in user_roles:
-        primary_role_name = "Fuhrparkmanagement"
+    elif ROLE_PERSONALMANAGEMENT in user_roles:
+        primary_role_name = "Personalmanagement"
+    elif ROLE_HR_CONTROLLING in user_roles:
+        primary_role_name = "HR Controlling"
     elif ROLE_BUCHHALTUNG in user_roles:
         primary_role_name = "Buchhaltung"
+    elif ROLE_DISPOSITION in user_roles:
+        primary_role_name = "Disposition"
+    elif ROLE_FUHRPARKMANAGEMENT in user_roles:
+        primary_role_name = "Fuhrparkmanagement"
 
     return render_template('dashboard.html', 
                            current_user=user, 
