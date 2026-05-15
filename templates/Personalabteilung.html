@@ -39,12 +39,21 @@
         --el-shadow: 0 28px 80px rgba(0, 0, 0, 0.58);
     }
 
+    .personal-page,
+    .personal-shell,
+    .driver-table-wrap,
+    .driver-table,
+    .token-btn {
+        pointer-events: auto;
+    }
+
     .personal-page {
         position: relative;
         min-height: calc(100vh - 120px);
         padding: 34px;
         color: var(--el-text);
-        overflow: hidden;
+        overflow: visible;
+        z-index: 1;
     }
 
     .personal-page::before {
@@ -56,6 +65,7 @@
             radial-gradient(circle at 18% 14%, rgba(var(--el-green-rgb), 0.13), transparent 32%),
             radial-gradient(circle at 78% 16%, rgba(var(--el-yellow-rgb), 0.07), transparent 30%),
             linear-gradient(135deg, var(--el-bg-1) 0%, var(--el-bg-2) 48%, #010201 100%);
+        pointer-events: none;
     }
 
     .personal-page::after {
@@ -73,6 +83,8 @@
     }
 
     .personal-shell {
+        position: relative;
+        z-index: 5;
         width: min(1440px, 100%);
         margin: 0 auto;
         display: flex;
@@ -82,7 +94,7 @@
 
     .glass-card {
         position: relative;
-        overflow: hidden;
+        overflow: visible;
         background:
             linear-gradient(145deg, rgba(13, 24, 15, 0.52) 0%, rgba(2, 6, 3, 0.9) 100%);
         border: 1px solid rgba(255, 255, 255, 0.065);
@@ -92,6 +104,11 @@
         backdrop-filter: blur(28px);
         -webkit-backdrop-filter: blur(28px);
         box-shadow: var(--el-shadow);
+    }
+
+    .glass-card > * {
+        position: relative;
+        z-index: 2;
     }
 
     .glass-card::before {
@@ -264,6 +281,7 @@
 
     .table-card {
         padding: 0;
+        overflow: hidden;
     }
 
     .table-head {
@@ -294,6 +312,8 @@
     .driver-table-wrap {
         width: 100%;
         overflow-x: auto;
+        position: relative;
+        z-index: 10;
     }
 
     .driver-table {
@@ -324,6 +344,8 @@
         color: var(--el-text);
         font-size: 13px;
         vertical-align: middle;
+        position: relative;
+        z-index: 12;
     }
 
     .driver-table tbody tr {
@@ -435,9 +457,13 @@
     .action-wrap {
         display: flex;
         justify-content: flex-end;
+        position: relative;
+        z-index: 50;
     }
 
     .token-btn {
+        position: relative;
+        z-index: 100;
         min-height: 42px;
         border-radius: 14px;
         padding: 0 15px;
@@ -457,6 +483,8 @@
         letter-spacing: 0.13em;
         transition: 220ms ease;
         white-space: nowrap;
+        -webkit-user-select: none;
+        user-select: none;
     }
 
     .token-btn:hover:not(:disabled) {
@@ -497,10 +525,10 @@
     }
 
     .toast {
-        width: min(420px, calc(100vw - 40px));
+        width: min(440px, calc(100vw - 40px));
         border-radius: 18px;
         padding: 16px 18px;
-        background: rgba(8, 17, 12, 0.94);
+        background: rgba(8, 17, 12, 0.96);
         border: 1px solid rgba(var(--el-green-rgb), 0.24);
         box-shadow: 0 18px 46px rgba(0, 0, 0, 0.58);
         backdrop-filter: blur(18px);
@@ -546,6 +574,7 @@
         font-weight: 900;
         letter-spacing: 0.08em;
         user-select: all;
+        cursor: copy;
     }
 
     @keyframes toastIn {
@@ -641,23 +670,17 @@
 
             <div class="glass-card stat-card">
                 <small>Mit Tracker-Code</small>
-                <strong id="statWithToken">
-                    {{ drivers|selectattr("tracker_code_hash")|list|length }}
-                </strong>
+                <strong id="statWithToken">{{ drivers|selectattr("tracker_code_hash")|list|length }}</strong>
             </div>
 
             <div class="glass-card stat-card">
                 <small>Ohne Tracker-Code</small>
-                <strong id="statWithoutToken">
-                    {{ drivers|rejectattr("tracker_code_hash")|list|length }}
-                </strong>
+                <strong id="statWithoutToken">{{ drivers|rejectattr("tracker_code_hash")|list|length }}</strong>
             </div>
 
             <div class="glass-card stat-card">
                 <small>Tracker aktiv</small>
-                <strong id="statTrackerEnabled">
-                    {{ drivers|rejectattr("tracker_enabled", "equalto", false)|list|length }}
-                </strong>
+                <strong id="statTrackerEnabled">{{ drivers|rejectattr("tracker_enabled", "equalto", false)|list|length }}</strong>
             </div>
         </section>
 
@@ -777,7 +800,7 @@
                                         <button
                                             class="token-btn"
                                             type="button"
-                                            data-create-token
+                                            data-create-token="true"
                                             data-driver-name="{{ username }}"
                                             data-display-name="{{ display_name }}"
                                             data-discord-id="{{ driver.discord_id or '' }}"
@@ -810,59 +833,126 @@
 
     <div class="toast-layer" id="toastLayer" aria-live="polite"></div>
 </section>
-{% endblock %}
 
-{% block scripts %}
 <script>
-    const searchInput = document.getElementById("driverSearch");
-    const tokenFilter = document.getElementById("tokenFilter");
-    const trackerFilter = document.getElementById("trackerFilter");
-    const rows = Array.from(document.querySelectorAll("[data-driver-row]"));
-    const toastLayer = document.getElementById("toastLayer");
+    document.addEventListener("DOMContentLoaded", () => {
+        const CREATE_TOKEN_URL = "{{ url_for('personalabteilung_create_tracker_code') }}";
 
-    function showToast(title, message, type = "success", code = null) {
-        const toast = document.createElement("div");
-        toast.className = type === "error" ? "toast error" : "toast";
+        const searchInput = document.getElementById("driverSearch");
+        const tokenFilter = document.getElementById("tokenFilter");
+        const trackerFilter = document.getElementById("trackerFilter");
+        const toastLayer = document.getElementById("toastLayer");
 
-        toast.innerHTML = `
-            <strong>${title}</strong>
-            <p>${message}</p>
-            ${code ? `<div class="generated-code-box">${code}</div>` : ""}
-        `;
+        function getRows() {
+            return Array.from(document.querySelectorAll("[data-driver-row]"));
+        }
 
-        toastLayer.appendChild(toast);
+        function setText(id, value) {
+            const node = document.getElementById(id);
+            if (node) {
+                node.textContent = String(value);
+            }
+        }
 
-        setTimeout(() => {
-            toast.style.opacity = "0";
-            toast.style.transform = "translateY(10px) scale(0.98)";
-            toast.style.transition = "220ms ease";
+        function updateStats() {
+            const rows = getRows();
+            const total = rows.length;
+            const withToken = rows.filter((row) => row.dataset.token === "with-token").length;
+            const withoutToken = rows.filter((row) => row.dataset.token === "without-token").length;
+            const enabled = rows.filter((row) => row.dataset.tracker === "enabled").length;
+
+            setText("statTotalDrivers", total);
+            setText("statWithToken", withToken);
+            setText("statWithoutToken", withoutToken);
+            setText("statTrackerEnabled", enabled);
+        }
+
+        function showToast(title, message, type = "success", code = null) {
+            if (!toastLayer) {
+                alert(code ? `${title}\n\n${message}\n\n${code}` : `${title}\n\n${message}`);
+                return;
+            }
+
+            const toast = document.createElement("div");
+            toast.className = type === "error" ? "toast error" : "toast";
+
+            toast.innerHTML = `
+                <strong>${escapeHtml(title)}</strong>
+                <p>${escapeHtml(message)}</p>
+                ${code ? `<div class="generated-code-box" data-copy-code="${escapeHtml(code)}">${escapeHtml(code)}</div>` : ""}
+            `;
+
+            toastLayer.appendChild(toast);
+
+            const codeBox = toast.querySelector("[data-copy-code]");
+            if (codeBox) {
+                codeBox.addEventListener("click", async () => {
+                    try {
+                        await navigator.clipboard.writeText(codeBox.dataset.copyCode || "");
+                        codeBox.textContent = "Kopiert: " + (codeBox.dataset.copyCode || "");
+                    } catch {
+                        codeBox.textContent = codeBox.dataset.copyCode || "";
+                    }
+                });
+            }
 
             setTimeout(() => {
-                toast.remove();
-            }, 260);
-        }, code ? 12000 : 5200);
-    }
+                toast.style.opacity = "0";
+                toast.style.transform = "translateY(10px) scale(0.98)";
+                toast.style.transition = "220ms ease";
 
-    function applyFilters() {
-        const query = String(searchInput.value || "").trim().toLowerCase();
-        const tokenValue = tokenFilter.value;
-        const trackerValue = trackerFilter.value;
+                setTimeout(() => {
+                    toast.remove();
+                }, 260);
+            }, code ? 16000 : 6000);
+        }
 
-        rows.forEach((row) => {
-            const matchesSearch = !query || row.dataset.search.includes(query);
-            const matchesToken = tokenValue === "all" || row.dataset.token === tokenValue;
-            const matchesTracker = trackerValue === "all" || row.dataset.tracker === trackerValue;
+        function escapeHtml(value) {
+            return String(value || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
 
-            row.style.display = matchesSearch && matchesToken && matchesTracker ? "" : "none";
-        });
-    }
+        function applyFilters() {
+            const rows = getRows();
+            const query = String(searchInput?.value || "").trim().toLowerCase();
+            const tokenValue = tokenFilter?.value || "all";
+            const trackerValue = trackerFilter?.value || "all";
 
-    searchInput.addEventListener("input", applyFilters);
-    tokenFilter.addEventListener("change", applyFilters);
-    trackerFilter.addEventListener("change", applyFilters);
+            rows.forEach((row) => {
+                const matchesSearch = !query || String(row.dataset.search || "").includes(query);
+                const matchesToken = tokenValue === "all" || row.dataset.token === tokenValue;
+                const matchesTracker = trackerValue === "all" || row.dataset.tracker === trackerValue;
 
-    document.querySelectorAll("[data-create-token]").forEach((button) => {
-        button.addEventListener("click", async () => {
+                row.style.display = matchesSearch && matchesToken && matchesTracker ? "" : "none";
+            });
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener("input", applyFilters);
+        }
+
+        if (tokenFilter) {
+            tokenFilter.addEventListener("change", applyFilters);
+        }
+
+        if (trackerFilter) {
+            trackerFilter.addEventListener("change", applyFilters);
+        }
+
+        document.addEventListener("click", async (event) => {
+            const button = event.target.closest("[data-create-token='true']");
+
+            if (!button) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+
             const driverName = button.dataset.driverName || "";
             const displayName = button.dataset.displayName || driverName || "Fahrer";
             const discordId = button.dataset.discordId || "";
@@ -877,14 +967,16 @@
             }
 
             button.disabled = true;
-            const oldText = button.textContent;
+            const oldText = button.textContent.trim();
             button.textContent = "Erstelle...";
 
             try {
-                const response = await fetch("{{ url_for('personalabteilung_create_tracker_code') }}", {
+                const response = await fetch(CREATE_TOKEN_URL, {
                     method: "POST",
+                    credentials: "same-origin",
                     headers: {
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "X-Requested-With": "XMLHttpRequest"
                     },
                     body: JSON.stringify({
                         driverName,
@@ -893,7 +985,13 @@
                     })
                 });
 
-                const result = await response.json();
+                let result = null;
+
+                try {
+                    result = await response.json();
+                } catch {
+                    throw new Error("Server hat keine gültige JSON-Antwort gesendet.");
+                }
 
                 if (!response.ok || !result.success) {
                     throw new Error(result.error || result.message || "Token konnte nicht erstellt werden.");
@@ -909,16 +1007,26 @@
                 const row = button.closest("[data-driver-row]");
                 if (row) {
                     row.dataset.token = "with-token";
+                    row.dataset.tracker = "enabled";
 
-                    const badge = row.querySelector(".token-badge");
-                    if (badge) {
-                        badge.className = "token-badge exists";
-                        badge.textContent = "Vorhanden";
+                    const tokenBadge = row.querySelector(".token-badge");
+                    if (tokenBadge) {
+                        tokenBadge.className = "token-badge exists";
+                        tokenBadge.textContent = "Vorhanden";
+                    }
+
+                    const statusBadge = row.querySelector(".status-badge");
+                    if (statusBadge) {
+                        statusBadge.className = "status-badge enabled";
+                        statusBadge.textContent = "Aktiv";
                     }
                 }
 
                 button.dataset.forceNew = "true";
                 button.textContent = "Neuen Token";
+
+                updateStats();
+                applyFilters();
             } catch (error) {
                 showToast("Fehler", error.message || "Token konnte nicht erstellt werden.", "error");
                 button.textContent = oldText;
@@ -926,6 +1034,9 @@
                 button.disabled = false;
             }
         });
+
+        updateStats();
+        applyFilters();
     });
 </script>
 {% endblock %}
