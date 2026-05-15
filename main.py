@@ -1,4 +1,5 @@
 import os
+import json
 import requests
 import eventlet
 from datetime import datetime
@@ -196,14 +197,6 @@ def dashboard():
     # 2. Prüfen ob der Nutzer eine der erlaubten Rollen hat
     has_permission = any(role in clean_user_roles for role in clean_allowed_roles)
     
-    # --- DEBUGGING-AUSGABE IN DER KONSOLE ---
-    print("\n=== LOGIN DEBUG INFO ===")
-    print(f"User: {user['username']}")
-    print(f"User Rollen (Discord): {clean_user_roles}")
-    print(f"Erlaubte Rollen (.env): {clean_allowed_roles}")
-    print(f"Zugriff gewährt: {has_permission}")
-    print("========================\n")
-    
     if not has_permission:
         flash("Zugriff verweigert! Du benötigst eine anerkannte Rolle (z.B. Fahrer), um das Dashboard zu betreten.", "error")
         return redirect(url_for('home'))
@@ -234,10 +227,32 @@ def dashboard():
     elif str(ROLE_FUHRPARKMANAGEMENT).strip() in clean_user_roles:
         primary_role_name = "Fuhrparkmanagement"
 
+    # --- 5. JSON DATEN LADEN (News & Dokumente) ---
+    news_items = []
+    if os.path.exists('news.json'):
+        try:
+            with open('news.json', 'r', encoding='utf-8') as f:
+                news_items = json.load(f)
+        except Exception as e:
+            print(f"Fehler beim Laden der News: {e}")
+
+    user_documents = []
+    if os.path.exists('documents.json'):
+        try:
+            with open('documents.json', 'r', encoding='utf-8') as f:
+                all_docs = json.load(f)
+                # Nur Dokumente für diesen User filtern (nach discord_id)
+                user_id_str = str(user['id'])
+                user_documents = [doc for doc in all_docs if str(doc.get('discord_id')) == user_id_str]
+        except Exception as e:
+            print(f"Fehler beim Laden der Dokumente: {e}")
+
     return render_template('dashboard.html', 
                            current_user=user, 
                            needs_signature=needs_signature,
-                           primary_role_name=primary_role_name)
+                           primary_role_name=primary_role_name,
+                           news_items=news_items,
+                           user_documents=user_documents)
 
 
 # --- API ROUTEN ---
