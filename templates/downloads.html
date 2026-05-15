@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block title %}EifelLog - Downloads{% endblock %}
+
+{% block content %}
+
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 mt-6">
+    <div>
+        <span class="font-orbitron text-[10px] font-bold text-[var(--muted)] tracking-[0.2em] uppercase">
+            EifelLog Hub
+        </span>
+        <h1 class="text-2xl md:text-3xl font-orbitron font-bold text-white mt-1">
+            Downloads
+        </h1>
+        <p class="text-sm text-[var(--muted)] font-inter mt-2 max-w-2xl">
+            Lade dir hier die aktuellen EifelLog-Dateien direkt aus dem offiziellen GitHub Release herunter.
+        </p>
+    </div>
+
+    <a href="{{ url_for('dashboard') if url_for is defined else '/dashboard' }}"
+       class="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/10 transition-all text-xs font-orbitron uppercase tracking-widest text-[var(--text)]">
+        Zurück zum Dashboard
+    </a>
+</div>
+
+{% set github_latest = "https://github.com/xLukxs053x/EifelLog-Tracking/releases/latest" %}
+{% set github_download_base = "https://github.com/xLukxs053x/EifelLog-Tracking/releases/latest/download" %}
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-10 mb-10">
+
+    <div class="xl:col-span-2 flex flex-col gap-6">
+
+        <div class="glass-card p-6 relative overflow-hidden border-t border-[var(--brand-green)]/30">
+            <div class="absolute -right-10 -top-10 opacity-5 text-white">
+                <svg class="w-56 h-56" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 16l4-5h-3V4h-2v7H8l4 5zm-7 2h14v2H5v-2z"/>
+                </svg>
+            </div>
+
+            <div class="flex items-start gap-4">
+                <div class="w-14 h-14 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 flex items-center justify-center text-[var(--brand-green)] shrink-0 shadow-[0_0_25px_rgba(137,190,50,0.08)]">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                </div>
+
+                <div class="min-w-0">
+                    <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">
+                        Offizielle Dateien
+                    </span>
+                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">
+                        GitHub Release Downloads
+                    </h2>
+                    <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed">
+                        Alle Dateien werden direkt aus dem aktuellsten GitHub Release von EifelLog geladen.
+                        Wenn eine Datei im Release ersetzt wird, zeigt dieser Bereich automatisch auf die neueste Version.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-6 bg-black/30 rounded-2xl border border-white/5 p-4">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">
+                            Aktuelles Release
+                        </p>
+                        <p class="text-sm text-white font-inter break-all">
+                            {{ github_latest }}
+                        </p>
+                    </div>
+
+                    <a href="{{ github_latest }}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-white/5 border border-white/10 hover:border-white/30 hover:bg-white/10 transition-all text-xs font-orbitron uppercase tracking-widest text-white shrink-0">
+                        GitHub öffnen
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card p-6">
+            <div class="flex items-center justify-between gap-4 mb-6">
+                <div>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide">
+                        Dateien
+                    </h2>
+                    <p class="text-xs text-[var(--muted)] font-inter mt-1">
+                        Klicke auf „Download“, um die Datei direkt herunterzuladen.
+                    </p>
+                </div>
+
+                <span class="hidden sm:inline-flex px-3 py-1 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/20 text-[var(--brand-green)] text-[10px] font-orbitron uppercase tracking-widest">
+                    Latest Release
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <div class="p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-green)]/60 hover:bg-white/[0.07] transition-all group">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center text-[var(--brand-green)] shrink-0 group-hover:scale-105 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+
+                        <div class="min-w-0 flex-1">
+                            <h3 class="font-orbitron font-bold text-sm text-white truncate">
+                                Frachtterminal.doc
+                            </h3>
+                            <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">
+                                Dokument für das EifelLog Frachtterminal.
+                            </p>
+
+                            <div class="mt-4 flex items-center gap-3">
+                                <a href="{{ github_download_base }}/Frachtterminal.doc"
+                                   download
+                                   class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/40 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 transition-all text-[10px] font-orbitron uppercase tracking-widest">
+                                    Download
+                                </a>
+
+                                <span class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                                    DOC
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-yellow)]/60 hover:bg-white/[0.07] transition-all group">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 flex items-center justify-center text-[var(--brand-yellow)] shrink-0 group-hover:scale-105 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+
+                        <div class="min-w-0 flex-1">
+                            <h3 class="font-orbitron font-bold text-sm text-white truncate">
+                                nutzungsbedingunen.doc
+                            </h3>
+                            <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">
+                                Nutzungsbedingungen für die Verwendung von EifelLog.
+                            </p>
+
+                            <div class="mt-4 flex items-center gap-3">
+                                <a href="{{ github_download_base }}/nutzungsbedingunen.doc"
+                                   download
+                                   class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/40 text-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/20 transition-all text-[10px] font-orbitron uppercase tracking-widest">
+                                    Download
+                                </a>
+
+                                <span class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                                    DOC
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[#5865F2]/60 hover:bg-white/[0.07] transition-all group md:col-span-2">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/25 flex items-center justify-center text-[#5865F2] shrink-0 group-hover:scale-105 transition-transform">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 17l4 4m0 0l4-4m-4 4V3m-7 8H3a2 2 0 00-2 2v6a2 2 0 002 2h18a2 2 0 002-2v-6a2 2 0 00-2-2h-2"></path>
+                                </svg>
+                            </div>
+
+                            <div>
+                                <h3 class="font-orbitron font-bold text-sm text-white">
+                                    Alle Release-Dateien anzeigen
+                                </h3>
+                                <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">
+                                    Öffnet die GitHub Release-Seite mit allen verfügbaren Dateien, Versionen und Änderungen.
+                                </p>
+                            </div>
+                        </div>
+
+                        <a href="{{ github_latest }}"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-[#5865F2]/10 border border-[#5865F2]/40 text-[#8ea0ff] hover:bg-[#5865F2]/20 transition-all text-[10px] font-orbitron uppercase tracking-widest shrink-0">
+                            Release öffnen
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <div class="flex flex-col gap-6">
+
+        <div class="glass-card p-6">
+            <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4 flex items-center justify-between">
+                Hinweise
+                <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse"></span>
+            </h2>
+
+            <div class="space-y-4">
+                <div class="border-l-2 border-[var(--brand-green)] pl-3">
+                    <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
+                        Direkter Download
+                    </p>
+                    <p class="text-sm font-inter text-gray-300 leading-relaxed">
+                        Die Download-Buttons nutzen direkt das aktuellste GitHub Release.
+                    </p>
+                </div>
+
+                <div class="border-l-2 border-[var(--brand-yellow)] pl-3">
+                    <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
+                        Wichtig
+                    </p>
+                    <p class="text-sm font-inter text-gray-300 leading-relaxed">
+                        Die Dateien müssen im GitHub Release exakt so heißen wie hier angegeben.
+                    </p>
+                </div>
+
+                <div class="border-l-2 border-[#5865F2] pl-3">
+                    <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
+                        Quelle
+                    </p>
+                    <p class="text-sm font-inter text-gray-300 leading-relaxed break-all">
+                        xLukxs053x/EifelLog-Tracking
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card p-6 bg-gradient-to-br from-black/40 to-black/80">
+            <h2 class="font-orbitron font-bold text-sm text-[var(--muted)] uppercase tracking-widest mb-4">
+                Download Status
+            </h2>
+
+            <div class="space-y-3">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-400 font-inter">Quelle:</span>
+                    <span class="text-white font-orbitron font-bold text-xs uppercase">GitHub</span>
+                </div>
+
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-400 font-inter">Release:</span>
+                    <span class="text-[var(--brand-green)] font-orbitron font-bold text-xs uppercase">Latest</span>
+                </div>
+
+                <div class="flex justify-between items-center text-sm border-t border-white/10 pt-3">
+                    <span class="text-gray-400 font-inter">Dokumente:</span>
+                    <span class="text-white font-orbitron font-bold text-xs uppercase">2 Dateien</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}
