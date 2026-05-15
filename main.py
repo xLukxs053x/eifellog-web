@@ -73,7 +73,7 @@ API_BASE_URL = "https://discord.com/api/v10"
 # ==========================================
 
 MONGO_URI = os.getenv("MONGO_URI")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "eifellog")
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "eifellog_db")
 
 if not MONGO_URI:
     raise RuntimeError("MONGO_URI fehlt. Bitte in deiner .env setzen.")
