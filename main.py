@@ -82,8 +82,8 @@ def about():
 
 @app.route('/login')
 def login():
-    # Leitet den Nutzer zu Discord weiter. Wir fragen Profil ('identify') und Serverliste ('guilds') ab.
-    auth_url = f"{OAUTH_URL}?client_id={DISCORD_CLIENT_ID}&redirect_uri={DISCORD_REDIRECT_URI}&response_type=code&scope=identify%20guilds"
+    # WICHTIG: Hier wurde 'guilds.members.read' hinzugefügt, damit Discord die Rollen freigibt!
+    auth_url = f"{OAUTH_URL}?client_id={DISCORD_CLIENT_ID}&redirect_uri={DISCORD_REDIRECT_URI}&response_type=code&scope=identify%20guilds%20guilds.members.read"
     return redirect(auth_url)
 
 @app.route('/callback')
