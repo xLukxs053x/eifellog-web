@@ -9,12 +9,12 @@ import hmac
 import hashlib
 import secrets
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import Flask, render_template, redirect, request, session, url_for, flash, jsonify, abort
 from dotenv import load_dotenv
-from pymongo import MongoClient, ASCENDING
+from pymongo import MongoClient, ASCENDING, DESCENDING
 from werkzeug.utils import secure_filename
 
 
@@ -42,7 +42,7 @@ TRACKER_API_KEY = os.getenv("TRACKER_API_KEY", "").strip()
 def add_tracker_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = (
-        "Content-Type, Authorization, X-Tracker-Token, X-Tracker-Code, X-Tracker-Api-Key"
+        "Content-Type, Authorization, X-Tracker-Token, X-Tracker-Code, X-Tracker-Api-Key, X-Requested-With"
     )
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
@@ -91,6 +91,8 @@ def ensure_indexes():
         users_collection.create_index([("username_lc", ASCENDING)], unique=False)
         users_collection.create_index([("tracker_code_hash", ASCENDING)], unique=False)
         users_collection.create_index([("tracker_client_token_hash", ASCENDING)], unique=False)
+        users_collection.create_index([("tracker_live_updated_at", DESCENDING)], unique=False)
+        users_collection.create_index([("tracker_online", ASCENDING)], unique=False)
     except Exception as error:
         print(f"MongoDB Index-Erstellung fehlgeschlagen: {error}")
 
@@ -124,7 +126,7 @@ ALLOWED_HUB_ROLES = [
 
 
 # ==========================================
-# HILFSFUNKTIONEN
+# ALLGEMEINE HILFSFUNKTIONEN
 # ==========================================
 
 def now_utc():
@@ -348,11 +350,59 @@ def make_external_url(possible_url):
     return request.host_url.rstrip("/") + "/" + possible_url.lstrip("/")
 
 
+def format_datetime_for_template(value):
+    if isinstance(value, datetime):
+        return value.strftime("%d.%m.%Y %H:%M")
+
+    if value:
+        return str(value)
+
+    return ""
+
+
+def datetime_to_iso(value):
+    if isinstance(value, datetime):
+        return value.isoformat() + "Z"
+
+    if value:
+        return str(value)
+
+    return ""
+
+
+def parse_number(value, fallback=0.0):
+    if value is None:
+        return fallback
+
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    value = str(value)
+    value = value.replace("km", "")
+    value = value.replace("KM", "")
+    value = value.replace("€", "")
+    value = value.replace("%", "")
+    value = value.replace(".", "")
+    value = value.replace(",", ".")
+    value = value.strip()
+
+    try:
+        return float(value)
+    except Exception:
+        return fallback
+
+
+def parse_int(value, fallback=0):
+    try:
+        return int(round(parse_number(value, fallback)))
+    except Exception:
+        return fallback
+
+
 def prepare_profile_data(user_doc):
     profile_data = dict(user_doc)
 
     profile_data["_id"] = str(profile_data.get("_id"))
-
     profile_data["avatar_url"] = get_discord_avatar_url(profile_data)
     profile_data["display_name"] = profile_data.get("display_name") or profile_data.get("username") or "Eifel LOG Fahrer"
     profile_data["username"] = profile_data.get("username") or "driver"
@@ -390,8 +440,11 @@ def get_profile_stats(user_doc):
     return {
         "km": user_doc.get("profile_km", "0"),
         "deliveries": user_doc.get("profile_deliveries", "0"),
+        "jobs": user_doc.get("profile_jobs", user_doc.get("profile_deliveries", "0")),
         "convoys": user_doc.get("profile_convoys", "0"),
-        "rating": user_doc.get("profile_rating", "0.0")
+        "rating": user_doc.get("profile_rating", "0.0"),
+        "income": user_doc.get("profile_income", user_doc.get("profile_revenue", "0")),
+        "revenue": user_doc.get("profile_revenue", user_doc.get("profile_income", "0"))
     }
 
 
@@ -462,6 +515,33 @@ def normalize_tracker_code(code):
     return code
 
 
+def get_client_token_from_request(data=None):
+    data = data or {}
+
+    authorization = safe_str(request.headers.get("Authorization"))
+
+    if authorization.lower().startswith("bearer "):
+        authorization = authorization[7:].strip()
+
+    return (
+        safe_str(data.get("clientToken"))
+        or safe_str(request.headers.get("X-Tracker-Token"))
+        or authorization
+        or safe_str(request.args.get("clientToken"))
+    )
+
+
+def find_tracker_user_by_client_token(client_token):
+    client_token = safe_str(client_token)
+
+    if not client_token:
+        return None
+
+    return users_collection.find_one({
+        "tracker_client_token_hash": hash_secret(client_token)
+    })
+
+
 def user_has_tracker_access(user_doc):
     if not user_doc:
         return False
@@ -499,8 +579,11 @@ def tracker_profile_payload(user_doc):
         "stats": {
             "km": stats.get("km"),
             "deliveries": stats.get("deliveries"),
+            "jobs": stats.get("jobs"),
             "convoys": stats.get("convoys"),
-            "rating": stats.get("rating")
+            "rating": stats.get("rating"),
+            "income": stats.get("income"),
+            "revenue": stats.get("revenue")
         }
     }
 
@@ -525,6 +608,365 @@ def tracker_api_key_required(func):
         return func(*args, **kwargs)
 
     return wrapper
+
+
+# ==========================================
+# TRACKER LIVE STATE / COMPANY / LOGBOOK
+# ==========================================
+
+def normalize_telemetry_payload(raw):
+    raw = raw or {}
+
+    def n(*keys, fallback=0):
+        for key in keys:
+            if key in raw and raw.get(key) is not None:
+                return parse_number(raw.get(key), fallback)
+        return fallback
+
+    def s(*keys, fallback="-"):
+        for key in keys:
+            value = safe_str(raw.get(key))
+            if value:
+                return value
+        return fallback
+
+    def b(*keys, fallback=False):
+        for key in keys:
+            if key in raw:
+                value = raw.get(key)
+
+                if isinstance(value, bool):
+                    return value
+
+                if isinstance(value, str):
+                    return value.lower() in {"true", "1", "yes", "ja"}
+
+                return bool(value)
+
+        return fallback
+
+    clean = {
+        "isConnected": b("isConnected", "telemetryConnected", fallback=False),
+        "gameProcessDetected": b("gameProcessDetected", fallback=False),
+        "telemetryConnected": b("telemetryConnected", "isConnected", fallback=False),
+        "statusText": s("statusText", fallback=""),
+
+        "game": s("game", fallback="ETS2/ATS"),
+        "truck": s("truck", "driverTruckModel", fallback="-"),
+        "sourceCity": s("sourceCity", "routeOrigin", fallback="-"),
+        "destinationCity": s("destinationCity", "routeDestination", "activeDestination", fallback="-"),
+        "cargo": s("cargo", "cargoName", fallback="-"),
+
+        "speedKmh": n("speedKmh", "speed", fallback=0),
+        "rpm": n("rpm", "engineRpm", "engineRPM", fallback=0),
+        "fuelPercent": n("fuelPercent", "fuel", fallback=0),
+        "damagePercent": n("damagePercent", "damage", fallback=0),
+        "tripDistanceKm": n("tripDistanceKm", "driverKm", fallback=0),
+        "remainingDistanceKm": n("remainingDistanceKm", "routeRemainingDistance", fallback=0),
+        "plannedDistanceKm": n("plannedDistanceKm", fallback=0),
+        "routeProgressPercent": n("routeProgressPercent", fallback=0),
+
+        "engineEnabled": b("engineEnabled", fallback=False),
+        "parkingBrake": b("parkingBrake", fallback=False),
+
+        "driverName": s("driverName", fallback=""),
+        "timestampUtc": now_utc().isoformat() + "Z"
+    }
+
+    if clean["destinationCity"] == "Freie Fahrt":
+        clean["destinationCity"] = "-"
+
+    return clean
+
+
+def current_job_from_live(live):
+    live = live or {}
+
+    destination = live.get("destinationCity") or "-"
+    source = live.get("sourceCity") or "-"
+    cargo = live.get("cargo") or "-"
+
+    has_job = destination != "-" or source != "-" or cargo != "-"
+
+    if not has_job:
+        return None
+
+    return {
+        "sourceCity": source,
+        "destinationCity": destination,
+        "cargo": cargo,
+        "distanceKm": parse_number(live.get("plannedDistanceKm"), 0),
+        "remainingDistanceKm": parse_number(live.get("remainingDistanceKm"), 0),
+        "income": round(parse_number(live.get("tripDistanceKm"), 0) * 3.2),
+        "status": "Aktiv" if live.get("telemetryConnected") else "Warte"
+    }
+
+
+def get_user_job_entries(user_doc):
+    result = []
+
+    possible_fields = [
+        "job_history",
+        "jobs",
+        "deliveries",
+        "logbook",
+        "tracker_logbook"
+    ]
+
+    for field in possible_fields:
+        items = user_doc.get(field)
+
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, dict):
+                    result.append(item)
+
+    return result
+
+
+def normalize_logbook_entry(entry, user_doc=None):
+    user_doc = user_doc or {}
+
+    source = safe_str(
+        entry.get("sourceCity")
+        or entry.get("source")
+        or entry.get("from")
+        or entry.get("routeOrigin"),
+        "-"
+    )
+
+    destination = safe_str(
+        entry.get("destinationCity")
+        or entry.get("destination")
+        or entry.get("to")
+        or entry.get("routeDestination"),
+        "-"
+    )
+
+    route = safe_str(entry.get("route"))
+
+    if not route:
+        route = f"{source} → {destination}"
+
+    distance = parse_number(
+        entry.get("distanceKm")
+        or entry.get("distance")
+        or entry.get("tripDistanceKm"),
+        0
+    )
+
+    income = parse_number(
+        entry.get("income")
+        or entry.get("revenue")
+        or entry.get("money"),
+        0
+    )
+
+    created_at = (
+        entry.get("createdAt")
+        or entry.get("created_at")
+        or entry.get("finishedAt")
+        or entry.get("timestamp")
+        or ""
+    )
+
+    if isinstance(created_at, datetime):
+        created_at_text = created_at.isoformat() + "Z"
+        sort_date = created_at
+    else:
+        created_at_text = safe_str(created_at)
+        sort_date = datetime.min
+
+    return {
+        "status": safe_str(entry.get("status"), "Fertig"),
+        "route": route,
+        "sourceCity": source,
+        "destinationCity": destination,
+        "cargo": safe_str(entry.get("cargo") or entry.get("cargoName"), "-"),
+        "distanceKm": distance,
+        "income": income,
+        "driverName": (
+            user_doc.get("display_name")
+            or user_doc.get("username")
+            or user_doc.get("discord_username")
+            or "EifelLog Fahrer"
+        ),
+        "createdAt": created_at_text,
+        "_sortDate": sort_date
+    }
+
+
+def build_active_driver_payload(user_doc):
+    live = user_doc.get("tracker_live") or {}
+
+    display_name = (
+        user_doc.get("display_name")
+        or user_doc.get("username")
+        or user_doc.get("discord_username")
+        or "EifelLog Fahrer"
+    )
+
+    return {
+        "driverName": display_name,
+        "displayName": display_name,
+        "username": user_doc.get("username"),
+        "discordId": user_doc.get("discord_id"),
+        "avatarUrl": make_external_url(get_discord_avatar_url(user_doc)),
+        "game": live.get("game") or "ETS2/ATS",
+        "truck": live.get("truck") or "-",
+        "destinationCity": live.get("destinationCity") or "-",
+        "cargo": live.get("cargo") or "-",
+        "speedKmh": parse_number(live.get("speedKmh"), 0),
+        "isOnline": bool(user_doc.get("tracker_online", False)),
+        "lastSeen": datetime_to_iso(user_doc.get("tracker_live_updated_at"))
+    }
+
+
+def get_active_drivers():
+    since = now_utc() - timedelta(minutes=2)
+
+    users = users_collection.find({
+        "tracker_online": True,
+        "tracker_live_updated_at": {"$gte": since}
+    }).sort("tracker_live_updated_at", DESCENDING)
+
+    return [build_active_driver_payload(user) for user in users]
+
+
+def build_logbook_payload(limit=30):
+    entries = []
+
+    for user_doc in users_collection.find({}):
+        for raw_entry in get_user_job_entries(user_doc):
+            entries.append(normalize_logbook_entry(raw_entry, user_doc))
+
+        live = user_doc.get("tracker_live") or {}
+        updated_at = user_doc.get("tracker_live_updated_at")
+
+        if user_doc.get("tracker_online") and isinstance(updated_at, datetime):
+            if updated_at >= now_utc() - timedelta(minutes=2):
+                current_job = current_job_from_live(live)
+
+                if current_job:
+                    entries.append({
+                        "status": "Aktiv",
+                        "route": f"{current_job.get('sourceCity', '-')} → {current_job.get('destinationCity', '-')}",
+                        "sourceCity": current_job.get("sourceCity", "-"),
+                        "destinationCity": current_job.get("destinationCity", "-"),
+                        "cargo": current_job.get("cargo", "-"),
+                        "distanceKm": parse_number(live.get("tripDistanceKm"), 0),
+                        "income": round(parse_number(live.get("tripDistanceKm"), 0) * 3.2),
+                        "driverName": (
+                            user_doc.get("display_name")
+                            or user_doc.get("username")
+                            or user_doc.get("discord_username")
+                            or "EifelLog Fahrer"
+                        ),
+                        "createdAt": datetime_to_iso(updated_at),
+                        "_sortDate": updated_at
+                    })
+
+    entries.sort(key=lambda item: item.get("_sortDate") or datetime.min, reverse=True)
+
+    clean_entries = []
+
+    for entry in entries[:limit]:
+        entry.pop("_sortDate", None)
+        clean_entries.append(entry)
+
+    return clean_entries
+
+
+def build_company_stats_payload():
+    users = list(users_collection.find({}))
+
+    company_income = 0.0
+    company_km = 0.0
+    jobs_all_time = 0
+    deliveries = 0
+
+    monthly_kilometers = [0, 0, 0, 0, 0, 0]
+    income_series = [0, 0, 0, 0, 0, 0]
+
+    for user_doc in users:
+        stats = get_profile_stats(user_doc)
+
+        user_km = parse_number(stats.get("km"), 0)
+        user_income = parse_number(stats.get("income") or stats.get("revenue"), 0)
+        user_deliveries = parse_int(stats.get("deliveries"), 0)
+        user_jobs = parse_int(stats.get("jobs"), user_deliveries)
+
+        live = user_doc.get("tracker_live") or {}
+        live_km = parse_number(live.get("tripDistanceKm"), 0)
+        live_income = round(live_km * 3.2)
+
+        company_km += user_km + live_km
+        company_income += user_income + live_income
+        jobs_all_time += user_jobs
+        deliveries += user_deliveries
+
+        job_entries = get_user_job_entries(user_doc)
+
+        if job_entries:
+            for job in job_entries:
+                distance = parse_number(
+                    job.get("distanceKm")
+                    or job.get("distance")
+                    or job.get("tripDistanceKm"),
+                    0
+                )
+
+                income = parse_number(
+                    job.get("income")
+                    or job.get("revenue")
+                    or job.get("money"),
+                    0
+                )
+
+                monthly_kilometers[-1] += distance
+                income_series[-1] += income
+        else:
+            monthly_kilometers[-1] += user_km + live_km
+            income_series[-1] += user_income + live_income
+
+    active_driver_count = len(get_active_drivers())
+
+    return {
+        "companyIncome": round(company_income),
+        "income": round(company_income),
+        "revenue": round(company_income),
+        "allTimeKilometers": round(company_km, 1),
+        "allTimeKm": round(company_km, 1),
+        "kilometers": round(company_km, 1),
+        "jobsAllTime": jobs_all_time,
+        "jobs": jobs_all_time,
+        "totalJobs": jobs_all_time,
+        "deliveries": deliveries,
+        "totalDeliveries": deliveries,
+        "activeDrivers": active_driver_count,
+        "monthlyKilometers": monthly_kilometers,
+        "incomeSeries": income_series
+    }
+
+
+def tracker_state_payload(user_doc):
+    active_drivers = get_active_drivers()
+    company_stats = build_company_stats_payload()
+    logbook = build_logbook_payload(limit=30)
+
+    live = user_doc.get("tracker_live") or {}
+    current_job = current_job_from_live(live)
+
+    return {
+        "success": True,
+        "profile": tracker_profile_payload(user_doc),
+        "company": company_stats,
+        "companyStats": company_stats,
+        "currentJob": current_job,
+        "logbook": logbook,
+        "lastDeliveries": logbook,
+        "activeDrivers": active_drivers
+    }
 
 
 # ==========================================
@@ -672,7 +1114,8 @@ def callback():
                 "profile_km": "0",
                 "profile_deliveries": "0",
                 "profile_convoys": "0",
-                "profile_rating": "0.0"
+                "profile_rating": "0.0",
+                "profile_income": "0"
             }
         },
         upsert=True
@@ -792,7 +1235,8 @@ def tracker_login():
                 "tracker_client_token_hash": client_token_hash,
                 "tracker_last_login": now_utc(),
                 "tracker_last_driver_name": driver_name,
-                "tracker_enabled": True
+                "tracker_enabled": True,
+                "tracker_online": True
             },
             "$inc": {
                 "tracker_login_count": 1
@@ -827,12 +1271,7 @@ def tracker_session_login():
         }), 200
 
     data = request.get_json(silent=True) or {}
-
-    client_token = (
-        safe_str(data.get("clientToken"))
-        or safe_str(request.headers.get("X-Tracker-Token"))
-        or safe_str(request.headers.get("Authorization")).replace("Bearer ", "").strip()
-    )
+    client_token = get_client_token_from_request(data)
 
     if not client_token:
         return jsonify({
@@ -840,11 +1279,7 @@ def tracker_session_login():
             "error": "Kein gespeicherter Tracker-Token vorhanden."
         }), 401
 
-    client_token_hash = hash_secret(client_token)
-
-    user_doc = users_collection.find_one({
-        "tracker_client_token_hash": client_token_hash
-    })
+    user_doc = find_tracker_user_by_client_token(client_token)
 
     if not user_doc:
         return jsonify({
@@ -862,7 +1297,8 @@ def tracker_session_login():
         {"_id": user_doc["_id"]},
         {
             "$set": {
-                "tracker_last_session_login": now_utc()
+                "tracker_last_session_login": now_utc(),
+                "tracker_online": True
             }
         }
     )
@@ -881,15 +1317,8 @@ def tracker_profile():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
 
-    if request.method == "GET":
-        client_token = (
-            safe_str(request.headers.get("X-Tracker-Token"))
-            or safe_str(request.headers.get("Authorization")).replace("Bearer ", "").strip()
-            or safe_str(request.args.get("clientToken"))
-        )
-    else:
-        data = request.get_json(silent=True) or {}
-        client_token = safe_str(data.get("clientToken"))
+    data = request.get_json(silent=True) or {}
+    client_token = get_client_token_from_request(data)
 
     if not client_token:
         return jsonify({
@@ -897,9 +1326,7 @@ def tracker_profile():
             "error": "Tracker-Token fehlt."
         }), 401
 
-    user_doc = users_collection.find_one({
-        "tracker_client_token_hash": hash_secret(client_token)
-    })
+    user_doc = find_tracker_user_by_client_token(client_token)
 
     if not user_doc:
         return jsonify({
@@ -919,6 +1346,122 @@ def tracker_profile():
     })
 
 
+@app.route("/api/tracker/state", methods=["GET", "POST", "OPTIONS"])
+def tracker_state():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    data = request.get_json(silent=True) or {}
+    client_token = get_client_token_from_request(data)
+
+    if not client_token:
+        return jsonify({
+            "success": False,
+            "error": "Tracker-Token fehlt."
+        }), 401
+
+    user_doc = find_tracker_user_by_client_token(client_token)
+
+    if not user_doc:
+        return jsonify({
+            "success": False,
+            "error": "Tracker-Token ist ungültig."
+        }), 401
+
+    if not user_has_tracker_access(user_doc):
+        return jsonify({
+            "success": False,
+            "error": "Tracker-Zugriff ist deaktiviert."
+        }), 403
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": {
+                "tracker_state_requested_at": now_utc()
+            }
+        }
+    )
+
+    fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
+
+    return jsonify(tracker_state_payload(fresh_user))
+
+
+@app.route("/api/tracker/telemetry/live", methods=["GET", "POST", "OPTIONS"])
+def tracker_telemetry_live():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    if request.method == "GET":
+        return jsonify({
+            "success": False,
+            "message": "Dieser Endpoint ist aktiv, erwartet aber POST mit clientToken und telemetry."
+        }), 200
+
+    data = request.get_json(silent=True) or {}
+    client_token = get_client_token_from_request(data)
+
+    if not client_token:
+        return jsonify({
+            "success": False,
+            "error": "Tracker-Token fehlt."
+        }), 401
+
+    user_doc = find_tracker_user_by_client_token(client_token)
+
+    if not user_doc:
+        return jsonify({
+            "success": False,
+            "error": "Tracker-Token ist ungültig."
+        }), 401
+
+    if not user_has_tracker_access(user_doc):
+        return jsonify({
+            "success": False,
+            "error": "Tracker-Zugriff ist deaktiviert."
+        }), 403
+
+    raw_telemetry = data.get("telemetry") or data.get("snapshot") or {}
+    telemetry = normalize_telemetry_payload(raw_telemetry)
+
+    is_online = bool(
+        telemetry.get("isConnected")
+        or telemetry.get("gameProcessDetected")
+        or telemetry.get("telemetryConnected")
+    )
+
+    update_payload = {
+        "tracker_live": telemetry,
+        "tracker_live_updated_at": now_utc(),
+        "tracker_online": is_online,
+        "tracker_last_game": telemetry.get("game"),
+        "tracker_last_truck": telemetry.get("truck"),
+        "tracker_last_destination": telemetry.get("destinationCity"),
+        "tracker_last_cargo": telemetry.get("cargo"),
+        "tracker_last_speed_kmh": telemetry.get("speedKmh"),
+        "tracker_last_fuel_percent": telemetry.get("fuelPercent"),
+        "tracker_last_damage_percent": telemetry.get("damagePercent"),
+        "tracker_last_trip_distance_km": telemetry.get("tripDistanceKm")
+    }
+
+    current_job = current_job_from_live(telemetry)
+
+    if current_job:
+        update_payload["tracker_current_job"] = current_job
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": update_payload
+        }
+    )
+
+    fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
+
+    return jsonify(tracker_state_payload(fresh_user))
+
+
 @app.route("/api/tracker/logout", methods=["GET", "POST", "OPTIONS"])
 def tracker_logout():
     if request.method == "OPTIONS":
@@ -931,7 +1474,7 @@ def tracker_logout():
         }), 200
 
     data = request.get_json(silent=True) or {}
-    client_token = safe_str(data.get("clientToken"))
+    client_token = get_client_token_from_request(data)
 
     if client_token:
         users_collection.update_one(
@@ -941,7 +1484,8 @@ def tracker_logout():
                     "tracker_client_token_hash": ""
                 },
                 "$set": {
-                    "tracker_logged_out_at": now_utc()
+                    "tracker_logged_out_at": now_utc(),
+                    "tracker_online": False
                 }
             }
         )
@@ -1298,8 +1842,6 @@ def dashboard():
 
 
 # ==========================================
-# Tracker Management, Downloads, Fuhrpark - NUR FÜR DASHBOARD MITGLIEDER
-# ==========================================
 # PERSONALABTEILUNG / TRACKER-CODE VERWALTUNG
 # ==========================================
 
@@ -1331,16 +1873,6 @@ def require_personalabteilung_permission():
         return redirect(url_for("dashboard"))
 
     return None
-
-
-def format_datetime_for_template(value):
-    if isinstance(value, datetime):
-        return value.strftime("%d.%m.%Y %H:%M")
-
-    if value:
-        return str(value)
-
-    return ""
 
 
 def get_role_name_for_driver(user_doc):
@@ -1476,7 +2008,7 @@ def personalabteilung_create_tracker_code():
         "trackerCode": tracker_code,
         "driver": tracker_profile_payload(fresh_user)
     })
-# ==========================================
+
 
 # ==========================================
 # STANDARD ROUTEN
@@ -1541,7 +2073,15 @@ def health_check():
         "success": True,
         "service": "EifelLog",
         "database": MONGO_DB_NAME,
-        "time": now_utc().isoformat() + "Z"
+        "time": now_utc().isoformat() + "Z",
+        "trackerRoutes": [
+            "/api/tracker/login",
+            "/api/tracker/session",
+            "/api/tracker/profile",
+            "/api/tracker/state",
+            "/api/tracker/telemetry/live",
+            "/api/tracker/logout"
+        ]
     })
 
 
