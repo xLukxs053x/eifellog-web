@@ -21,4 +21,4 @@ def hub():
 if __name__ == '__main__':
     # debug=True startet den Server bei Code-Änderungen automatisch neu
     # Läuft lokal auf Port 6000
-    app.run(host='127.0.0.1', port=6000, debug=True)
+    app.run(host='127.0.0.1', port=5005, debug=True)
