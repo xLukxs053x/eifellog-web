@@ -4,16 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Eifel LOG - Virtuelle Spedition{% endblock %}</title>
-    
+
     <!-- Favicon -->
     <link rel="icon" href="{{ url_for('static', filename='eifellog.jpg') }}" type="image/jpeg">
-    
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Sci-Fi & Clean Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
+
     <style>
         /* === FARBPALETTE & VARIABLEN === */
         :root {
@@ -23,14 +23,46 @@
             --line: rgba(255, 255, 255, 0.08);
             --text: #edf3ff;
             --muted: #93a4c8;
-            
+
             /* Eifel LOG Farben */
             --brand-yellow: #dce226;
             --brand-green: #89be32;
-            --brand-green-rgb: 137, 190, 50; 
-            
+            --brand-green-rgb: 137, 190, 50;
+
             --danger: #ff9f9f;
             --shadow: 0 36px 100px rgba(0, 0, 0, 0.6);
+
+            /* Allgemeiner Zoom / Layout-Balance */
+            --site-max-width: 1280px;
+            --nav-max-width: 1280px;
+        }
+
+        /*
+            Global leicht rausgezoomt:
+            Tailwind nutzt viel rem. Dadurch werden Abstände, Texte, Karten und Buttons
+            etwas kleiner, ohne dass alles kaputt skaliert wird.
+        */
+        html {
+            font-size: 14.5px;
+            scroll-behavior: smooth;
+        }
+
+        @media (min-width: 1280px) {
+            html {
+                font-size: 14px;
+            }
+        }
+
+        @media (min-width: 1536px) {
+            html {
+                font-size: 13.6px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            html {
+                font-size: 14px;
+            }
         }
 
         /* === GLOBAL SCROLLBAR HIDE === */
@@ -44,6 +76,7 @@
         * {
             scrollbar-width: none !important;
             -ms-overflow-style: none !important;
+            box-sizing: border-box;
         }
 
         body {
@@ -55,6 +88,10 @@
             display: flex;
             flex-direction: column;
             min-height: 100vh;
+        }
+
+        body.overflow-hidden {
+            overflow: hidden;
         }
 
         /* === HINTERGRUND SLIDESHOW === */
@@ -73,42 +110,69 @@
             height: 100%;
             object-fit: cover;
             object-position: center;
-            filter: saturate(1.1) brightness(0.35);
+            filter: saturate(1.05) brightness(0.3);
             opacity: 0;
             animation: fadeZoom 24s infinite;
         }
-        
-        .hero-bg .slide-1 { animation-delay: 0s; }
-        .hero-bg .slide-2 { animation-delay: 8s; }
-        .hero-bg .slide-3 { animation-delay: 16s; }
+
+        .hero-bg .slide-1 {
+            animation-delay: 0s;
+        }
+
+        .hero-bg .slide-2 {
+            animation-delay: 8s;
+        }
+
+        .hero-bg .slide-3 {
+            animation-delay: 16s;
+        }
 
         @keyframes fadeZoom {
-            0%   { opacity: 0; transform: scale(1); }
-            10%  { opacity: 1; }
-            33%  { opacity: 1; }
-            45%  { opacity: 0; transform: scale(1.05); }
-            100% { opacity: 0; transform: scale(1.05); }
+            0% {
+                opacity: 0;
+                transform: scale(1);
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            33% {
+                opacity: 1;
+            }
+
+            45% {
+                opacity: 0;
+                transform: scale(1.045);
+            }
+
+            100% {
+                opacity: 0;
+                transform: scale(1.045);
+            }
         }
 
         .hero-overlay {
             position: absolute;
             inset: 0;
-            background: radial-gradient(circle at 50% 30%, rgba(10, 20, 15, 0.3) 0%, rgba(4, 10, 6, 0.95) 100%);
+            background:
+                radial-gradient(circle at 50% 32%, rgba(10, 20, 15, 0.18) 0%, rgba(4, 10, 6, 0.86) 58%, rgba(2, 5, 3, 0.98) 100%),
+                linear-gradient(180deg, rgba(0, 0, 0, 0.20), rgba(0, 0, 0, 0.56));
         }
 
         /* === UI ELEMENTE & GLASSMORPHISM === */
         .glass-nav {
-            background: rgba(10, 20, 15, 0.6);
+            background: rgba(10, 20, 15, 0.58);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
-            border: 1px solid rgba(255,255,255,0.06);
+            border: 1px solid rgba(255, 255, 255, 0.06);
             border-top: 1px solid rgba(137, 190, 50, 0.2);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         }
 
         .glass-card {
-            background: linear-gradient(135deg, rgba(20, 30, 20, 0.4) 0%, rgba(5, 10, 5, 0.8) 100%);
-            border: 1px solid rgba(255,255,255,0.06);
+            background: linear-gradient(135deg, rgba(20, 30, 20, 0.36) 0%, rgba(5, 10, 5, 0.76) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.06);
             border-top: 1px solid rgba(137, 190, 50, 0.2);
             border-left: 1px solid rgba(137, 190, 50, 0.2);
             border-radius: 28px;
@@ -121,12 +185,12 @@
         .btn-primary,
         .btn-secondary {
             font-family: 'Orbitron', sans-serif;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.15em;
             border-radius: 12px;
-            padding: 12px 24px;
+            padding: 11px 21px;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
@@ -134,8 +198,10 @@
             gap: 8px;
             transition: all 0.3s ease;
             text-decoration: none;
+            line-height: 1;
+            min-height: 40px;
         }
-        
+
         .btn-primary {
             background: rgba(var(--brand-green-rgb), 0.15);
             color: var(--brand-green);
@@ -151,48 +217,139 @@
         }
 
         .btn-secondary {
-            background: rgba(255,255,255,0.03);
+            background: rgba(255, 255, 255, 0.03);
             color: var(--text);
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .btn-secondary:hover {
-            background: rgba(255,255,255,0.08);
-            border-color: rgba(255,255,255,0.25);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.25);
             transform: translateY(-2px);
         }
 
         /* Hover-Effekt für Navigations-Links */
         .nav-link {
             font-family: 'Orbitron', sans-serif;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.15em;
             color: var(--muted);
             transition: all 0.3s ease;
-            padding: 8px 16px;
+            padding: 8px 14px;
             border-radius: 8px;
+            text-decoration: none;
+            line-height: 1;
         }
+
         .nav-link:hover {
             color: var(--text);
-            background: rgba(255,255,255,0.05);
+            background: rgba(255, 255, 255, 0.05);
         }
-        
+
+        .base-shell {
+            width: 100%;
+            max-width: var(--site-max-width);
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 1.25rem;
+            padding-right: 1.25rem;
+        }
+
+        .base-main {
+            position: relative;
+            z-index: 10;
+            padding-top: 7.5rem;
+            padding-bottom: 4rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .base-content {
+            width: 100%;
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /*
+            Modals aus Unterseiten wirken weniger „draufgedrückt“:
+            feste Overlays werden sauber mittig ausgerichtet.
+        */
+        .fixed.inset-0.items-center.justify-center {
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
+        /* Bei sehr breiten Monitoren etwas kompakter und mittiger */
+        @media (min-width: 1536px) {
+            .base-main {
+                padding-top: 7rem;
+            }
+
+            .base-shell {
+                max-width: 1220px;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .base-main {
+                padding-top: 7rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .base-main {
+                padding-top: 6.5rem;
+                padding-bottom: 3rem;
+            }
+
+            .base-shell {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            .btn-primary,
+            .btn-secondary {
+                width: 100%;
+            }
+        }
+
         /* === FADE ANIMATIONEN FÜR SEITENWECHSEL === */
         .fade-enter {
             animation: fadeIn 0.4s ease-out forwards;
         }
+
         .fade-leave {
             animation: fadeOut 0.3s ease-in forwards;
         }
+
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(15px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
+
         @keyframes fadeOut {
-            from { opacity: 1; transform: translateY(0); }
-            to { opacity: 0; transform: translateY(-15px); }
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateY(-12px);
+            }
         }
     </style>
 
@@ -200,18 +357,22 @@
         // Fade-out Effekt für interne Links
         document.addEventListener('DOMContentLoaded', () => {
             const links = document.querySelectorAll('a:not([target="_blank"]):not([href^="#"]):not(.no-fade)');
+
             links.forEach(link => {
                 link.addEventListener('click', e => {
-                    if(link.closest('#mobile-menu-btn')) return;
+                    if (link.closest('#mobile-menu-btn')) return;
 
                     if (link.hostname === window.location.hostname) {
                         e.preventDefault();
+
                         const href = link.href;
+
                         document.body.classList.remove('fade-enter');
                         document.body.classList.add('fade-leave');
+
                         setTimeout(() => {
                             window.location = href;
-                        }, 300); 
+                        }, 300);
                     }
                 });
             });
@@ -220,11 +381,15 @@
         // Mobile Menü Toggle
         function toggleMobileMenu() {
             const menu = document.getElementById('mobile-menu');
+
+            if (!menu) return;
+
             menu.classList.toggle('hidden');
             menu.classList.toggle('flex');
         }
     </script>
 </head>
+
 <body class="fade-enter antialiased flex flex-col overflow-x-hidden">
 
     <!-- Hintergrund Slideshow -->
@@ -236,44 +401,52 @@
     </div>
 
     <!-- Navigation -->
-    <header class="fixed top-0 left-0 w-full z-50 px-4 py-4 md:py-6 pointer-events-none">
-        <div class="max-w-[1400px] mx-auto pointer-events-auto">
-            <nav class="glass-nav px-4 md:px-6 py-3 rounded-full flex justify-between items-center transition-all">
-                
+    <header class="fixed top-0 left-0 w-full z-50 px-4 py-4 md:py-5 pointer-events-none">
+        <div class="w-full max-w-[var(--nav-max-width)] mx-auto pointer-events-auto">
+            <nav class="glass-nav px-4 md:px-5 py-2.5 rounded-full flex justify-between items-center transition-all">
+
                 <!-- Logo Brand -->
                 <a href="/" class="flex items-center gap-3 group shrink-0">
-                    <div class="w-10 h-10 rounded-full overflow-hidden border border-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.3)] group-hover:shadow-[0_0_25px_rgba(137,190,50,0.6)] transition-all duration-300">
+                    <div class="w-9 h-9 rounded-full overflow-hidden border border-[var(--brand-green)] shadow-[0_0_15px_rgba(137,190,50,0.3)] group-hover:shadow-[0_0_25px_rgba(137,190,50,0.6)] transition-all duration-300">
                         <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo" class="w-full h-full object-cover">
                     </div>
+
                     <div class="hidden sm:flex flex-col leading-none">
-                        <span class="text-sm font-orbitron font-bold tracking-widest text-[var(--text)] uppercase">Eifel LOG</span>
-                        <span class="text-[8px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-[0.2em] mt-1">Network Node</span>
+                        <span class="text-[13px] font-orbitron font-bold tracking-widest text-[var(--text)] uppercase">Eifel LOG</span>
+                        <span class="text-[7px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-[0.2em] mt-1">Network Node</span>
                     </div>
                 </a>
-                
+
                 <!-- Desktop Menu -->
                 <div class="hidden lg:flex items-center gap-2">
                     <a href="/" class="nav-link">Home</a>
                     <a href="/about" class="nav-link">Über uns</a>
                     <a href="/fuhrpark" class="nav-link">Fuhrpark</a>
                 </div>
-                
+
                 <!-- Desktop Buttons -->
                 <div class="hidden lg:flex shrink-0 items-center gap-3">
                     {% if session.get('user') %}
                         <!-- Zeige Dashboard & Logout, wenn eingeloggt -->
                         <a href="/dashboard" class="btn-primary">
-                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                            </svg>
                             Dashboard
                         </a>
+
                         <a href="/logout" class="btn-secondary" style="color: var(--danger); border-color: rgba(255, 159, 159, 0.3);">
-                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            </svg>
                             Logout
                         </a>
                     {% else %}
                         <!-- Zeige Driver Hub, wenn NICHT eingeloggt -->
                         <a href="/hub" class="btn-primary">
-                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path></svg>
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path>
+                            </svg>
                             Driver Hub
                         </a>
                     {% endif %}
@@ -293,14 +466,16 @@
             <div id="mobile-menu" class="hidden flex-col gap-3 mt-4 p-6 glass-nav rounded-3xl lg:hidden pointer-events-auto">
                 <a href="/" class="nav-link text-center w-full bg-white/5 border border-white/5">Home</a>
                 <a href="/about" class="nav-link text-center w-full bg-white/5 border border-white/5">Über uns</a>
-                <a href="/fleet" class="nav-link text-center w-full bg-white/5 border border-white/5">Fuhrpark</a>
+                <a href="/fuhrpark" class="nav-link text-center w-full bg-white/5 border border-white/5">Fuhrpark</a>
+
                 <div class="h-px w-full bg-white/10 my-2"></div>
-                
+
                 {% if session.get('user') %}
                     <!-- Zeige Dashboard & Logout, wenn eingeloggt -->
                     <a href="/dashboard" class="btn-primary w-full justify-center">
                         Dashboard
                     </a>
+
                     <a href="/logout" class="btn-secondary w-full justify-center mt-2" style="color: var(--danger); border-color: rgba(255, 159, 159, 0.3);">
                         Logout
                     </a>
@@ -315,9 +490,9 @@
     </header>
 
     <!-- Main Content -->
-    <main class="relative z-10 pt-32 pb-16 min-h-screen flex flex-col">
-        <div class="max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-8 flex-grow flex flex-col">
-            
+    <main class="base-main">
+        <div class="base-shell base-content">
+
             <!-- Optional: Flask Flash Messages können hier gerendert werden -->
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -339,17 +514,19 @@
     </main>
 
     <!-- Footer -->
-    <footer class="relative z-10 border-t border-[var(--line)] py-8 bg-[var(--bg-2)]/80 backdrop-blur-xl mt-auto w-full">
-        <div class="max-w-[1400px] mx-auto px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+    <footer class="relative z-10 border-t border-[var(--line)] py-7 bg-[var(--bg-2)]/80 backdrop-blur-xl mt-auto w-full">
+        <div class="w-full max-w-[var(--site-max-width)] mx-auto px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <div class="flex items-center gap-3">
                 <div class="w-2 h-2 rounded-full bg-[var(--brand-green)] opacity-80 animate-pulse"></div>
                 <p class="font-orbitron tracking-[0.2em] uppercase text-[10px] font-bold text-[var(--text)]">
                     Eifel LOG
                 </p>
             </div>
+
             <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest text-center md:text-left">
                 Wir bringen deine Fracht sicher ans Ziel.
             </p>
+
             <p class="text-[10px] font-inter text-[var(--muted)]">
                 &copy; 2026 Eifel LOG. All systems nominal.
             </p>
