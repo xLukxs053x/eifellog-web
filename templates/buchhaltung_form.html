@@ -1,108 +1,31 @@
 {% extends "base.html" %}
 
-{% block title %}Buchhaltung | EifelLog{% endblock %}
+{% block title %}Buchhaltung | Eifel LOG{% endblock %}
 
 {% block content %}
 {% set session_user = session.get('user', {}) %}
 {% set display_name = session_user.get('username') or session_user.get('display_name') or session_user.get('discord_username') or 'Buchhaltung' %}
 
 <style>
-    :root {
-        --bh-bg-1: #010302;
-        --bh-bg-2: #06100a;
-        --bh-card: rgba(7, 14, 10, 0.78);
-        --bh-card-strong: rgba(8, 17, 12, 0.94);
-        --bh-line: rgba(255, 255, 255, 0.08);
-        --bh-text: #edf3ff;
-        --bh-muted: #9aa9c4;
-        --bh-muted-2: #65718a;
-        --bh-green: #6f9232;
-        --bh-green-soft: #86ad48;
-        --bh-green-rgb: 111, 146, 50;
-        --bh-yellow: #dce226;
-        --bh-yellow-rgb: 220, 226, 38;
-        --bh-danger: #ff9f9f;
-        --bh-danger-rgb: 255, 159, 159;
-        --bh-blue: #7ba7ff;
-        --bh-blue-rgb: 123, 167, 255;
-        --bh-radius-xl: 30px;
-        --bh-radius-lg: 22px;
-        --bh-shadow: 0 28px 80px rgba(0, 0, 0, 0.58);
+    /*
+        buchhaltung2.html
+        Nutzt bewusst den Hintergrund, die Slideshow, Navigation, Buttons und das Grundlayout aus base.html.
+        Deshalb wird hier KEIN eigener Seitenhintergrund gesetzt.
+    */
+
+    .buchhaltung2-page {
+        width: 100%;
+        display: grid;
+        gap: 22px;
+        color: var(--text);
     }
 
-    .buchhaltung-page {
-        position: relative;
-        min-height: calc(100vh - 120px);
-        padding: 34px 34px 130px;
-        color: var(--bh-text);
-        overflow: hidden;
-    }
-
-    .buchhaltung-page::before {
-        content: "";
-        position: fixed;
-        inset: 0;
-        z-index: 0;
-        pointer-events: none;
-        background:
-            radial-gradient(circle at 20% 16%, rgba(var(--bh-yellow-rgb), 0.10), transparent 28%),
-            radial-gradient(circle at 82% 20%, rgba(var(--bh-green-rgb), 0.12), transparent 30%),
-            radial-gradient(circle at 50% 85%, rgba(var(--bh-blue-rgb), 0.08), transparent 34%),
-            linear-gradient(180deg, rgba(1, 3, 2, 0.94), rgba(2, 8, 5, 0.98));
-    }
-
-    .buchhaltung-page::after {
-        content: "";
-        position: fixed;
-        inset: 0;
-        z-index: 0;
-        pointer-events: none;
-        opacity: 0.23;
-        background:
-            linear-gradient(rgba(255, 255, 255, 0.014) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px);
-        background-size: 48px 48px;
-        mask-image: radial-gradient(circle at center, black, transparent 82%);
-    }
-
-    .buchhaltung-shell {
-        position: relative;
-        z-index: 2;
-        width: min(1120px, 100%);
-        margin: 0 auto;
+    .bh2-grid {
         display: grid;
         gap: 22px;
     }
 
-    .bh-card {
-        position: relative;
-        overflow: hidden;
-        border-radius: var(--bh-radius-xl);
-        border: 1px solid var(--bh-line);
-        border-top: 1px solid rgba(var(--bh-green-rgb), 0.22);
-        background: linear-gradient(145deg, rgba(13, 24, 15, 0.58), rgba(2, 6, 3, 0.92));
-        backdrop-filter: blur(26px);
-        -webkit-backdrop-filter: blur(26px);
-        box-shadow: var(--bh-shadow);
-    }
-
-    .bh-card > * {
-        position: relative;
-        z-index: 2;
-    }
-
-    .bh-card::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 16%;
-        right: 16%;
-        height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(var(--bh-green-rgb), 0.45), rgba(var(--bh-yellow-rgb), 0.25), transparent);
-        pointer-events: none;
-    }
-
-    .bh-header {
+    .bh2-hero {
         padding: 30px;
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
@@ -110,597 +33,1351 @@
         align-items: center;
     }
 
-    .bh-kicker {
-        display: inline-flex;
+    .bh2-kicker {
         width: fit-content;
+        display: inline-flex;
         align-items: center;
         gap: 9px;
         margin-bottom: 14px;
-        color: var(--bh-yellow);
+        color: var(--brand-yellow);
         font-family: "Orbitron", sans-serif;
         font-size: 10px;
+        font-weight: 800;
         text-transform: uppercase;
         letter-spacing: 0.18em;
-        font-weight: 900;
     }
 
-    .bh-kicker i {
+    .bh2-kicker::before {
+        content: "";
         width: 8px;
         height: 8px;
         border-radius: 999px;
-        background: var(--bh-green-soft);
-        box-shadow: 0 0 10px rgba(var(--bh-green-rgb), 0.55);
+        background: var(--brand-green);
+        box-shadow: 0 0 16px rgba(var(--brand-green-rgb), 0.65);
     }
 
-    .bh-header h1 {
+    .bh2-title {
         margin: 0;
+        color: #fff;
         font-family: "Orbitron", sans-serif;
-        font-size: clamp(28px, 4vw, 52px);
+        font-size: clamp(30px, 4vw, 54px);
         line-height: 0.98;
         letter-spacing: -0.04em;
-        color: #fff;
+        text-transform: uppercase;
     }
 
-    .bh-header h1 span {
-        color: var(--bh-green-soft);
-        text-shadow: 0 0 18px rgba(var(--bh-green-rgb), 0.18);
+    .bh2-title span {
+        color: var(--brand-green);
+        text-shadow: 0 0 24px rgba(var(--brand-green-rgb), 0.28);
     }
 
-    .bh-header p {
+    .bh2-lead {
+        max-width: 780px;
         margin: 18px 0 0;
-        max-width: 760px;
-        color: var(--bh-muted);
+        color: var(--muted);
         font-size: 14px;
-        line-height: 1.7;
+        line-height: 1.75;
         font-weight: 500;
     }
 
-    .bh-head-actions {
+    .bh2-hero-actions {
+        min-width: 260px;
         display: grid;
         gap: 10px;
-        min-width: 260px;
     }
 
-    .bh-action-link,
-    .bh-action-button {
-        min-height: 46px;
-        border-radius: 16px;
-        padding: 0 18px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 9px;
-        border: 1px solid rgba(var(--bh-green-rgb), 0.36);
-        background: rgba(var(--bh-green-rgb), 0.12);
-        color: var(--bh-green-soft);
+    .bh2-panel {
+        padding: 24px;
+    }
+
+    .bh2-section-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 18px;
+    }
+
+    .bh2-section-head h2 {
+        margin: 0;
+        color: var(--brand-green);
         font-family: "Orbitron", sans-serif;
-        font-size: 10px;
-        font-weight: 900;
+        font-size: 14px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+    }
+
+    .bh2-section-head p {
+        margin: 7px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+    }
+
+    .bh2-mini-label {
+        color: var(--muted);
+        font-family: "Orbitron", sans-serif;
+        font-size: 9px;
+        font-weight: 800;
         text-transform: uppercase;
         letter-spacing: 0.14em;
-        text-decoration: none;
-        cursor: pointer;
-        transition: 220ms ease;
+        white-space: nowrap;
     }
 
-    .bh-action-link:hover,
-    .bh-action-button:hover:not(:disabled) {
-        color: #fff;
-        border-color: rgba(var(--bh-green-rgb), 0.58);
-        background: rgba(var(--bh-green-rgb), 0.20);
-        transform: translateY(-1px);
-    }
-
-    .bh-action-link.secondary {
-        border-color: rgba(255, 255, 255, 0.10);
-        background: rgba(255, 255, 255, 0.04);
-        color: var(--bh-muted);
-    }
-
-    .bh-action-link.secondary:hover {
-        color: #fff;
-        border-color: rgba(255, 255, 255, 0.20);
-        background: rgba(255, 255, 255, 0.08);
-    }
-
-    .bh-stats-grid {
+    .bh2-stats {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 14px;
     }
 
-    .bh-stat-card {
-        padding: 22px;
-        border-radius: var(--bh-radius-lg);
+    .bh2-stat {
+        padding: 17px;
+        min-height: 112px;
+        border-radius: 20px;
         border: 1px solid rgba(255, 255, 255, 0.065);
-        background: rgba(0, 0, 0, 0.28);
+        background: rgba(0, 0, 0, 0.30);
     }
 
-    .bh-stat-card small {
+    .bh2-stat small {
         display: block;
-        margin-bottom: 12px;
-        color: var(--bh-muted);
+        margin-bottom: 10px;
+        color: var(--muted);
         font-family: "Orbitron", sans-serif;
-        font-size: 9px;
-        font-weight: 900;
+        font-size: 8.5px;
+        font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: 0.16em;
+        letter-spacing: 0.14em;
     }
 
-    .bh-stat-card strong {
+    .bh2-stat strong {
         display: block;
         color: #fff;
         font-family: "Orbitron", sans-serif;
-        font-size: 21px;
-        font-weight: 900;
+        font-size: 18px;
         line-height: 1.2;
+        word-break: break-word;
     }
 
-    .bh-stat-card p {
-        margin: 10px 0 0;
-        color: var(--bh-muted);
-        font-size: 12px;
-        line-height: 1.55;
+    .bh2-stat span {
+        display: block;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.45;
     }
 
-    .bh-main-grid {
+    .bh2-main {
         display: grid;
-        grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+        grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
         gap: 22px;
-        align-items: stretch;
+        align-items: start;
     }
 
-    .bh-form-card,
-    .bh-info-card {
-        padding: 26px;
-    }
-
-    .bh-section-title {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        margin-bottom: 20px;
-    }
-
-    .bh-section-title h2 {
-        margin: 0;
-        color: var(--bh-green-soft);
-        font-family: "Orbitron", sans-serif;
-        font-size: 15px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 0.16em;
-    }
-
-    .bh-section-title span {
-        color: var(--bh-muted-2);
-        font-size: 12px;
-        font-weight: 700;
-    }
-
-    .bh-form {
+    .bh2-form {
         display: grid;
-        gap: 16px;
+        gap: 15px;
     }
 
-    .bh-field {
+    .bh2-field-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    .bh2-field {
         display: grid;
         gap: 8px;
     }
 
-    .bh-field label {
-        color: var(--bh-green-soft);
-        font-family: "Orbitron", sans-serif;
-        font-size: 10px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 0.16em;
+    .bh2-field.full {
+        grid-column: 1 / -1;
     }
 
-    .bh-input,
-    .bh-select,
-    .bh-textarea {
+    .bh2-field label {
+        color: var(--brand-green);
+        font-family: "Orbitron", sans-serif;
+        font-size: 9.5px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+    }
+
+    .bh2-input,
+    .bh2-select,
+    .bh2-textarea {
         width: 100%;
         border-radius: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.085);
+        border: 1px solid rgba(255, 255, 255, 0.09);
         background: rgba(0, 0, 0, 0.42);
-        color: var(--bh-text);
+        color: var(--text);
         outline: none;
-        padding: 0 16px;
         font-size: 13px;
-        font-weight: 700;
+        font-weight: 650;
         transition: 180ms ease;
     }
 
-    .bh-input,
-    .bh-select {
-        min-height: 48px;
+    .bh2-input,
+    .bh2-select {
+        min-height: 46px;
+        padding: 0 14px;
     }
 
-    .bh-textarea {
-        min-height: 190px;
-        padding: 16px;
+    .bh2-textarea {
+        min-height: 108px;
         resize: vertical;
+        padding: 14px;
         line-height: 1.55;
     }
 
-    .bh-input::placeholder,
-    .bh-textarea::placeholder {
-        color: rgba(154, 169, 196, 0.48);
+    .bh2-input::placeholder,
+    .bh2-textarea::placeholder {
+        color: rgba(147, 164, 200, 0.48);
     }
 
-    .bh-input:focus,
-    .bh-select:focus,
-    .bh-textarea:focus {
-        border-color: rgba(var(--bh-green-rgb), 0.48);
-        box-shadow: 0 0 0 3px rgba(var(--bh-green-rgb), 0.07);
+    .bh2-input:focus,
+    .bh2-select:focus,
+    .bh2-textarea:focus {
+        border-color: rgba(var(--brand-green-rgb), 0.52);
+        box-shadow: 0 0 0 3px rgba(var(--brand-green-rgb), 0.08);
     }
 
-    .bh-template-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
-    .bh-template-btn {
-        min-height: 34px;
-        border-radius: 999px;
-        padding: 0 12px;
-        border: 1px solid rgba(255, 255, 255, 0.09);
-        background: rgba(255, 255, 255, 0.04);
-        color: var(--bh-muted);
-        font-family: "Orbitron", sans-serif;
-        font-size: 9px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 0.11em;
-        cursor: pointer;
-        transition: 180ms ease;
-    }
-
-    .bh-template-btn:hover {
-        color: #fff;
-        border-color: rgba(var(--bh-yellow-rgb), 0.42);
-        background: rgba(var(--bh-yellow-rgb), 0.08);
-    }
-
-    .bh-submit-row {
+    .bh2-btn-row {
         display: flex;
         flex-wrap: wrap;
         justify-content: flex-end;
-        align-items: center;
-        gap: 12px;
-        padding-top: 4px;
+        gap: 10px;
+        margin-top: 4px;
     }
 
-    .bh-submit-hint {
-        margin-right: auto;
-        color: var(--bh-muted-2);
+    .bh2-btn-row .btn-primary,
+    .bh2-btn-row .btn-secondary {
+        min-width: 170px;
+    }
+
+    .bh2-split {
+        display: grid;
+        grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+        gap: 22px;
+    }
+
+    .bh2-task-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .bh2-task {
+        display: flex;
+        align-items: flex-start;
+        gap: 11px;
+        padding: 13px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.065);
+        background: rgba(0, 0, 0, 0.28);
+        cursor: pointer;
+        transition: 180ms ease;
+    }
+
+    .bh2-task:hover {
+        border-color: rgba(var(--brand-green-rgb), 0.30);
+        background: rgba(var(--brand-green-rgb), 0.07);
+    }
+
+    .bh2-task input {
+        margin-top: 3px;
+        accent-color: var(--brand-green);
+    }
+
+    .bh2-task strong {
+        display: block;
+        color: #fff;
+        font-family: "Orbitron", sans-serif;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+    }
+
+    .bh2-task span {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .bh2-task.done {
+        opacity: 0.56;
+    }
+
+    .bh2-task.done strong,
+    .bh2-task.done span {
+        text-decoration: line-through;
+    }
+
+    .bh2-filter-grid {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr 0.8fr;
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .bh2-table-wrap {
+        overflow-x: auto;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        background: rgba(0, 0, 0, 0.28);
+    }
+
+    .bh2-table {
+        width: 100%;
+        min-width: 860px;
+        border-collapse: collapse;
+    }
+
+    .bh2-table th,
+    .bh2-table td {
+        padding: 13px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.065);
+        text-align: left;
+        vertical-align: top;
+    }
+
+    .bh2-table th {
+        color: var(--brand-green);
+        font-family: "Orbitron", sans-serif;
+        font-size: 8.5px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.13em;
+        background: rgba(0, 0, 0, 0.22);
+    }
+
+    .bh2-table td {
+        color: var(--text);
         font-size: 12px;
         line-height: 1.45;
     }
 
-    .bh-action-button {
-        min-width: 210px;
+    .bh2-table tr:last-child td {
+        border-bottom: 0;
     }
 
-    .bh-action-button:disabled {
-        opacity: 0.58;
-        cursor: not-allowed;
-        filter: grayscale(0.35);
-    }
-
-    .bh-info-list {
-        display: grid;
-        gap: 12px;
-    }
-
-    .bh-info-item {
-        display: grid;
-        gap: 7px;
-        padding: 15px;
-        border-radius: 18px;
-        border: 1px solid rgba(255, 255, 255, 0.065);
-        background: rgba(0, 0, 0, 0.28);
-    }
-
-    .bh-info-item strong {
-        color: #fff;
-        font-family: "Orbitron", sans-serif;
-        font-size: 11px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 0.13em;
-    }
-
-    .bh-info-item p {
-        margin: 0;
-        color: var(--bh-muted);
-        font-size: 12px;
-        line-height: 1.55;
-    }
-
-    .bh-result-box {
-        display: none;
-        margin-top: 16px;
-        padding: 15px;
-        border-radius: 18px;
-        border: 1px solid rgba(var(--bh-green-rgb), 0.32);
-        background: rgba(var(--bh-green-rgb), 0.075);
-        color: var(--bh-muted);
+    .bh2-empty {
+        padding: 24px;
+        color: var(--muted);
+        text-align: center;
         font-size: 13px;
-        line-height: 1.5;
+        line-height: 1.65;
     }
 
-    .bh-result-box.active {
-        display: block;
-    }
-
-    .bh-result-box.error {
-        border-color: rgba(var(--bh-danger-rgb), 0.38);
-        background: rgba(var(--bh-danger-rgb), 0.075);
-    }
-
-    .bh-result-box strong {
-        display: block;
-        margin-bottom: 5px;
-        color: var(--bh-green-soft);
+    .bh2-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 24px;
+        padding: 0 9px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
         font-family: "Orbitron", sans-serif;
-        font-size: 10px;
-        font-weight: 900;
+        font-size: 8px;
+        font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: 0.13em;
+        letter-spacing: 0.1em;
+        white-space: nowrap;
     }
 
-    .bh-result-box.error strong {
-        color: var(--bh-danger);
+    .bh2-badge.good {
+        border-color: rgba(var(--brand-green-rgb), 0.36);
+        background: rgba(var(--brand-green-rgb), 0.10);
+        color: var(--brand-green);
     }
 
-    @media (max-width: 980px) {
-        .bh-header,
-        .bh-main-grid {
-            grid-template-columns: 1fr;
+    .bh2-badge.warn {
+        border-color: rgba(220, 226, 38, 0.34);
+        background: rgba(220, 226, 38, 0.08);
+        color: var(--brand-yellow);
+    }
+
+    .bh2-badge.danger {
+        border-color: rgba(255, 159, 159, 0.34);
+        background: rgba(255, 159, 159, 0.08);
+        color: var(--danger);
+    }
+
+    .bh2-row-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+    }
+
+    .bh2-mini-btn {
+        min-height: 28px;
+        border-radius: 999px;
+        padding: 0 10px;
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        background: rgba(255, 255, 255, 0.035);
+        color: var(--muted);
+        font-family: "Orbitron", sans-serif;
+        font-size: 7.5px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        cursor: pointer;
+        transition: 180ms ease;
+    }
+
+    .bh2-mini-btn:hover {
+        color: #fff;
+        border-color: rgba(var(--brand-green-rgb), 0.38);
+        background: rgba(var(--brand-green-rgb), 0.10);
+    }
+
+    .bh2-mini-btn.danger:hover {
+        border-color: rgba(255, 159, 159, 0.38);
+        background: rgba(255, 159, 159, 0.08);
+        color: var(--danger);
+    }
+
+    .bh2-report-box {
+        min-height: 260px;
+        white-space: pre-wrap;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        background: rgba(0, 0, 0, 0.34);
+        padding: 17px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.7;
+        overflow: auto;
+    }
+
+    .bh2-toast {
+        position: fixed;
+        right: 22px;
+        bottom: 22px;
+        z-index: 80;
+        max-width: 360px;
+        display: none;
+        padding: 15px 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.34);
+        background: rgba(6, 14, 8, 0.92);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        color: var(--text);
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.50);
+    }
+
+    .bh2-toast.active {
+        display: block;
+        animation: bh2ToastIn 220ms ease-out forwards;
+    }
+
+    .bh2-toast strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--brand-green);
+        font-family: "Orbitron", sans-serif;
+        font-size: 9px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+    }
+
+    .bh2-toast span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+    }
+
+    @keyframes bh2ToastIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
         }
 
-        .bh-head-actions {
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @media (max-width: 1180px) {
+        .bh2-stats {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .bh2-main,
+        .bh2-split {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 860px) {
+        .bh2-hero {
+            grid-template-columns: 1fr;
+            padding: 24px;
+        }
+
+        .bh2-hero-actions {
             min-width: 0;
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
-        .bh-stats-grid {
+        .bh2-field-grid,
+        .bh2-filter-grid {
             grid-template-columns: 1fr;
         }
     }
 
     @media (max-width: 640px) {
-        .buchhaltung-page {
-            padding: 18px 18px 120px;
-        }
-
-        .bh-header,
-        .bh-form-card,
-        .bh-info-card {
-            padding: 22px;
-        }
-
-        .bh-head-actions,
-        .bh-submit-row {
+        .bh2-stats {
             grid-template-columns: 1fr;
         }
 
-        .bh-action-link,
-        .bh-action-button {
+        .bh2-panel {
+            padding: 20px;
+        }
+
+        .bh2-hero-actions,
+        .bh2-btn-row {
+            grid-template-columns: 1fr;
+        }
+
+        .bh2-btn-row .btn-primary,
+        .bh2-btn-row .btn-secondary,
+        .bh2-hero-actions .btn-primary,
+        .bh2-hero-actions .btn-secondary {
             width: 100%;
         }
 
-        .bh-submit-hint {
-            width: 100%;
+        .bh2-toast {
+            left: 14px;
+            right: 14px;
+            bottom: 14px;
+            max-width: none;
         }
     }
 </style>
 
-<div class="buchhaltung-page">
-    <div class="buchhaltung-shell">
-        <section class="bh-card bh-header">
-            <div>
-                <div class="bh-kicker"><i></i> EifelLog Buchhaltung</div>
-                <h1>Buchhaltung <span>Service</span></h1>
-                <p>
-                    Sende Rückfragen, Zahlungsprüfungen oder Beleg-Hinweise direkt an die Personalabteilung.
-                    Deine Nachricht wird gespeichert und automatisch als Aufgabe im internen Aufgaben-Pool hinterlegt.
-                </p>
-            </div>
+<div class="buchhaltung2-page" data-user="{{ display_name }}">
+    <section class="glass-card bh2-hero">
+        <div>
+            <div class="bh2-kicker">Eifel LOG Finance Node</div>
+            <h1 class="bh2-title">Buchhaltung <span>2.0</span></h1>
+            <p class="bh2-lead">
+                Hier findet die tägliche Buchhaltung statt: Einnahmen und Ausgaben erfassen, Belege prüfen,
+                offene Zahlungen verfolgen, Tagesabschluss erstellen und Daten als CSV oder JSON exportieren.
+            </p>
+        </div>
 
-            <div class="bh-head-actions">
-                <a class="bh-action-link" href="{{ url_for('dashboard') }}">
-                    Zum Dashboard
-                </a>
-                <a class="bh-action-link secondary" href="{{ url_for('profile', username=display_name) }}">
-                    Mein Profil
-                </a>
-            </div>
-        </section>
+        <div class="bh2-hero-actions">
+            <a href="/dashboard" class="btn-primary">Dashboard</a>
+            <a href="/profile/{{ display_name|urlencode }}" class="btn-secondary">Mein Profil</a>
+        </div>
+    </section>
 
-        <section class="bh-stats-grid">
-            <div class="bh-stat-card">
-                <small>Absender</small>
-                <strong>{{ display_name }}</strong>
-                <p>Deine Anfrage wird mit deinem eingeloggten Account verknüpft.</p>
-            </div>
+    <section class="bh2-stats" aria-label="Buchhaltung Übersicht">
+        <div class="bh2-stat">
+            <small>Einnahmen brutto</small>
+            <strong id="stat-income">0,00 €</strong>
+            <span>Alle erfassten Einnahmen im aktuellen Speicher.</span>
+        </div>
 
-            <div class="bh-stat-card">
-                <small>Status</small>
-                <strong>Direktübermittlung</strong>
-                <p>Nach dem Absenden landet die Nachricht im System der Personalabteilung.</p>
-            </div>
+        <div class="bh2-stat">
+            <small>Ausgaben brutto</small>
+            <strong id="stat-expense">0,00 €</strong>
+            <span>Alle erfassten Kosten, Belege und sonstigen Ausgaben.</span>
+        </div>
 
-            <div class="bh-stat-card">
-                <small>Aufgaben-Pool</small>
-                <strong>Automatisch</strong>
-                <p>Für jede Anfrage wird zusätzlich ein offener Eintrag im Aufgaben-Pool erstellt.</p>
-            </div>
-        </section>
+        <div class="bh2-stat">
+            <small>Saldo</small>
+            <strong id="stat-balance">0,00 €</strong>
+            <span>Einnahmen abzüglich Ausgaben.</span>
+        </div>
 
-        <section class="bh-main-grid">
-            <div class="bh-card bh-form-card">
-                <div class="bh-section-title">
-                    <h2>Anfrage erstellen</h2>
-                    <span>Endpoint: /api/buchhaltung/request</span>
+        <div class="bh2-stat">
+            <small>USt.-Saldo</small>
+            <strong id="stat-vat">0,00 €</strong>
+            <span>Umsatzsteuer abzüglich Vorsteuer.</span>
+        </div>
+
+        <div class="bh2-stat">
+            <small>Belege offen</small>
+            <strong id="stat-receipts">0</strong>
+            <span>Einträge mit fehlendem Beleg.</span>
+        </div>
+
+        <div class="bh2-stat">
+            <small>Zahlungen offen</small>
+            <strong id="stat-open">0</strong>
+            <span>Noch nicht vollständig bezahlte Vorgänge.</span>
+        </div>
+    </section>
+
+    <section class="bh2-main">
+        <div class="glass-card bh2-panel">
+            <div class="bh2-section-head">
+                <div>
+                    <h2>Buchung erfassen</h2>
+                    <p>Nutze dieses Formular für Tour-Einnahmen, Tankbelege, Reparaturen, Lohnpositionen oder sonstige tägliche Buchhaltungsvorgänge.</p>
                 </div>
+                <span class="bh2-mini-label">Lokal gespeichert</span>
+            </div>
 
-                <form id="buchhaltung-request-form" class="bh-form">
-                    <div class="bh-field">
-                        <label for="bh-category">Kategorie</label>
-                        <select id="bh-category" class="bh-select" autocomplete="off">
-                            <option value="Allgemeine Rückfrage">Allgemeine Rückfrage</option>
-                            <option value="Zahlungsprüfung">Zahlungsprüfung</option>
-                            <option value="Beleg fehlt">Beleg fehlt</option>
-                            <option value="Auszahlung / Vergütung">Auszahlung / Vergütung</option>
-                            <option value="Korrektur notwendig">Korrektur notwendig</option>
+            <form id="bh2-entry-form" class="bh2-form" autocomplete="off">
+                <div class="bh2-field-grid">
+                    <div class="bh2-field">
+                        <label for="entry-date">Datum</label>
+                        <input id="entry-date" class="bh2-input" type="date" required>
+                    </div>
+
+                    <div class="bh2-field">
+                        <label for="entry-type">Typ</label>
+                        <select id="entry-type" class="bh2-select" required>
+                            <option value="income">Einnahme</option>
+                            <option value="expense">Ausgabe</option>
                         </select>
                     </div>
 
-                    <div class="bh-field">
-                        <label for="bh-subject">Betreff optional</label>
-                        <input id="bh-subject" class="bh-input" type="text" maxlength="120" placeholder="z. B. Belegprüfung KW 20 oder Auszahlung offen">
+                    <div class="bh2-field">
+                        <label for="entry-category">Kategorie</label>
+                        <select id="entry-category" class="bh2-select" required>
+                            <option value="Fracht / Tour">Fracht / Tour</option>
+                            <option value="Kraftstoff">Kraftstoff</option>
+                            <option value="Maut">Maut</option>
+                            <option value="Wartung / Reparatur">Wartung / Reparatur</option>
+                            <option value="Fahrer-Vergütung">Fahrer-Vergütung</option>
+                            <option value="Versicherung">Versicherung</option>
+                            <option value="Software / Verwaltung">Software / Verwaltung</option>
+                            <option value="Sonstiges">Sonstiges</option>
+                        </select>
                     </div>
 
-                    <div class="bh-field">
-                        <label>Schnellvorlagen</label>
-                        <div class="bh-template-grid">
-                            <button type="button" class="bh-template-btn" data-template="Bitte prüft eine offene Zahlung. Details: ">Zahlung prüfen</button>
-                            <button type="button" class="bh-template-btn" data-template="Zu dieser Fahrt fehlt noch ein Beleg. Details: ">Beleg fehlt</button>
-                            <button type="button" class="bh-template-btn" data-template="Ich benötige eine Korrektur in der Abrechnung. Details: ">Korrektur</button>
-                            <button type="button" class="bh-template-btn" data-template="Bitte um Rückmeldung zu folgender Buchhaltungsfrage: ">Rückfrage</button>
-                        </div>
+                    <div class="bh2-field">
+                        <label for="entry-amount">Betrag brutto</label>
+                        <input id="entry-amount" class="bh2-input" type="text" inputmode="decimal" required placeholder="z. B. 129,90">
                     </div>
 
-                    <div class="bh-field">
-                        <label for="bh-message">Nachricht</label>
-                        <textarea id="bh-message" class="bh-textarea" maxlength="1000" required placeholder="Schreibe hier deine Anfrage. Bitte möglichst mit Zeitraum, Fahrername, Fahrt/Beleg und Betrag, falls relevant."></textarea>
+                    <div class="bh2-field">
+                        <label for="entry-vat">USt. / MwSt.</label>
+                        <select id="entry-vat" class="bh2-select">
+                            <option value="19">19 %</option>
+                            <option value="7">7 %</option>
+                            <option value="0">0 %</option>
+                        </select>
                     </div>
 
-                    <div class="bh-submit-row">
-                        <div class="bh-submit-hint">
-                            Maximal 1000 Zeichen. Leere Anfragen werden nicht gesendet.
-                        </div>
-                        <button id="bh-submit" class="bh-action-button" type="submit">
-                            Anfrage senden
-                        </button>
+                    <div class="bh2-field">
+                        <label for="entry-document">Beleg / Rechnung</label>
+                        <input id="entry-document" class="bh2-input" type="text" maxlength="80" placeholder="z. B. RG-2026-014">
                     </div>
-                </form>
 
-                <div id="bh-result" class="bh-result-box" role="status" aria-live="polite"></div>
-            </div>
+                    <div class="bh2-field">
+                        <label for="entry-partner">Kunde / Lieferant / Fahrer</label>
+                        <input id="entry-partner" class="bh2-input" type="text" maxlength="80" placeholder="z. B. Fahrername oder Auftraggeber">
+                    </div>
 
-            <aside class="bh-card bh-info-card">
-                <div class="bh-section-title">
-                    <h2>Ablauf</h2>
+                    <div class="bh2-field">
+                        <label for="entry-tour">Tour / Kennzeichen</label>
+                        <input id="entry-tour" class="bh2-input" type="text" maxlength="80" placeholder="z. B. Tour #42 oder LKW-01">
+                    </div>
+
+                    <div class="bh2-field">
+                        <label for="entry-receipt">Belegstatus</label>
+                        <select id="entry-receipt" class="bh2-select">
+                            <option value="Vorhanden">Vorhanden</option>
+                            <option value="Fehlt">Fehlt</option>
+                            <option value="Digital prüfen">Digital prüfen</option>
+                        </select>
+                    </div>
+
+                    <div class="bh2-field">
+                        <label for="entry-payment">Zahlungsstatus</label>
+                        <select id="entry-payment" class="bh2-select">
+                            <option value="Offen">Offen</option>
+                            <option value="Bezahlt">Bezahlt</option>
+                            <option value="Teilzahlung">Teilzahlung</option>
+                            <option value="Prüfen">Prüfen</option>
+                        </select>
+                    </div>
+
+                    <div class="bh2-field full">
+                        <label for="entry-note">Notiz</label>
+                        <textarea id="entry-note" class="bh2-textarea" maxlength="500" placeholder="Kurz notieren, was später nachvollziehbar sein muss: Zeitraum, Fahrt, Grund, Rückfrage, zuständige Person."></textarea>
+                    </div>
                 </div>
 
-                <div class="bh-info-list">
-                    <div class="bh-info-item">
-                        <strong>1. Anfrage senden</strong>
-                        <p>Beschreibe dein Anliegen vollständig. Der Betreff und die Kategorie werden in die Nachricht übernommen.</p>
+                <div class="bh2-btn-row">
+                    <button type="button" id="bh2-reset-form" class="btn-secondary">Formular leeren</button>
+                    <button type="submit" class="btn-primary">Buchung speichern</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="bh2-grid">
+            <aside class="glass-card bh2-panel">
+                <div class="bh2-section-head">
+                    <div>
+                        <h2>Tagesaufgaben</h2>
+                        <p>Checkliste für den normalen Buchhaltungsablauf im Speditionsalltag.</p>
                     </div>
-                    <div class="bh-info-item">
-                        <strong>2. Aufgabe entsteht</strong>
-                        <p>Das Backend speichert deine Anfrage und legt eine offene Aufgabe für die Personalabteilung an.</p>
-                    </div>
-                    <div class="bh-info-item">
-                        <strong>3. Bearbeitung</strong>
-                        <p>Die zuständige Stelle prüft die Anfrage im internen Dashboard und kann danach reagieren.</p>
-                    </div>
-                    <div class="bh-info-item">
-                        <strong>Hinweis</strong>
-                        <p>Für sensible Daten nur notwendige Informationen eintragen. Tokens oder private Zugangsdaten niemals senden.</p>
-                    </div>
+                    <span id="task-counter" class="bh2-mini-label">0/0 erledigt</span>
+                </div>
+
+                <div id="bh2-task-list" class="bh2-task-list">
+                    <label class="bh2-task">
+                        <input type="checkbox" data-task="receipts">
+                        <span>
+                            <strong>Belege einsammeln</strong>
+                            <span>Tankbelege, Maut, Reparaturen und sonstige Nachweise prüfen.</span>
+                        </span>
+                    </label>
+
+                    <label class="bh2-task">
+                        <input type="checkbox" data-task="payments">
+                        <span>
+                            <strong>Zahlungseingänge prüfen</strong>
+                            <span>Offene Kundenrechnungen und Tourvergütungen abgleichen.</span>
+                        </span>
+                    </label>
+
+                    <label class="bh2-task">
+                        <input type="checkbox" data-task="drivers">
+                        <span>
+                            <strong>Fahrerabrechnung vorbereiten</strong>
+                            <span>Vergütung, Boni, Abzüge und offene Rückfragen sammeln.</span>
+                        </span>
+                    </label>
+
+                    <label class="bh2-task">
+                        <input type="checkbox" data-task="vat">
+                        <span>
+                            <strong>USt. kontrollieren</strong>
+                            <span>Umsatzsteuer und Vorsteuer aus den erfassten Buchungen prüfen.</span>
+                        </span>
+                    </label>
+
+                    <label class="bh2-task">
+                        <input type="checkbox" data-task="close">
+                        <span>
+                            <strong>Tagesabschluss erstellen</strong>
+                            <span>Bericht generieren und bei Bedarf an die Verwaltung senden.</span>
+                        </span>
+                    </label>
                 </div>
             </aside>
-        </section>
-    </div>
+
+            <aside class="glass-card bh2-panel">
+                <div class="bh2-section-head">
+                    <div>
+                        <h2>Schnellaktionen</h2>
+                        <p>Export, Bericht und Übergabe für die interne Bearbeitung.</p>
+                    </div>
+                </div>
+
+                <div class="bh2-btn-row">
+                    <button type="button" id="bh2-generate-report" class="btn-primary">Tagesbericht</button>
+                    <button type="button" id="bh2-export-csv" class="btn-secondary">CSV Export</button>
+                    <button type="button" id="bh2-export-json" class="btn-secondary">JSON Export</button>
+                    <button type="button" id="bh2-send-request" class="btn-secondary">An Verwaltung senden</button>
+                    <button type="button" id="bh2-clear-all" class="btn-secondary">Alles löschen</button>
+                </div>
+            </aside>
+        </div>
+    </section>
+
+    <section class="bh2-split">
+        <div class="glass-card bh2-panel">
+            <div class="bh2-section-head">
+                <div>
+                    <h2>Tagesbericht</h2>
+                    <p>Der Bericht wird aus den aktuellen Buchungen und offenen Aufgaben erzeugt.</p>
+                </div>
+                <span class="bh2-mini-label">Copy-ready</span>
+            </div>
+
+            <div id="bh2-report" class="bh2-report-box">
+Noch kein Tagesbericht erstellt.
+
+Klicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.
+            </div>
+        </div>
+
+        <div class="glass-card bh2-panel">
+            <div class="bh2-section-head">
+                <div>
+                    <h2>Buchungsliste</h2>
+                    <p>Filtere, prüfe und bearbeite alle erfassten Vorgänge direkt in der Tabelle.</p>
+                </div>
+                <span id="entry-counter" class="bh2-mini-label">0 Einträge</span>
+            </div>
+
+            <div class="bh2-filter-grid">
+                <input id="bh2-search" class="bh2-input" type="search" placeholder="Suche nach Beleg, Kunde, Tour oder Notiz">
+                <select id="bh2-filter-type" class="bh2-select">
+                    <option value="all">Alle Typen</option>
+                    <option value="income">Nur Einnahmen</option>
+                    <option value="expense">Nur Ausgaben</option>
+                </select>
+                <select id="bh2-filter-status" class="bh2-select">
+                    <option value="all">Alle Status</option>
+                    <option value="open">Zahlung offen</option>
+                    <option value="receipt-missing">Beleg fehlt</option>
+                    <option value="paid">Bezahlt</option>
+                </select>
+            </div>
+
+            <div class="bh2-table-wrap">
+                <table class="bh2-table">
+                    <thead>
+                        <tr>
+                            <th>Datum</th>
+                            <th>Typ</th>
+                            <th>Kategorie</th>
+                            <th>Brutto</th>
+                            <th>USt.</th>
+                            <th>Beleg</th>
+                            <th>Status</th>
+                            <th>Info</th>
+                            <th>Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bh2-entry-table"></tbody>
+                </table>
+                <div id="bh2-empty" class="bh2-empty">
+                    Noch keine Buchungen erfasst. Lege links deine erste Einnahme oder Ausgabe an.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div id="bh2-toast" class="bh2-toast" role="status" aria-live="polite"></div>
 </div>
 
 <script>
     document.addEventListener("DOMContentLoaded", () => {
-        const endpoint = {{ url_for('api_buchhaltung_request') | tojson }};
-        const form = document.getElementById("buchhaltung-request-form");
-        const category = document.getElementById("bh-category");
-        const subject = document.getElementById("bh-subject");
-        const message = document.getElementById("bh-message");
-        const submit = document.getElementById("bh-submit");
-        const result = document.getElementById("bh-result");
-        const templateButtons = document.querySelectorAll(".bh-template-btn");
-        const defaultSubmitText = submit ? submit.textContent.trim() : "Anfrage senden";
+        const storageKey = "eifellog.buchhaltung2.entries";
+        const taskStorageKey = "eifellog.buchhaltung2.tasks";
+        const currentUser = {{ display_name|tojson }};
 
-        function showResult(title, text, type = "success") {
-            if (!result) return;
-            result.classList.add("active");
-            result.classList.toggle("error", type === "error");
-            result.innerHTML = `<strong>${title}</strong><span>${text}</span>`;
+        const form = document.getElementById("bh2-entry-form");
+        const fields = {
+            date: document.getElementById("entry-date"),
+            type: document.getElementById("entry-type"),
+            category: document.getElementById("entry-category"),
+            amount: document.getElementById("entry-amount"),
+            vat: document.getElementById("entry-vat"),
+            documentNo: document.getElementById("entry-document"),
+            partner: document.getElementById("entry-partner"),
+            tour: document.getElementById("entry-tour"),
+            receipt: document.getElementById("entry-receipt"),
+            payment: document.getElementById("entry-payment"),
+            note: document.getElementById("entry-note")
+        };
+
+        const stats = {
+            income: document.getElementById("stat-income"),
+            expense: document.getElementById("stat-expense"),
+            balance: document.getElementById("stat-balance"),
+            vat: document.getElementById("stat-vat"),
+            receipts: document.getElementById("stat-receipts"),
+            open: document.getElementById("stat-open")
+        };
+
+        const table = document.getElementById("bh2-entry-table");
+        const empty = document.getElementById("bh2-empty");
+        const entryCounter = document.getElementById("entry-counter");
+        const reportBox = document.getElementById("bh2-report");
+        const toast = document.getElementById("bh2-toast");
+
+        const searchInput = document.getElementById("bh2-search");
+        const filterType = document.getElementById("bh2-filter-type");
+        const filterStatus = document.getElementById("bh2-filter-status");
+
+        const taskInputs = Array.from(document.querySelectorAll("#bh2-task-list input[type='checkbox']"));
+        const taskCounter = document.getElementById("task-counter");
+
+        let entries = loadEntries();
+
+        function todayIso() {
+            return new Date().toISOString().slice(0, 10);
         }
 
-        function buildMessagePayload() {
-            const parts = [];
-            const selectedCategory = String(category?.value || "Allgemeine Rückfrage").trim();
-            const subjectValue = String(subject?.value || "").trim();
-            const messageValue = String(message?.value || "").trim();
-
-            if (selectedCategory) parts.push(`Kategorie: ${selectedCategory}`);
-            if (subjectValue) parts.push(`Betreff: ${subjectValue}`);
-            if (messageValue) parts.push(`Nachricht: ${messageValue}`);
-
-            return parts.join("\n\n").slice(0, 1000);
+        function uid() {
+            return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
         }
 
-        templateButtons.forEach((button) => {
-            button.addEventListener("click", () => {
-                const template = button.dataset.template || "";
-                const current = String(message.value || "").trim();
-                message.value = current ? `${current}\n\n${template}` : template;
-                message.focus();
+        function parseAmount(value) {
+            const normalized = String(value || "")
+                .replace(/\s/g, "")
+                .replace(/\./g, "")
+                .replace(",", ".");
+            const amount = Number.parseFloat(normalized);
+            return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : NaN;
+        }
+
+        function formatMoney(value) {
+            return new Intl.NumberFormat("de-DE", {
+                style: "currency",
+                currency: "EUR"
+            }).format(Number(value || 0));
+        }
+
+        function formatDate(value) {
+            if (!value) return "-";
+            const date = new Date(`${value}T12:00:00`);
+            if (Number.isNaN(date.getTime())) return value;
+            return new Intl.DateTimeFormat("de-DE").format(date);
+        }
+
+        function calculateVat(gross, vatRate) {
+            const rate = Number(vatRate || 0);
+            if (!rate) return 0;
+            return Math.round((gross - gross / (1 + rate / 100)) * 100) / 100;
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function loadEntries() {
+            try {
+                const raw = localStorage.getItem(storageKey);
+                const parsed = raw ? JSON.parse(raw) : [];
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                console.warn("Buchhaltungsdaten konnten nicht geladen werden.", error);
+                return [];
+            }
+        }
+
+        function saveEntries() {
+            localStorage.setItem(storageKey, JSON.stringify(entries));
+        }
+
+        function showToast(title, text) {
+            if (!toast) return;
+            toast.innerHTML = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(text)}</span>`;
+            toast.classList.add("active");
+            window.clearTimeout(showToast.timeout);
+            showToast.timeout = window.setTimeout(() => toast.classList.remove("active"), 3200);
+        }
+
+        function getFilteredEntries() {
+            const query = String(searchInput?.value || "").trim().toLowerCase();
+            const typeValue = filterType?.value || "all";
+            const statusValue = filterStatus?.value || "all";
+
+            return entries.filter((entry) => {
+                const haystack = [
+                    entry.date,
+                    entry.typeLabel,
+                    entry.category,
+                    entry.documentNo,
+                    entry.partner,
+                    entry.tour,
+                    entry.receipt,
+                    entry.payment,
+                    entry.note
+                ].join(" ").toLowerCase();
+
+                const matchesQuery = !query || haystack.includes(query);
+                const matchesType = typeValue === "all" || entry.type === typeValue;
+
+                let matchesStatus = true;
+                if (statusValue === "open") matchesStatus = entry.payment !== "Bezahlt";
+                if (statusValue === "receipt-missing") matchesStatus = entry.receipt === "Fehlt";
+                if (statusValue === "paid") matchesStatus = entry.payment === "Bezahlt";
+
+                return matchesQuery && matchesType && matchesStatus;
             });
-        });
+        }
 
-        form?.addEventListener("submit", async (event) => {
+        function statusBadge(value, mode) {
+            let cls = "";
+            if (mode === "payment") {
+                cls = value === "Bezahlt" ? "good" : value === "Offen" ? "warn" : "";
+            }
+            if (mode === "receipt") {
+                cls = value === "Vorhanden" ? "good" : value === "Fehlt" ? "danger" : "warn";
+            }
+            return `<span class="bh2-badge ${cls}">${escapeHtml(value || "-")}</span>`;
+        }
+
+        function renderEntries() {
+            const filtered = getFilteredEntries();
+            table.innerHTML = "";
+
+            if (!filtered.length) {
+                empty.style.display = "block";
+            } else {
+                empty.style.display = "none";
+            }
+
+            filtered
+                .slice()
+                .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+                .forEach((entry) => {
+                    const tr = document.createElement("tr");
+                    const typeBadge = entry.type === "income"
+                        ? `<span class="bh2-badge good">Einnahme</span>`
+                        : `<span class="bh2-badge warn">Ausgabe</span>`;
+
+                    tr.innerHTML = `
+                        <td>${escapeHtml(formatDate(entry.date))}</td>
+                        <td>${typeBadge}</td>
+                        <td>${escapeHtml(entry.category)}</td>
+                        <td><strong>${escapeHtml(formatMoney(entry.amount))}</strong></td>
+                        <td>${escapeHtml(formatMoney(entry.vatAmount))}<br><span class="bh2-badge">${escapeHtml(entry.vatRate)} %</span></td>
+                        <td>${escapeHtml(entry.documentNo || "-")}<br>${statusBadge(entry.receipt, "receipt")}</td>
+                        <td>${statusBadge(entry.payment, "payment")}</td>
+                        <td>
+                            <strong>${escapeHtml(entry.partner || "-")}</strong><br>
+                            ${escapeHtml(entry.tour || "-")}<br>
+                            <span style="color: var(--muted);">${escapeHtml(entry.note || "")}</span>
+                        </td>
+                        <td>
+                            <div class="bh2-row-actions">
+                                <button type="button" class="bh2-mini-btn" data-action="paid" data-id="${escapeHtml(entry.id)}">Bezahlt</button>
+                                <button type="button" class="bh2-mini-btn" data-action="receipt" data-id="${escapeHtml(entry.id)}">Beleg OK</button>
+                                <button type="button" class="bh2-mini-btn danger" data-action="delete" data-id="${escapeHtml(entry.id)}">Löschen</button>
+                            </div>
+                        </td>
+                    `;
+                    table.appendChild(tr);
+                });
+
+            entryCounter.textContent = `${filtered.length} / ${entries.length} Einträge`;
+            updateStats();
+        }
+
+        function updateStats() {
+            const income = entries
+                .filter((entry) => entry.type === "income")
+                .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+
+            const expense = entries
+                .filter((entry) => entry.type === "expense")
+                .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+
+            const outputVat = entries
+                .filter((entry) => entry.type === "income")
+                .reduce((sum, entry) => sum + Number(entry.vatAmount || 0), 0);
+
+            const inputVat = entries
+                .filter((entry) => entry.type === "expense")
+                .reduce((sum, entry) => sum + Number(entry.vatAmount || 0), 0);
+
+            const receiptMissing = entries.filter((entry) => entry.receipt === "Fehlt").length;
+            const openPayments = entries.filter((entry) => entry.payment !== "Bezahlt").length;
+
+            stats.income.textContent = formatMoney(income);
+            stats.expense.textContent = formatMoney(expense);
+            stats.balance.textContent = formatMoney(income - expense);
+            stats.vat.textContent = formatMoney(outputVat - inputVat);
+            stats.receipts.textContent = String(receiptMissing);
+            stats.open.textContent = String(openPayments);
+        }
+
+        function resetForm() {
+            form.reset();
+            fields.date.value = todayIso();
+            fields.type.value = "income";
+            fields.category.value = "Fracht / Tour";
+            fields.vat.value = "19";
+            fields.receipt.value = "Vorhanden";
+            fields.payment.value = "Offen";
+        }
+
+        function addEntry(event) {
             event.preventDefault();
 
-            const payloadMessage = buildMessagePayload();
-
-            if (!payloadMessage || !String(message.value || "").trim()) {
-                showResult("Fehler", "Bitte gib eine Nachricht ein.", "error");
+            const amount = parseAmount(fields.amount.value);
+            if (!Number.isFinite(amount) || amount <= 0) {
+                showToast("Fehler", "Bitte gib einen gültigen Bruttobetrag ein.");
+                fields.amount.focus();
                 return;
             }
 
-            submit.disabled = true;
-            submit.textContent = "Sende...";
+            const vatRate = Number(fields.vat.value || 0);
+            const type = fields.type.value;
+
+            const entry = {
+                id: uid(),
+                createdAt: new Date().toISOString(),
+                createdBy: currentUser,
+                date: fields.date.value || todayIso(),
+                type,
+                typeLabel: type === "income" ? "Einnahme" : "Ausgabe",
+                category: fields.category.value,
+                amount,
+                vatRate,
+                vatAmount: calculateVat(amount, vatRate),
+                documentNo: fields.documentNo.value.trim(),
+                partner: fields.partner.value.trim(),
+                tour: fields.tour.value.trim(),
+                receipt: fields.receipt.value,
+                payment: fields.payment.value,
+                note: fields.note.value.trim()
+            };
+
+            entries.unshift(entry);
+            saveEntries();
+            renderEntries();
+            resetForm();
+            showToast("Buchung gespeichert", "Der Vorgang wurde in der lokalen Buchhaltungsliste erfasst.");
+        }
+
+        function handleTableAction(event) {
+            const button = event.target.closest("[data-action]");
+            if (!button) return;
+
+            const id = button.dataset.id;
+            const action = button.dataset.action;
+            const index = entries.findIndex((entry) => entry.id === id);
+            if (index === -1) return;
+
+            if (action === "paid") {
+                entries[index].payment = "Bezahlt";
+                showToast("Status aktualisiert", "Der Zahlungsstatus wurde auf bezahlt gesetzt.");
+            }
+
+            if (action === "receipt") {
+                entries[index].receipt = "Vorhanden";
+                showToast("Beleg aktualisiert", "Der Belegstatus wurde auf vorhanden gesetzt.");
+            }
+
+            if (action === "delete") {
+                const confirmed = window.confirm("Diese Buchung wirklich löschen?");
+                if (!confirmed) return;
+                entries.splice(index, 1);
+                showToast("Buchung gelöscht", "Der Eintrag wurde entfernt.");
+            }
+
+            saveEntries();
+            renderEntries();
+        }
+
+        function loadTasks() {
+            let saved = {};
+            try {
+                saved = JSON.parse(localStorage.getItem(taskStorageKey) || "{}");
+            } catch (error) {
+                saved = {};
+            }
+
+            taskInputs.forEach((input) => {
+                input.checked = Boolean(saved[input.dataset.task]);
+                input.closest(".bh2-task")?.classList.toggle("done", input.checked);
+            });
+
+            updateTaskCounter();
+        }
+
+        function saveTasks() {
+            const data = {};
+            taskInputs.forEach((input) => {
+                data[input.dataset.task] = input.checked;
+                input.closest(".bh2-task")?.classList.toggle("done", input.checked);
+            });
+            localStorage.setItem(taskStorageKey, JSON.stringify(data));
+            updateTaskCounter();
+        }
+
+        function updateTaskCounter() {
+            const done = taskInputs.filter((input) => input.checked).length;
+            taskCounter.textContent = `${done}/${taskInputs.length} erledigt`;
+        }
+
+        function buildReport() {
+            const incomeEntries = entries.filter((entry) => entry.type === "income");
+            const expenseEntries = entries.filter((entry) => entry.type === "expense");
+            const income = incomeEntries.reduce((sum, entry) => sum + entry.amount, 0);
+            const expense = expenseEntries.reduce((sum, entry) => sum + entry.amount, 0);
+            const outputVat = incomeEntries.reduce((sum, entry) => sum + entry.vatAmount, 0);
+            const inputVat = expenseEntries.reduce((sum, entry) => sum + entry.vatAmount, 0);
+            const openPayments = entries.filter((entry) => entry.payment !== "Bezahlt");
+            const missingReceipts = entries.filter((entry) => entry.receipt === "Fehlt");
+            const doneTasks = taskInputs.filter((input) => input.checked).length;
+
+            const lines = [
+                "EIFEL LOG - TAGESABSCHLUSS BUCHHALTUNG",
+                `Erstellt am: ${new Intl.DateTimeFormat("de-DE", { dateStyle: "full", timeStyle: "short" }).format(new Date())}`,
+                `Bearbeiter: ${currentUser}`,
+                "",
+                "ÜBERSICHT",
+                `- Buchungen gesamt: ${entries.length}`,
+                `- Einnahmen brutto: ${formatMoney(income)}`,
+                `- Ausgaben brutto: ${formatMoney(expense)}`,
+                `- Saldo: ${formatMoney(income - expense)}`,
+                `- Umsatzsteuer geschätzt: ${formatMoney(outputVat)}`,
+                `- Vorsteuer geschätzt: ${formatMoney(inputVat)}`,
+                `- USt.-Saldo geschätzt: ${formatMoney(outputVat - inputVat)}`,
+                `- Offene Zahlungen: ${openPayments.length}`,
+                `- Fehlende Belege: ${missingReceipts.length}`,
+                `- Tagesaufgaben erledigt: ${doneTasks}/${taskInputs.length}`,
+                "",
+                "OFFENE ZAHLUNGEN",
+                openPayments.length
+                    ? openPayments.map((entry) => `- ${formatDate(entry.date)} | ${entry.typeLabel} | ${entry.category} | ${formatMoney(entry.amount)} | ${entry.partner || "-"} | ${entry.documentNo || "-"}`).join("\n")
+                    : "- Keine offenen Zahlungen.",
+                "",
+                "FEHLENDE BELEGE",
+                missingReceipts.length
+                    ? missingReceipts.map((entry) => `- ${formatDate(entry.date)} | ${entry.category} | ${formatMoney(entry.amount)} | ${entry.partner || "-"} | ${entry.tour || "-"}`).join("\n")
+                    : "- Keine fehlenden Belege.",
+                "",
+                "LETZTE BUCHUNGEN",
+                entries.length
+                    ? entries.slice(0, 10).map((entry) => `- ${formatDate(entry.date)} | ${entry.typeLabel} | ${entry.category} | ${formatMoney(entry.amount)} | Zahlung: ${entry.payment} | Beleg: ${entry.receipt}`).join("\n")
+                    : "- Noch keine Buchungen erfasst.",
+                "",
+                "HINWEIS",
+                "Dieser Bericht wird im Browser aus den lokal erfassten Daten generiert. Für eine echte Finanzbuchhaltung muss die Datenhaltung serverseitig angebunden und fachlich geprüft werden."
+            ];
+
+            return lines.join("\n");
+        }
+
+        function generateReport() {
+            const report = buildReport();
+            reportBox.textContent = report;
+            navigator.clipboard?.writeText(report).catch(() => {});
+            showToast("Tagesbericht erstellt", "Der Bericht wurde generiert und, falls erlaubt, in die Zwischenablage kopiert.");
+        }
+
+        function downloadFile(filename, content, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportCsv() {
+            const headers = [
+                "Datum",
+                "Typ",
+                "Kategorie",
+                "Betrag brutto",
+                "USt Satz",
+                "USt Betrag",
+                "Belegnummer",
+                "Partner",
+                "Tour/Kennzeichen",
+                "Belegstatus",
+                "Zahlungsstatus",
+                "Notiz",
+                "Erfasst von",
+                "Erfasst am"
+            ];
+
+            const rows = entries.map((entry) => [
+                entry.date,
+                entry.typeLabel,
+                entry.category,
+                String(entry.amount).replace(".", ","),
+                `${entry.vatRate}%`,
+                String(entry.vatAmount).replace(".", ","),
+                entry.documentNo,
+                entry.partner,
+                entry.tour,
+                entry.receipt,
+                entry.payment,
+                entry.note,
+                entry.createdBy,
+                entry.createdAt
+            ]);
+
+            const csv = [headers, ...rows]
+                .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(";"))
+                .join("\n");
+
+            downloadFile(`eifellog-buchhaltung-${todayIso()}.csv`, "\uFEFF" + csv, "text/csv;charset=utf-8");
+            showToast("CSV exportiert", "Die Buchungsliste wurde als CSV heruntergeladen.");
+        }
+
+        function exportJson() {
+            downloadFile(
+                `eifellog-buchhaltung-${todayIso()}.json`,
+                JSON.stringify({ exportedAt: new Date().toISOString(), user: currentUser, entries }, null, 2),
+                "application/json;charset=utf-8"
+            );
+            showToast("JSON exportiert", "Die Buchungsliste wurde als JSON heruntergeladen.");
+        }
+
+        async function sendRequest() {
+            const report = buildReport();
 
             try {
-                const response = await fetch(endpoint, {
+                const response = await fetch("/api/buchhaltung/request", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
                         "X-Requested-With": "XMLHttpRequest"
                     },
-                    body: JSON.stringify({ message: payloadMessage })
+                    body: JSON.stringify({
+                        message: report,
+                        source: "buchhaltung2",
+                        entries
+                    })
                 });
 
                 const data = await response.json().catch(() => ({}));
 
                 if (!response.ok || data.success === false) {
-                    throw new Error(data.message || "Anfrage konnte nicht gesendet werden.");
+                    throw new Error(data.message || "Die Verwaltung konnte nicht erreicht werden.");
                 }
 
-                showResult("Anfrage gesendet", data.message || "Deine Anfrage wurde erfolgreich übermittelt.", "success");
-                form.reset();
+                showToast("Gesendet", data.message || "Der Tagesbericht wurde an die Verwaltung übermittelt.");
             } catch (error) {
-                showResult("Fehler", error.message || "Anfrage konnte nicht gesendet werden.", "error");
-            } finally {
-                submit.disabled = false;
-                submit.textContent = defaultSubmitText;
+                showToast("Nicht gesendet", error.message || "Bitte prüfe, ob /api/buchhaltung/request im Backend existiert.");
             }
-        });
+        }
+
+        function clearAll() {
+            const confirmed = window.confirm("Alle lokalen Buchhaltungsdaten und Tagesaufgaben löschen?");
+            if (!confirmed) return;
+
+            entries = [];
+            localStorage.removeItem(storageKey);
+            localStorage.removeItem(taskStorageKey);
+            reportBox.textContent = "Noch kein Tagesbericht erstellt.\n\nKlicke auf „Tagesbericht“, sobald du Buchungen erfasst hast.";
+            loadTasks();
+            renderEntries();
+            showToast("Zurückgesetzt", "Alle lokalen Buchhaltungsdaten wurden gelöscht.");
+        }
+
+        form?.addEventListener("submit", addEntry);
+        document.getElementById("bh2-reset-form")?.addEventListener("click", resetForm);
+        document.getElementById("bh2-generate-report")?.addEventListener("click", generateReport);
+        document.getElementById("bh2-export-csv")?.addEventListener("click", exportCsv);
+        document.getElementById("bh2-export-json")?.addEventListener("click", exportJson);
+        document.getElementById("bh2-send-request")?.addEventListener("click", sendRequest);
+        document.getElementById("bh2-clear-all")?.addEventListener("click", clearAll);
+
+        table?.addEventListener("click", handleTableAction);
+        searchInput?.addEventListener("input", renderEntries);
+        filterType?.addEventListener("change", renderEntries);
+        filterStatus?.addEventListener("change", renderEntries);
+        taskInputs.forEach((input) => input.addEventListener("change", saveTasks));
+
+        resetForm();
+        loadTasks();
+        renderEntries();
     });
 </script>
 {% endblock %}
