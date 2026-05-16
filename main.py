@@ -118,6 +118,8 @@ def ensure_indexes():
         tasks_collection.create_index([("created_at", DESCENDING)], unique=False)
         
         buchhaltung_requests_collection.create_index([("created_at", DESCENDING)], unique=False)
+        buchhaltung_requests_collection.create_index([("status", ASCENDING)], unique=False)
+        buchhaltung_requests_collection.create_index([("archived", ASCENDING)], unique=False)
     except Exception as error:
         print(f"MongoDB Index-Erstellung fehlgeschlagen: {error}")
 
@@ -824,6 +826,100 @@ def prepare_token_request_for_personalabteilung(request_doc):
     item["reason"] = item.get("reason") or "Kein Grund angegeben"
     item["avatar_url"] = item.get("avatar_url") or ""
     return item
+
+def normalize_buchhaltung_priority(priority):
+    priority = safe_str(priority, "Normal")
+    priority_lc = priority.lower()
+
+    if priority_lc in {"dringend", "urgent", "high", "hoch"}:
+        return "Dringend"
+    if priority_lc in {"wichtig", "important", "medium", "mittel"}:
+        return "Wichtig"
+    if priority_lc in {"normal", "low", "niedrig"}:
+        return "Normal"
+
+    return priority[:40] if priority else "Normal"
+
+
+def prepare_buchhaltung_request_for_personalabteilung(request_doc):
+    item = dict(request_doc)
+    mongo_id = item.get("_id")
+    mongo_id_str = str(mongo_id) if mongo_id else ""
+
+    item["_id"] = mongo_id_str
+    item["id"] = safe_str(item.get("id") or item.get("request_id") or mongo_id_str)
+    item["request_id"] = safe_str(item.get("request_id") or item["id"])
+
+    item["category"] = safe_str(item.get("category") or item.get("type"), "Allgemeine Personalfrage")
+    item["type"] = item.get("type") or item["category"]
+
+    item["title"] = safe_str(item.get("title") or item.get("subject"), "Ohne Betreff")
+    item["subject"] = safe_str(item.get("subject") or item.get("title"), item["title"])
+
+    item["message"] = safe_str(item.get("message") or item.get("description") or item.get("text") or item.get("body"))
+    item["description"] = item["message"]
+
+    item["priority"] = normalize_buchhaltung_priority(item.get("priority"))
+    item["status"] = safe_str(item.get("status"), "open").lower()
+
+    item["reference"] = safe_str(item.get("reference") or item.get("ref") or item.get("bezug") or item.get("case_reference"))
+
+    created_by = item.get("created_by") or {}
+    sender_name = (
+        item.get("sender_name")
+        or item.get("requester_name")
+        or item.get("created_by_name")
+        or created_by.get("display_name")
+        or item.get("user_name")
+        or item.get("display_name")
+        or item.get("name")
+        or item.get("username")
+        or "Buchhaltung"
+    )
+
+    sender_username = (
+        item.get("sender_username")
+        or created_by.get("username")
+        or item.get("username")
+        or item.get("discord_username")
+        or sender_name
+    )
+
+    sender_discord_id = (
+        item.get("sender_discord_id")
+        or created_by.get("discord_id")
+        or item.get("discord_id")
+        or item.get("user_id")
+        or "-"
+    )
+
+    item["sender_name"] = sender_name
+    item["requester_name"] = sender_name
+    item["created_by_name"] = item.get("created_by_name") or sender_name
+    item["username"] = sender_username
+    item["discord_username"] = item.get("discord_username") or sender_username
+    item["discord_id"] = sender_discord_id
+    item["user_id"] = sender_discord_id
+    item["avatar_url"] = item.get("avatar_url") or ""
+
+    item["created_at"] = format_datetime_for_template(item.get("created_at")) or "-"
+    item["requested_at"] = item["created_at"]
+    item["submitted_at"] = item["created_at"]
+    item["updated_at"] = format_datetime_for_template(item.get("updated_at")) or item["created_at"]
+
+    claimed_by = item.get("claimed_by") or {}
+    item["claimed_by_name"] = (
+        item.get("claimed_by_name")
+        or item.get("handler_name")
+        or item.get("sachbearbeiter_name")
+        or claimed_by.get("display_name")
+        or "Noch nicht zugewiesen"
+    )
+    item["handler_name"] = item["claimed_by_name"]
+    item["sachbearbeiter_name"] = item["claimed_by_name"]
+
+    return item
+
 
 def find_user_for_request_doc(request_doc):
     discord_id = safe_str(request_doc.get("discord_id") or request_doc.get("user_id"))
@@ -1881,8 +1977,20 @@ def personalabteilung():
     token_requests_cursor = token_request_collection.find({"archived": {"$ne": True}}).sort([("created_at", DESCENDING)]).limit(250)
     token_requests = [prepare_token_request_for_personalabteilung(item) for item in token_requests_cursor]
 
-    # Tasks abrufen
-    tasks_cursor = tasks_collection.find({}).sort([("created_at", DESCENDING)]).limit(100)
+    buchhaltung_requests_cursor = buchhaltung_requests_collection.find(
+        {"archived": {"$ne": True}}
+    ).sort([("created_at", DESCENDING)]).limit(250)
+    buchhaltung_requests = [
+        prepare_buchhaltung_request_for_personalabteilung(item)
+        for item in buchhaltung_requests_cursor
+    ]
+
+    # Tasks abrufen: Buchhaltungsanfragen laufen ab jetzt nur noch über den eigenen Tab.
+    tasks_cursor = tasks_collection.find({
+        "source": {"$ne": "buchhaltung"},
+        "type": {"$ne": "Buchhaltung"},
+        "buchhaltung_request_id": {"$exists": False}
+    }).sort([("created_at", DESCENDING)]).limit(100)
     tasks = []
     for t in tasks_cursor:
         t["id"] = str(t["_id"])
@@ -1895,6 +2003,9 @@ def personalabteilung():
         fahrer_registration_requests=registration_requests,
         registration_requests=registration_requests,
         token_requests=token_requests,
+        buchhaltung_requests=buchhaltung_requests,
+        accounting_requests=buchhaltung_requests,
+        accounting_department_requests=buchhaltung_requests,
         tasks=tasks
     )
 
@@ -2041,12 +2152,13 @@ def api_buchhaltung_request():
         return permission_response
 
     if request.method == "GET":
-        items = list(
-            buchhaltung_requests_collection.find(
-                {"archived": {"$ne": True}},
-                {"_id": 0}
-            ).sort("created_at", DESCENDING).limit(100)
-        )
+        items_cursor = buchhaltung_requests_collection.find(
+            {"archived": {"$ne": True}}
+        ).sort("created_at", DESCENDING).limit(100)
+        items = [
+            prepare_buchhaltung_request_for_personalabteilung(item)
+            for item in items_cursor
+        ]
         return jsonify({"success": True, "requests": items})
 
     data = request.get_json(silent=True) or {}
@@ -2072,44 +2184,33 @@ def api_buchhaltung_request():
         "category": category,
         "type": category,
         "title": title,
+        "subject": title,
         "description": message,
         "message": message,
+        "reference": safe_str(data.get("reference") or data.get("ref") or data.get("bezug"))[:160],
+        "target_department": safe_str(data.get("target_department"), "Personalabteilung")[:80],
         "amount": amount,
         "currency": "EUR",
-        "priority": priority,
+        "priority": normalize_buchhaltung_priority(priority),
         "status": "open",
         "archived": False,
         "created_at": now,
         "updated_at": now,
         "created_by": actor,
         "created_by_name": actor.get("display_name"),
+        "sender_name": actor.get("display_name"),
         "sender_discord_id": actor.get("discord_id"),
         "sender_username": actor.get("username"),
-        "source": "buchhaltung"
-    }
-
-    insert_result = buchhaltung_requests_collection.insert_one(request_doc)
-
-    task_doc = {
-        "title": f"Buchhaltung: {title}",
-        "type": "Buchhaltung",
-        "priority": priority,
-        "description": message,
-        "status": "open",
-        "created_at": now,
-        "updated_at": now,
-        "assignee": None,
         "source": "buchhaltung",
-        "buchhaltung_request_id": str(insert_result.inserted_id),
-        "request_id": request_id,
-        "created_by": actor
+        "destination": "personalabteilung",
+        "visible_in_personalabteilung_tab": True
     }
 
-    tasks_collection.insert_one(task_doc)
+    buchhaltung_requests_collection.insert_one(request_doc)
 
     return jsonify({
         "success": True,
-        "message": "Buchhaltungs-Anfrage wurde gespeichert.",
+        "message": "Buchhaltungs-Anfrage wurde gespeichert und direkt an den Tab der Personalabteilung gesendet.",
         "requestId": request_id
     })
 
