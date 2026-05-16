@@ -1889,6 +1889,9 @@
         const REJECT_TOKEN_REQUEST_URL = "/api/personalabteilung/token_request/reject";
         
         const SEND_DOCUMENT_URL = "/api/personalabteilung/driver/document/send";
+        
+        // NEUER ENDPUNKT HINZUGEFÜGT
+        const CREATE_TASK_URL = "/api/personalabteilung/task/create";
 
         const searchInput = document.getElementById("driverSearch");
         const tokenFilter = document.getElementById("tokenFilter");
@@ -2415,11 +2418,45 @@
             }
         });
 
+        // LOGIK FÜR DAS SPEICHERN DER AUFGABE
         taskForm.addEventListener("submit", async (event) => {
             event.preventDefault();
-            // Platzhalter für das Speichern der Aufgabe (API Endpunkt noch zu erstellen)
-            showToast("Information", "Aufgabe erfolgreich gespeichert. (API Endpunkt zur Verarbeitung erforderlich)", "success");
-            closeTaskModal();
+
+            const title = document.getElementById("taskTitle").value.trim();
+            const type = document.getElementById("taskType").value;
+            const priority = document.getElementById("taskPriority").value;
+            const description = document.getElementById("taskDescription").value.trim();
+
+            if (!title || !type) {
+                showToast("Fehler", "Bitte Titel und Typ der Aufgabe angeben.", "error");
+                return;
+            }
+
+            const submitButton = taskForm.querySelector("button[type='submit']");
+            const oldText = submitButton.textContent.trim();
+
+            submitButton.disabled = true;
+            submitButton.textContent = "Speichere...";
+
+            try {
+                await postJson(CREATE_TASK_URL, {
+                    title: title,
+                    type: type,
+                    priority: priority,
+                    description: description
+                });
+
+                showToast("Aufgabe erstellt", "Die neue Aufgabe wurde erfolgreich im Pool gespeichert.", "success");
+                closeTaskModal();
+                
+                // Optional: Seite nach kurzer Zeit neuladen, um die Tabelle zu aktualisieren
+                setTimeout(() => window.location.reload(), 1500);
+            } catch (error) {
+                showToast("Fehler", error.message || "Aufgabe konnte nicht erstellt werden.", "error");
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = oldText;
+            }
         });
 
         document.addEventListener("click", async (event) => {
