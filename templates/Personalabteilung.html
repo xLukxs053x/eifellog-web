@@ -27,6 +27,9 @@
         --el-yellow: #dce226;
         --el-yellow-rgb: 220, 226, 38;
 
+        --el-orange: #ffb74d;
+        --el-orange-rgb: 255, 183, 77;
+
         --el-green: #6f9232;
         --el-green-soft: #86ad48;
         --el-green-rgb: 111, 146, 50;
@@ -373,7 +376,8 @@
     .search-box,
     .filter-select,
     .modal-input,
-    .modal-textarea {
+    .modal-textarea,
+    .modal-file {
         width: 100%;
         min-height: 48px;
         border-radius: 16px;
@@ -384,6 +388,24 @@
         padding: 0 16px;
         font-size: 13px;
         font-weight: 700;
+    }
+
+    .modal-file {
+        padding: 12px 16px;
+        cursor: pointer;
+    }
+
+    .modal-file::-webkit-file-upload-button {
+        background: rgba(var(--el-green-rgb), 0.2);
+        border: 1px solid rgba(var(--el-green-rgb), 0.5);
+        color: var(--el-green-soft);
+        border-radius: 8px;
+        padding: 4px 10px;
+        margin-right: 12px;
+        font-family: "Orbitron", sans-serif;
+        font-size: 10px;
+        font-weight: bold;
+        cursor: pointer;
     }
 
     .modal-textarea {
@@ -450,11 +472,6 @@
         scroll-behavior: smooth;
     }
 
-    /*
-        Sichtbare horizontale Scroll-Leiste unten:
-        base.html blendet Scrollbars global aus. Diese Regeln holen sie
-        gezielt für die Tabellen der Personalabteilung zurück.
-    */
     .personal-page .driver-table-wrap::-webkit-scrollbar,
     .personal-page .request-table-wrap::-webkit-scrollbar {
         display: block !important;
@@ -674,6 +691,18 @@
         font-size: 12px;
     }
 
+    .aktenzeichen-mono {
+        color: var(--el-blue);
+        font-family: "Orbitron", sans-serif;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        font-weight: 700;
+        background: rgba(var(--el-blue-rgb), 0.08);
+        padding: 4px 8px;
+        border-radius: 6px;
+        border: 1px solid rgba(var(--el-blue-rgb), 0.2);
+    }
+
     .action-wrap {
         display: flex;
         justify-content: flex-end;
@@ -715,6 +744,12 @@
         border-color: rgba(var(--el-yellow-rgb), 0.35);
         background: rgba(var(--el-yellow-rgb), 0.08);
     }
+    
+    .request-btn.orange {
+        color: var(--el-orange);
+        border-color: rgba(var(--el-orange-rgb), 0.35);
+        background: rgba(var(--el-orange-rgb), 0.08);
+    }
 
     .request-btn.blue {
         color: var(--el-blue);
@@ -745,6 +780,11 @@
     .request-btn.yellow:hover:not(:disabled) {
         border-color: rgba(var(--el-yellow-rgb), 0.52);
         background: rgba(var(--el-yellow-rgb), 0.15);
+    }
+    
+    .request-btn.orange:hover:not(:disabled) {
+        border-color: rgba(var(--el-orange-rgb), 0.52);
+        background: rgba(var(--el-orange-rgb), 0.15);
     }
 
     .request-btn.blue:hover:not(:disabled) {
@@ -1049,8 +1089,8 @@
 
                 <p>
                     Hier werden neue Fahrer-Registrierungen aus dem Dashboard bearbeitet.
-                    Die Personalabteilung kann einen Antrag claimen, prüfen, annehmen oder ablehnen.
-                    Nach Genehmigung wird dem User über sein System-Postfach ein Bestätigungsdokument inklusive Token bereitgestellt.
+                    Die Personalabteilung kann einen Antrag claimen, prüfen, annehmen, ablehnen oder auf später verschieben.
+                    Nach Genehmigung wird dem User über sein System-Postfach ein Bestätigungsdokument (inklusive Aktenzeichen) bereitgestellt.
                 </p>
             </div>
 
@@ -1237,6 +1277,16 @@
                                                 >
                                                     Claimen
                                                 </button>
+                                                
+                                                <button
+                                                    class="request-btn orange"
+                                                    type="button"
+                                                    data-action="postpone-registration"
+                                                    data-request-id="{{ req_id }}"
+                                                    data-user-name="{{ req_name }}"
+                                                >
+                                                    Auf später (2h)
+                                                </button>
                                             {% elif req_status == "claimed" %}
                                                 <button
                                                     class="request-btn accept"
@@ -1258,6 +1308,16 @@
                                                     data-user-role="{{ req_role }}"
                                                 >
                                                     Ablehnen
+                                                </button>
+                                                
+                                                <button
+                                                    class="request-btn orange"
+                                                    type="button"
+                                                    data-action="postpone-registration"
+                                                    data-request-id="{{ req_id }}"
+                                                    data-user-name="{{ req_name }}"
+                                                >
+                                                    Auf später (2h)
                                                 </button>
                                             {% else %}
                                                 <span class="mono">Abgeschlossen</span>
@@ -1444,6 +1504,7 @@
                         <thead>
                             <tr>
                                 <th>Fahrer</th>
+                                <th>Aktenzeichen</th>
                                 <th>Discord-ID</th>
                                 <th>Rolle</th>
                                 <th>Status</th>
@@ -1461,10 +1522,11 @@
                                 {% set username = driver.username or "driver" %}
                                 {% set avatar_url = driver.avatar_url or "" %}
                                 {% set role_name = driver.primary_role_name or driver.role_name or driver.rank or "Fahrer" %}
+                                {% set aktenzeichen = driver.aktenzeichen or "Nicht vergeben" %}
 
                                 <tr
                                     data-driver-row
-                                    data-search="{{ (display_name ~ ' ' ~ username ~ ' ' ~ (driver.discord_username or '') ~ ' ' ~ (driver.discord_id or ''))|lower }}"
+                                    data-search="{{ (display_name ~ ' ' ~ username ~ ' ' ~ (driver.discord_username or '') ~ ' ' ~ (driver.discord_id or '') ~ ' ' ~ aktenzeichen)|lower }}"
                                     data-token="{{ 'with-token' if has_token else 'without-token' }}"
                                     data-tracker="{{ 'enabled' if tracker_enabled else 'disabled' }}"
                                 >
@@ -1484,6 +1546,10 @@
                                                 <span>@{{ username }}</span>
                                             </div>
                                         </div>
+                                    </td>
+                                    
+                                    <td>
+                                        <span class="aktenzeichen-mono">{{ aktenzeichen }}</span>
                                     </td>
 
                                     <td>
@@ -1523,6 +1589,16 @@
                                     <td>
                                         <div class="action-wrap">
                                             <button
+                                                class="request-btn blue"
+                                                type="button"
+                                                data-action="send-document"
+                                                data-driver-id="{{ driver.discord_id or driver.id }}"
+                                                data-driver-name="{{ display_name }}"
+                                            >
+                                                Dokument senden
+                                            </button>
+                                            
+                                            <button
                                                 class="token-btn"
                                                 type="button"
                                                 data-create-token="true"
@@ -1542,7 +1618,7 @@
                                 </tr>
                             {% else %}
                                 <tr>
-                                    <td colspan="7">
+                                    <td colspan="8">
                                         <div class="empty-state">
                                             <strong>Keine Fahrer gefunden</strong>
                                             In der Collection <code>users</code> wurden keine Fahrer geladen.
@@ -1560,6 +1636,7 @@
     <div class="toast-layer" id="toastLayer" aria-live="polite"></div>
 </section>
 
+<!-- Ablehnungs Modal -->
 <div class="modal-backdrop" id="rejectModal">
     <div class="modal-card">
         <div class="modal-head">
@@ -1594,6 +1671,47 @@
     </div>
 </div>
 
+<!-- Dokument Senden Modal -->
+<div class="modal-backdrop" id="documentModal">
+    <div class="modal-card">
+        <div class="modal-head">
+            <div>
+                <small>Personalabteilung</small>
+                <h3>Dokument an Fahrer übermitteln</h3>
+            </div>
+
+            <button class="modal-close" type="button" data-close-modal="documentModal">×</button>
+        </div>
+
+        <form class="modal-body" id="documentForm">
+            <input type="hidden" id="documentDriverId" />
+
+            <div class="modal-info">
+                <span>Empfänger: <strong id="documentDriverName">-</strong></span>
+                <span>Übermittle Vertrags- oder Richtliniendokumente an das Postfach des Fahrers. (Keine Lohn/Abrechnungen)</span>
+            </div>
+            
+            <input 
+                class="modal-input" 
+                type="text" 
+                id="documentTitle" 
+                placeholder="Dokumenten-Titel (z.B. Zusatzvereinbarung)" 
+                required 
+            />
+
+            <textarea
+                class="modal-textarea"
+                id="documentMessage"
+                placeholder="Optionale Nachricht an den Fahrer..."
+            ></textarea>
+
+            <div class="modal-actions">
+                <button class="request-btn blue" type="submit">Dokument senden</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         const CREATE_TOKEN_URL = "{{ url_for('personalabteilung_create_tracker_code') }}";
@@ -1601,9 +1719,12 @@
         const CLAIM_REGISTRATION_URL = "/api/personalabteilung/fahrer_registration/claim";
         const APPROVE_REGISTRATION_URL = "/api/personalabteilung/fahrer_registration/approve";
         const REJECT_REGISTRATION_URL = "/api/personalabteilung/fahrer_registration/reject";
+        const POSTPONE_REGISTRATION_URL = "/api/personalabteilung/fahrer_registration/postpone";
 
         const APPROVE_TOKEN_REQUEST_URL = "/api/personalabteilung/token_request/approve";
         const REJECT_TOKEN_REQUEST_URL = "/api/personalabteilung/token_request/reject";
+        
+        const SEND_DOCUMENT_URL = "/api/personalabteilung/driver/document/send";
 
         const searchInput = document.getElementById("driverSearch");
         const tokenFilter = document.getElementById("tokenFilter");
@@ -1621,6 +1742,13 @@
         const rejectReason = document.getElementById("rejectReason");
         const rejectUserName = document.getElementById("rejectUserName");
         const rejectModalTitle = document.getElementById("rejectModalTitle");
+        
+        const documentModal = document.getElementById("documentModal");
+        const documentForm = document.getElementById("documentForm");
+        const documentDriverId = document.getElementById("documentDriverId");
+        const documentDriverName = document.getElementById("documentDriverName");
+        const documentTitle = document.getElementById("documentTitle");
+        const documentMessage = document.getElementById("documentMessage");
 
         function getRows() {
             return Array.from(document.querySelectorAll("[data-driver-row]"));
@@ -1798,6 +1926,17 @@
                     "Ablehnen"
                 )
             );
+            
+            actionWrap.appendChild(
+                createActionButton(
+                    "request-btn orange",
+                    "postpone-registration",
+                    requestId,
+                    userName,
+                    userRole,
+                    "Auf später (2h)"
+                )
+            );
         }
 
         function renderClosedAction(row) {
@@ -1913,22 +2052,45 @@
             rejectModal.classList.remove("active");
             document.body.style.overflow = "";
         }
+        
+        function openDocumentModal(driverId, driverName) {
+            documentDriverId.value = driverId || "";
+            documentDriverName.textContent = driverName || "-";
+            documentTitle.value = "";
+            documentMessage.value = "";
+            
+            documentModal.classList.add("active");
+            document.body.style.overflow = "hidden";
+            
+            setTimeout(() => {
+                documentTitle.focus();
+            }, 60);
+        }
+        
+        function closeDocumentModal() {
+            documentModal.classList.remove("active");
+            document.body.style.overflow = "";
+        }
 
         document.querySelectorAll("[data-close-modal]").forEach((button) => {
             button.addEventListener("click", () => {
-                closeRejectModal();
+                if(button.dataset.closeModal === "rejectModal") closeRejectModal();
+                if(button.dataset.closeModal === "documentModal") closeDocumentModal();
             });
         });
 
         rejectModal.addEventListener("click", (event) => {
-            if (event.target === rejectModal) {
-                closeRejectModal();
-            }
+            if (event.target === rejectModal) closeRejectModal();
+        });
+        
+        documentModal.addEventListener("click", (event) => {
+            if (event.target === documentModal) closeDocumentModal();
         });
 
         document.addEventListener("keydown", (event) => {
-            if (event.key === "Escape" && rejectModal.classList.contains("active")) {
-                closeRejectModal();
+            if (event.key === "Escape") {
+                if (rejectModal.classList.contains("active")) closeRejectModal();
+                if (documentModal.classList.contains("active")) closeDocumentModal();
             }
         });
 
@@ -1938,25 +2100,11 @@
             });
         });
 
-        if (searchInput) {
-            searchInput.addEventListener("input", applyDriverFilters);
-        }
-
-        if (tokenFilter) {
-            tokenFilter.addEventListener("change", applyDriverFilters);
-        }
-
-        if (trackerFilter) {
-            trackerFilter.addEventListener("change", applyDriverFilters);
-        }
-
-        if (requestSearch) {
-            requestSearch.addEventListener("input", applyRequestFilters);
-        }
-
-        if (requestStatusFilter) {
-            requestStatusFilter.addEventListener("change", applyRequestFilters);
-        }
+        if (searchInput) searchInput.addEventListener("input", applyDriverFilters);
+        if (tokenFilter) tokenFilter.addEventListener("change", applyDriverFilters);
+        if (trackerFilter) trackerFilter.addEventListener("change", applyDriverFilters);
+        if (requestSearch) requestSearch.addEventListener("input", applyRequestFilters);
+        if (requestStatusFilter) requestStatusFilter.addEventListener("change", applyRequestFilters);
 
         rejectForm.addEventListener("submit", async (event) => {
             event.preventDefault();
@@ -2020,6 +2168,41 @@
                 submitButton.textContent = oldText;
             }
         });
+        
+        documentForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const driverId = documentDriverId.value;
+            const title = documentTitle.value.trim();
+            const message = documentMessage.value.trim();
+
+            if (!driverId || !title) {
+                showToast("Fehler", "Bitte einen Dokumententitel angeben.", "error");
+                return;
+            }
+
+            const submitButton = documentForm.querySelector("button[type='submit']");
+            const oldText = submitButton.textContent.trim();
+
+            submitButton.disabled = true;
+            submitButton.textContent = "Sende...";
+
+            try {
+                await postJson(SEND_DOCUMENT_URL, {
+                    driverId: driverId,
+                    title: title,
+                    message: message
+                });
+
+                showToast("Dokument gesendet", "Das Dokument wurde erfolgreich an das Postfach des Fahrers übermittelt.", "success");
+                closeDocumentModal();
+            } catch (error) {
+                showToast("Fehler", error.message || "Dokument konnte nicht gesendet werden.", "error");
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = oldText;
+            }
+        });
 
         document.addEventListener("click", async (event) => {
             const button = event.target.closest("[data-action]");
@@ -2032,6 +2215,13 @@
             const action = button.dataset.action;
             const requestId = button.dataset.requestId || "";
             const userName = button.dataset.userName || "User";
+
+            if (action === "send-document") {
+                const driverId = button.dataset.driverId;
+                const driverName = button.dataset.driverName;
+                openDocumentModal(driverId, driverName);
+                return;
+            }
 
             if (!requestId) {
                 showToast("Fehler", "Keine Request-ID vorhanden.", "error");
@@ -2057,7 +2247,7 @@
             }
 
             if (action === "approve-registration") {
-                const confirmed = confirm(`Fahrer-Registrierung für ${userName} annehmen und Token-Dokument ins Postfach senden?`);
+                const confirmed = confirm(`Fahrer-Registrierung für ${userName} annehmen und Token-Dokument (inkl. Aktenzeichen) ins Postfach senden?`);
 
                 if (!confirmed) return;
 
@@ -2084,6 +2274,28 @@
 
             if (action === "reject-registration") {
                 openRejectModal("registration", requestId, userName);
+                return;
+            }
+            
+            if (action === "postpone-registration") {
+                await runButtonAction(button, "Verschiebe...", async () => {
+                    const result = await postJson(POSTPONE_REGISTRATION_URL, {
+                        requestId: requestId,
+                        delayHours: 2
+                    });
+                    
+                    const row = button.closest("[data-request-row]");
+                    if (row) {
+                        row.remove();
+                        updateStats();
+                        applyRequestFilters();
+                    }
+
+                    showToast(
+                        "Aufgabe verschoben",
+                        `Die Registrierung für ${userName} wurde um 2 Stunden verschoben. Neue/ähnliche Tätigkeiten werden vom System vorgezogen.`
+                    );
+                });
                 return;
             }
 
