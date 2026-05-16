@@ -45,7 +45,7 @@ def add_tracker_headers(response):
     response.headers["Access-Control-Allow-Headers"] = (
         "Content-Type, Authorization, X-Tracker-Token, X-Tracker-Code, X-Tracker-Api-Key, X-Requested-With"
     )
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
     return response
 
 
@@ -89,6 +89,7 @@ token_request_collection = db["token_requests"]
 system_documents_collection = db["system_documents"]
 tasks_collection = db["tasks"]
 buchhaltung_requests_collection = db["buchhaltung_requests"]
+buchhaltung_entries_collection = db["buchhaltung_entries"]
 
 
 def ensure_indexes():
@@ -120,6 +121,17 @@ def ensure_indexes():
         buchhaltung_requests_collection.create_index([("created_at", DESCENDING)], unique=False)
         buchhaltung_requests_collection.create_index([("status", ASCENDING)], unique=False)
         buchhaltung_requests_collection.create_index([("archived", ASCENDING)], unique=False)
+
+        buchhaltung_entries_collection.create_index([("entry_id", ASCENDING)], unique=False)
+        buchhaltung_entries_collection.create_index([("created_at", DESCENDING)], unique=False)
+        buchhaltung_entries_collection.create_index([("updated_at", DESCENDING)], unique=False)
+        buchhaltung_entries_collection.create_index([("created_by.discord_id", ASCENDING)], unique=False)
+        buchhaltung_entries_collection.create_index([("created_by.username", ASCENDING)], unique=False)
+        buchhaltung_entries_collection.create_index([("date", DESCENDING)], unique=False)
+        buchhaltung_entries_collection.create_index([("type", ASCENDING)], unique=False)
+        buchhaltung_entries_collection.create_index([("payment_status", ASCENDING)], unique=False)
+        buchhaltung_entries_collection.create_index([("receipt_status", ASCENDING)], unique=False)
+        buchhaltung_entries_collection.create_index([("archived", ASCENDING)], unique=False)
     except Exception as error:
         print(f"MongoDB Index-Erstellung fehlgeschlagen: {error}")
 
@@ -2022,6 +2034,29 @@ BUCHHALTUNG_ALLOWED_ROLES = {
     ROLE_PROJEKTLEITUNG
 }
 
+# Diese Rollen/Rechte dürfen alle Buchhaltungseinträge sehen und bearbeiten.
+# Wichtig: Die Rechteprüfung passiert hier serverseitig. Frontend-Flags sind nur UI-Hinweise.
+BUCHHALTUNG_VIEW_ALL_ROLES = {
+    ROLE_BUCHHALTUNG_ID,
+    ROLE_BUCHHALTUNG,
+    ROLE_GESCHAEFTSFUEHRUNG_ID,
+    ROLE_PROJEKTLEITUNG_ID,
+    ROLE_GESCHAEFTSLEITUNG,
+    ROLE_PROJEKTLEITUNG,
+    "admin",
+    "owner",
+    "verwaltung",
+    "buchhaltung",
+    "accounting",
+    "finance",
+    "buchhaltung.view_all",
+    "buchhaltung:all",
+    "buchhaltung_all",
+    "buchhaltung.view.all",
+    "buchhaltung_admin",
+    "finance_admin"
+}
+
 
 def role_set(user_roles):
     return {str(role).strip() for role in (user_roles or []) if role and str(role).strip()}
@@ -2029,6 +2064,10 @@ def role_set(user_roles):
 
 def has_buchhaltung_permission(user_roles):
     return bool(role_set(user_roles).intersection(role_set(BUCHHALTUNG_ALLOWED_ROLES)))
+
+
+def has_buchhaltung_view_all_permission(user_roles):
+    return bool(role_set(user_roles).intersection(role_set(BUCHHALTUNG_VIEW_ALL_ROLES)))
 
 
 def require_buchhaltung_permission():
@@ -2082,6 +2121,238 @@ def current_account_identity():
     }
 
 
+def actor_owns_buchhaltung_entry(entry_doc, actor):
+    if not entry_doc or not actor:
+        return False
+
+    created_by = entry_doc.get("created_by") or {}
+    actor_discord_id = safe_str(actor.get("discord_id"))
+    actor_username = safe_str(actor.get("username")).lower()
+
+    entry_discord_id = safe_str(
+        entry_doc.get("created_by_discord_id")
+        or entry_doc.get("discord_id")
+        or created_by.get("discord_id")
+    )
+    entry_username = safe_str(
+        entry_doc.get("created_by_username")
+        or entry_doc.get("username")
+        or created_by.get("username")
+    ).lower()
+
+    if actor_discord_id and entry_discord_id and actor_discord_id == entry_discord_id:
+        return True
+    if actor_username and entry_username and actor_username == entry_username:
+        return True
+    return False
+
+
+def own_buchhaltung_query(actor):
+    discord_id = safe_str(actor.get("discord_id"))
+    username = safe_str(actor.get("username"))
+    display_name = safe_str(actor.get("display_name"))
+
+    clauses = []
+    if discord_id:
+        clauses.extend([
+            {"created_by.discord_id": discord_id},
+            {"created_by_discord_id": discord_id},
+            {"discord_id": discord_id},
+            {"user_id": discord_id},
+            {"owner_id": discord_id}
+        ])
+    if username:
+        clauses.extend([
+            {"created_by.username": username},
+            {"created_by_username": username},
+            {"username": username},
+            {"created_by": username}
+        ])
+    if display_name:
+        clauses.extend([
+            {"created_by.display_name": display_name},
+            {"created_by_name": display_name},
+            {"display_name": display_name}
+        ])
+
+    if not clauses:
+        return {"_id": None}
+    return {"$or": clauses}
+
+
+def buchhaltung_entry_lookup_query(entry_id):
+    entry_id = safe_str(entry_id)
+    query_items = [{"entry_id": entry_id}, {"id": entry_id}, {"uuid": entry_id}]
+    object_id = object_id_or_none(entry_id)
+    if object_id:
+        query_items.append({"_id": object_id})
+    return {"$or": query_items}
+
+
+def normalize_buchhaltung_type(value):
+    value = safe_str(value, "income").lower()
+    if value in {"expense", "ausgabe", "kosten", "cost"}:
+        return "expense"
+    return "income"
+
+
+def normalize_buchhaltung_payment(value):
+    value = safe_str(value, "Offen")[:60]
+    value_lc = value.lower()
+    if value_lc in {"bezahlt", "paid", "done", "erledigt"}:
+        return "Bezahlt"
+    if value_lc in {"teilzahlung", "partial", "teilweise"}:
+        return "Teilzahlung"
+    if value_lc in {"prüfen", "pruefen", "check"}:
+        return "Prüfen"
+    return "Offen"
+
+
+def normalize_buchhaltung_receipt(value):
+    value = safe_str(value, "Vorhanden")[:60]
+    value_lc = value.lower()
+    if value_lc in {"fehlt", "missing", "no", "nein"}:
+        return "Fehlt"
+    if value_lc in {"digital prüfen", "digital pruefen", "prüfen", "pruefen", "check"}:
+        return "Digital prüfen"
+    return "Vorhanden"
+
+
+def normalize_buchhaltung_date(value):
+    value = safe_str(value)
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", value):
+        return value
+    return now_utc().strftime("%Y-%m-%d")
+
+
+def calculate_buchhaltung_vat(gross, vat_rate):
+    gross = parse_number(gross, 0)
+    vat_rate = parse_number(vat_rate, 0)
+    if not vat_rate:
+        return 0.0
+    return round((gross - gross / (1 + vat_rate / 100)) * 100) / 100
+
+
+def datetime_to_client_iso(value):
+    if isinstance(value, datetime):
+        return value.isoformat() + "Z"
+    if value:
+        return str(value)
+    return ""
+
+
+def prepare_buchhaltung_entry_for_api(entry_doc):
+    item = dict(entry_doc or {})
+    created_by = item.get("created_by") or {}
+    updated_by = item.get("updated_by") or {}
+
+    entry_id = safe_str(item.get("entry_id") or item.get("id") or item.get("uuid") or item.get("_id"))
+    if item.get("_id"):
+        mongo_id = str(item.get("_id"))
+    else:
+        mongo_id = ""
+
+    entry_type = normalize_buchhaltung_type(item.get("type"))
+    amount = round(parse_number(item.get("amount") or item.get("gross_amount") or item.get("brutto"), 0), 2)
+    vat_rate = round(parse_number(item.get("vat_rate") or item.get("vatRate") or item.get("vat") or item.get("tax_rate"), 0), 2)
+    vat_amount = round(parse_number(item.get("vat_amount") or item.get("vatAmount") or item.get("tax_amount"), calculate_buchhaltung_vat(amount, vat_rate)), 2)
+
+    created_by_name = safe_str(
+        item.get("created_by_name")
+        or item.get("createdBy")
+        or created_by.get("display_name")
+        or created_by.get("username")
+        or item.get("username"),
+        "Unbekannt"
+    )
+
+    result = {
+        "_id": mongo_id,
+        "id": entry_id or mongo_id,
+        "entry_id": entry_id or mongo_id,
+        "createdAt": datetime_to_client_iso(item.get("created_at") or item.get("createdAt")),
+        "created_at": datetime_to_client_iso(item.get("created_at") or item.get("createdAt")),
+        "updatedAt": datetime_to_client_iso(item.get("updated_at") or item.get("updatedAt")),
+        "updated_at": datetime_to_client_iso(item.get("updated_at") or item.get("updatedAt")),
+        "createdBy": created_by_name,
+        "created_by_name": created_by_name,
+        "created_by": {
+            "discord_id": safe_str(created_by.get("discord_id") or item.get("created_by_discord_id") or item.get("discord_id")),
+            "username": safe_str(created_by.get("username") or item.get("created_by_username") or item.get("username")),
+            "display_name": safe_str(created_by.get("display_name") or created_by_name)
+        },
+        "updated_by": {
+            "discord_id": safe_str(updated_by.get("discord_id")),
+            "username": safe_str(updated_by.get("username")),
+            "display_name": safe_str(updated_by.get("display_name"))
+        },
+        "userId": safe_str(created_by.get("discord_id") or item.get("created_by_discord_id") or item.get("discord_id") or item.get("user_id")),
+        "user_id": safe_str(created_by.get("discord_id") or item.get("created_by_discord_id") or item.get("discord_id") or item.get("user_id")),
+        "date": normalize_buchhaltung_date(item.get("date")),
+        "type": entry_type,
+        "typeLabel": "Einnahme" if entry_type == "income" else "Ausgabe",
+        "type_label": "Einnahme" if entry_type == "income" else "Ausgabe",
+        "category": safe_str(item.get("category"), "Sonstiges")[:120],
+        "amount": amount,
+        "gross_amount": amount,
+        "vatRate": vat_rate,
+        "vat_rate": vat_rate,
+        "vatAmount": vat_amount,
+        "vat_amount": vat_amount,
+        "documentNo": safe_str(item.get("document_no") or item.get("documentNo") or item.get("document") or item.get("invoice_no"))[:120],
+        "document_no": safe_str(item.get("document_no") or item.get("documentNo") or item.get("document") or item.get("invoice_no"))[:120],
+        "partner": safe_str(item.get("partner") or item.get("customer") or item.get("supplier") or item.get("driver"))[:120],
+        "tour": safe_str(item.get("tour") or item.get("plate") or item.get("vehicle"))[:120],
+        "receipt": normalize_buchhaltung_receipt(item.get("receipt_status") or item.get("receipt")),
+        "receipt_status": normalize_buchhaltung_receipt(item.get("receipt_status") or item.get("receipt")),
+        "payment": normalize_buchhaltung_payment(item.get("payment_status") or item.get("payment")),
+        "payment_status": normalize_buchhaltung_payment(item.get("payment_status") or item.get("payment")),
+        "note": safe_str(item.get("note") or item.get("notes"))[:1000],
+        "source": safe_str(item.get("source"), "buchhaltung2")[:80]
+    }
+    return result
+
+
+def build_buchhaltung_entry_doc(data, actor):
+    data = data or {}
+    amount = round(parse_number(data.get("amount") or data.get("gross_amount") or data.get("brutto"), 0), 2)
+    vat_rate = round(parse_number(data.get("vat_rate") or data.get("vatRate") or data.get("vat") or data.get("tax_rate"), 0), 2)
+    vat_amount = round(parse_number(data.get("vat_amount") or data.get("vatAmount") or data.get("tax_amount"), calculate_buchhaltung_vat(amount, vat_rate)), 2)
+    entry_type = normalize_buchhaltung_type(data.get("type"))
+    now = now_utc()
+
+    return {
+        "entry_id": uuid.uuid4().hex,
+        "date": normalize_buchhaltung_date(data.get("date")),
+        "type": entry_type,
+        "type_label": "Einnahme" if entry_type == "income" else "Ausgabe",
+        "category": safe_str(data.get("category"), "Sonstiges")[:120],
+        "amount": amount,
+        "gross_amount": amount,
+        "currency": "EUR",
+        "vat_rate": vat_rate,
+        "vat_amount": vat_amount,
+        "document_no": safe_str(data.get("document_no") or data.get("documentNo") or data.get("document") or data.get("invoice_no"))[:120],
+        "partner": safe_str(data.get("partner") or data.get("customer") or data.get("supplier") or data.get("driver"))[:120],
+        "tour": safe_str(data.get("tour") or data.get("plate") or data.get("vehicle"))[:120],
+        "receipt_status": normalize_buchhaltung_receipt(data.get("receipt_status") or data.get("receipt")),
+        "payment_status": normalize_buchhaltung_payment(data.get("payment_status") or data.get("payment")),
+        "note": safe_str(data.get("note") or data.get("notes"))[:1000],
+        "source": safe_str(data.get("source"), "buchhaltung2")[:80],
+        "archived": False,
+        "created_at": now,
+        "updated_at": now,
+        "created_by": {
+            "discord_id": safe_str(actor.get("discord_id")),
+            "username": safe_str(actor.get("username")),
+            "display_name": safe_str(actor.get("display_name"))
+        },
+        "created_by_discord_id": safe_str(actor.get("discord_id")),
+        "created_by_username": safe_str(actor.get("username")),
+        "created_by_name": safe_str(actor.get("display_name") or actor.get("username"))
+    }
+
+
 def get_all_drivers_for_select():
     drivers_cursor = users_collection.find(
         {},
@@ -2122,12 +2393,27 @@ def buchhaltung():
         return permission_response
 
     actor = current_account_identity()
+    user_roles = session.get("user", {}).get("roles", [])
+    can_view_all_entries = has_buchhaltung_view_all_permission(user_roles)
+
+    # Die neue buchhaltung2.html liest diese Flags direkt aus der Session.
+    # Ohne diese Flags würden Rollen-IDs im Frontend nicht als "Buchhaltung" erkannt.
+    if isinstance(session.get("user"), dict):
+        session["user"]["buchhaltung_view_all"] = can_view_all_entries
+        session["user"]["can_view_all_buchhaltung"] = can_view_all_entries
+        session["user"]["is_buchhaltung"] = has_buchhaltung_permission(user_roles)
+        permissions = set(to_string for to_string in session["user"].get("permissions", []) if to_string)
+        if can_view_all_entries:
+            permissions.add("buchhaltung.view_all")
+        session["user"]["permissions"] = sorted(permissions)
+        session.modified = True
 
     return render_template(
         "buchhaltung2.html",
         current_user=session.get("user"),
         display_name=actor.get("username") or actor.get("display_name"),
         staff_name=actor.get("display_name"),
+        can_view_all_buchhaltung=can_view_all_entries,
         buchhaltung_requests=[],
         requests=[],
         transactions=[],
@@ -2140,6 +2426,167 @@ def buchhaltung():
             "total_amount": 0
         }
     )
+
+
+@app.route("/api/buchhaltung/entries", methods=["GET", "POST", "OPTIONS"])
+def api_buchhaltung_entries():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    permission_response = require_buchhaltung_api_permission()
+    if permission_response:
+        return permission_response
+
+    actor = current_account_identity()
+    user_roles = session.get("user", {}).get("roles", [])
+    can_view_all_entries = has_buchhaltung_view_all_permission(user_roles)
+
+    if request.method == "GET":
+        requested_scope = safe_str(request.args.get("scope"), "own").lower()
+        query = {"archived": {"$ne": True}}
+        scope = "own"
+
+        if requested_scope == "all":
+            if not can_view_all_entries:
+                return jsonify({
+                    "success": False,
+                    "message": "Nicht berechtigt, alle Buchhaltungseinträge zu sehen."
+                }), 403
+            scope = "all"
+        else:
+            query.update(own_buchhaltung_query(actor))
+
+        limit = max(1, min(parse_int(request.args.get("limit"), 500), 1000))
+        items_cursor = buchhaltung_entries_collection.find(query).sort(
+            [("date", DESCENDING), ("created_at", DESCENDING)]
+        ).limit(limit)
+        entries = [prepare_buchhaltung_entry_for_api(item) for item in items_cursor]
+
+        return jsonify({
+            "success": True,
+            "scope": scope,
+            "can_view_all": can_view_all_entries,
+            "entries": entries
+        })
+
+    data = request.get_json(silent=True) or {}
+    amount = parse_number(data.get("amount") or data.get("gross_amount") or data.get("brutto"), 0)
+    if amount <= 0:
+        return jsonify({"success": False, "message": "Bitte einen gültigen Bruttobetrag eingeben."}), 400
+
+    entry_doc = build_buchhaltung_entry_doc(data, actor)
+    buchhaltung_entries_collection.insert_one(entry_doc)
+    created = buchhaltung_entries_collection.find_one({"entry_id": entry_doc["entry_id"]})
+
+    return jsonify({
+        "success": True,
+        "message": "Buchung wurde serverseitig gespeichert.",
+        "entry": prepare_buchhaltung_entry_for_api(created)
+    }), 201
+
+
+@app.route("/api/buchhaltung/entries/<entry_id>", methods=["GET", "PATCH", "DELETE", "OPTIONS"])
+def api_buchhaltung_entry_detail(entry_id):
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    permission_response = require_buchhaltung_api_permission()
+    if permission_response:
+        return permission_response
+
+    actor = current_account_identity()
+    user_roles = session.get("user", {}).get("roles", [])
+    can_view_all_entries = has_buchhaltung_view_all_permission(user_roles)
+
+    lookup = buchhaltung_entry_lookup_query(entry_id)
+    query = {"$and": [lookup, {"archived": {"$ne": True}}]}
+    entry_doc = buchhaltung_entries_collection.find_one(query)
+
+    if not entry_doc:
+        return jsonify({"success": False, "message": "Buchung wurde nicht gefunden."}), 404
+
+    if not can_view_all_entries and not actor_owns_buchhaltung_entry(entry_doc, actor):
+        return jsonify({"success": False, "message": "Nicht berechtigt für diese Buchung."}), 403
+
+    if request.method == "GET":
+        return jsonify({"success": True, "entry": prepare_buchhaltung_entry_for_api(entry_doc)})
+
+    now = now_utc()
+
+    if request.method == "DELETE":
+        buchhaltung_entries_collection.update_one(
+            {"_id": entry_doc["_id"]},
+            {
+                "$set": {
+                    "archived": True,
+                    "archived_at": now,
+                    "archived_by": actor,
+                    "updated_at": now,
+                    "updated_by": actor
+                }
+            }
+        )
+        return jsonify({"success": True, "message": "Buchung wurde gelöscht."})
+
+    data = request.get_json(silent=True) or {}
+    update_fields = {}
+
+    if "date" in data:
+        update_fields["date"] = normalize_buchhaltung_date(data.get("date"))
+    if "type" in data:
+        entry_type = normalize_buchhaltung_type(data.get("type"))
+        update_fields["type"] = entry_type
+        update_fields["type_label"] = "Einnahme" if entry_type == "income" else "Ausgabe"
+    if "category" in data:
+        update_fields["category"] = safe_str(data.get("category"), "Sonstiges")[:120]
+    if "document_no" in data or "documentNo" in data or "document" in data or "invoice_no" in data:
+        update_fields["document_no"] = safe_str(data.get("document_no") or data.get("documentNo") or data.get("document") or data.get("invoice_no"))[:120]
+    if "partner" in data or "customer" in data or "supplier" in data or "driver" in data:
+        update_fields["partner"] = safe_str(data.get("partner") or data.get("customer") or data.get("supplier") or data.get("driver"))[:120]
+    if "tour" in data or "plate" in data or "vehicle" in data:
+        update_fields["tour"] = safe_str(data.get("tour") or data.get("plate") or data.get("vehicle"))[:120]
+    if "receipt_status" in data or "receipt" in data:
+        update_fields["receipt_status"] = normalize_buchhaltung_receipt(data.get("receipt_status") or data.get("receipt"))
+    if "payment_status" in data or "payment" in data:
+        update_fields["payment_status"] = normalize_buchhaltung_payment(data.get("payment_status") or data.get("payment"))
+    if "note" in data or "notes" in data:
+        update_fields["note"] = safe_str(data.get("note") or data.get("notes"))[:1000]
+
+    amount_changed = "amount" in data or "gross_amount" in data or "brutto" in data
+    vat_rate_changed = "vat_rate" in data or "vatRate" in data or "vat" in data or "tax_rate" in data
+    vat_amount_changed = "vat_amount" in data or "vatAmount" in data or "tax_amount" in data
+
+    if amount_changed:
+        amount = round(parse_number(data.get("amount") or data.get("gross_amount") or data.get("brutto"), 0), 2)
+        if amount <= 0:
+            return jsonify({"success": False, "message": "Bitte einen gültigen Bruttobetrag eingeben."}), 400
+        update_fields["amount"] = amount
+        update_fields["gross_amount"] = amount
+
+    if vat_rate_changed:
+        update_fields["vat_rate"] = round(parse_number(data.get("vat_rate") or data.get("vatRate") or data.get("vat") or data.get("tax_rate"), 0), 2)
+
+    if vat_amount_changed:
+        update_fields["vat_amount"] = round(parse_number(data.get("vat_amount") or data.get("vatAmount") or data.get("tax_amount"), 0), 2)
+    elif amount_changed or vat_rate_changed:
+        current_amount = update_fields.get("amount", parse_number(entry_doc.get("amount"), 0))
+        current_vat_rate = update_fields.get("vat_rate", parse_number(entry_doc.get("vat_rate"), 0))
+        update_fields["vat_amount"] = calculate_buchhaltung_vat(current_amount, current_vat_rate)
+
+    if not update_fields:
+        return jsonify({"success": True, "message": "Keine Änderung übergeben.", "entry": prepare_buchhaltung_entry_for_api(entry_doc)})
+
+    update_fields["updated_at"] = now
+    update_fields["updated_by"] = actor
+
+    buchhaltung_entries_collection.update_one({"_id": entry_doc["_id"]}, {"$set": update_fields})
+    updated = buchhaltung_entries_collection.find_one({"_id": entry_doc["_id"]})
+
+    return jsonify({
+        "success": True,
+        "message": "Buchung wurde aktualisiert.",
+        "entry": prepare_buchhaltung_entry_for_api(updated)
+    })
 
 
 @app.route("/api/buchhaltung/request", methods=["GET", "POST", "OPTIONS"])
@@ -2168,6 +2615,7 @@ def api_buchhaltung_request():
     message = safe_str(data.get("message") or data.get("description") or data.get("content"))[:2000]
     amount = parse_number(data.get("amount"), 0)
     priority = safe_str(data.get("priority"), "normal")[:40]
+    entries_snapshot = data.get("entries") if isinstance(data.get("entries"), list) else []
 
     if not message:
         return jsonify({
@@ -2202,6 +2650,8 @@ def api_buchhaltung_request():
         "sender_discord_id": actor.get("discord_id"),
         "sender_username": actor.get("username"),
         "source": "buchhaltung",
+        "scope": safe_str(data.get("scope"), "")[:40],
+        "entries_snapshot": entries_snapshot[:500],
         "destination": "personalabteilung",
         "visible_in_personalabteilung_tab": True
     }
