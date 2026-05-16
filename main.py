@@ -2024,9 +2024,6 @@ def downloads():
 
 @app.route("/fuhrpark")
 def fuhrpark():
-    if "user" not in session:
-        return redirect(url_for("login"))
-
     return render_template("fuhrpark.html")
 
 
