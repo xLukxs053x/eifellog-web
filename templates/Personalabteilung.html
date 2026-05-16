@@ -57,6 +57,88 @@
         pointer-events: auto;
     }
 
+
+    /* === PERSONALABTEILUNG BACKGROUND SLIDESHOW === */
+    .personal-slideshow-bg {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        overflow: hidden;
+        pointer-events: none;
+        background: #010302;
+    }
+
+    .personal-slideshow-bg .personal-bg-slide {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        filter: saturate(1.08) brightness(0.30) contrast(1.08);
+        opacity: 0;
+        animation: personalFadeZoom 24s infinite;
+        will-change: opacity, transform;
+    }
+
+    .personal-slideshow-bg .personal-slide-1 {
+        animation-delay: 0s;
+    }
+
+    .personal-slideshow-bg .personal-slide-2 {
+        animation-delay: 8s;
+    }
+
+    .personal-slideshow-bg .personal-slide-3 {
+        animation-delay: 16s;
+    }
+
+    .personal-slideshow-overlay {
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(circle at 50% 24%, rgba(var(--el-green-rgb), 0.12), transparent 34%),
+            radial-gradient(circle at 14% 18%, rgba(var(--el-yellow-rgb), 0.07), transparent 28%),
+            radial-gradient(circle at 84% 20%, rgba(var(--el-green-rgb), 0.08), transparent 30%),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.30), rgba(1, 5, 3, 0.82) 62%, rgba(1, 5, 3, 0.96));
+    }
+
+    .personal-slideshow-grid {
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(rgba(255, 255, 255, 0.014) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px);
+        background-size: 48px 48px;
+        mask-image: radial-gradient(circle at center, black, transparent 82%);
+        opacity: 0.26;
+    }
+
+    @keyframes personalFadeZoom {
+        0% {
+            opacity: 0;
+            transform: scale(1);
+        }
+
+        10% {
+            opacity: 1;
+        }
+
+        33% {
+            opacity: 1;
+        }
+
+        45% {
+            opacity: 0;
+            transform: scale(1.045);
+        }
+
+        100% {
+            opacity: 0;
+            transform: scale(1.045);
+        }
+    }
+
     .personal-page {
         position: relative;
         min-height: calc(100vh - 120px);
@@ -66,30 +148,10 @@
         z-index: 1;
     }
 
-    .personal-page::before {
-        content: "";
-        position: fixed;
-        inset: 0;
-        z-index: -2;
-        background:
-            radial-gradient(circle at 18% 14%, rgba(var(--el-green-rgb), 0.13), transparent 32%),
-            radial-gradient(circle at 78% 16%, rgba(var(--el-yellow-rgb), 0.07), transparent 30%),
-            linear-gradient(135deg, var(--el-bg-1) 0%, var(--el-bg-2) 48%, #010201 100%);
-        pointer-events: none;
-    }
-
+    .personal-page::before,
     .personal-page::after {
-        content: "";
-        position: fixed;
-        inset: 0;
-        z-index: -1;
-        background:
-            linear-gradient(rgba(255, 255, 255, 0.014) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px);
-        background-size: 48px 48px;
-        mask-image: radial-gradient(circle at center, black, transparent 82%);
-        opacity: 0.32;
-        pointer-events: none;
+        display: none !important;
+        content: none !important;
     }
 
     .personal-shell {
@@ -962,6 +1024,14 @@
         }
     }
 </style>
+
+<div class="personal-slideshow-bg" aria-hidden="true">
+    <img class="personal-bg-slide personal-slide-1" src="{{ url_for('static', filename='eifelog1.jpg') }}" alt="">
+    <img class="personal-bg-slide personal-slide-2" src="{{ url_for('static', filename='eifelog2.jpg') }}" alt="">
+    <img class="personal-bg-slide personal-slide-3" src="{{ url_for('static', filename='eifelog3.jpg') }}" alt="">
+    <div class="personal-slideshow-overlay"></div>
+    <div class="personal-slideshow-grid"></div>
+</div>
 
 <section class="personal-page">
     <div class="personal-shell">
