@@ -51,6 +51,36 @@
 {% block title %}EifelLog - Dashboard{% endblock %}
 
 {% block content %}
+<style>
+    #general-alerts-wrapper.flex,
+    #new-doc-alert-wrapper.flex {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #general-alerts-panel,
+    #new-doc-alert-panel {
+        margin: auto;
+    }
+
+    #alert-badge {
+        line-height: 1.25rem;
+    }
+
+    .doc-trigger.is-unread-doc {
+        box-shadow: 0 0 0 1px rgba(220, 226, 38, 0.18), 0 0 28px rgba(220, 226, 38, 0.08);
+    }
+
+    .doc-trigger[data-read="true"] .doc-attention-dot,
+    .doc-trigger[data-read="true"] .doc-new-indicator {
+        display: none !important;
+    }
+
+    .doc-trigger[data-read="false"] .doc-new-indicator {
+        display: inline-flex;
+    }
+</style>
 <div class="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 mt-6">
     <div class="flex items-center gap-4">
         <div class="w-16 h-16 rounded-full border-2 border-[var(--brand-green)] overflow-hidden shadow-[0_0_15px_rgba(137,190,50,0.3)]">
@@ -86,10 +116,8 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
             </svg>
 
-            {% if needs_signature_flag or (safe_user_documents and safe_user_documents|length > 0) or (fahrer_reg_status == 'approved' and fahrer_token_value) %}
-                <span class="absolute top-0 right-0 w-3 h-3 bg-[var(--danger)] rounded-full animate-ping"></span>
-                <span class="absolute top-0 right-0 w-3 h-3 bg-[var(--danger)] rounded-full shadow-[0_0_10px_rgba(255,159,159,0.8)]"></span>
-            {% endif %}
+            <span id="alert-badge"
+                  class="hidden absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-[var(--brand-yellow)] text-black border border-black/40 shadow-[0_0_16px_rgba(220,226,38,0.75)] text-[10px] font-orbitron font-black flex items-center justify-center">0</span>
         </button>
     </div>
 </div>
@@ -481,10 +509,41 @@
     </div>
 </div>
 
+<div id="new-doc-alert-wrapper" class="fixed inset-0 z-[130] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
+    <div id="new-doc-alert-panel" class="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-[var(--brand-yellow)]/25 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.8)] transform scale-95 translate-y-4 transition-all duration-300">
+        <div class="p-6 md:p-7">
+            <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded-2xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/30 flex items-center justify-center text-[var(--brand-yellow)] shrink-0 shadow-[0_0_25px_rgba(220,226,38,0.08)]">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                    </svg>
+                </div>
+
+                <div class="min-w-0">
+                    <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase">System Alert</span>
+                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Wichtige Dokumente</h2>
+                    <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed">
+                        Du hast wichtige Dokumente im Postfach. Schau nach!
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button id="btn-open-inbox-from-alert" type="button" class="btn-primary w-full justify-center">
+                    Postfach öffnen
+                </button>
+                <button id="btn-dismiss-new-doc-alert" type="button" class="w-full inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 hover:border-white/20 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.18em]">
+                    Später
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="general-alerts-wrapper" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/60 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
     <div id="alerts-backdrop" class="absolute inset-0 cursor-pointer"></div>
 
-    <div id="general-alerts-panel" class="relative z-10 w-full max-w-xl max-h-[86vh] overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.75)] transform scale-95 translate-y-4 transition-all duration-300 flex flex-col">
+    <div id="general-alerts-panel" class="relative z-10 w-full max-w-xl mx-auto max-h-[86vh] overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.75)] transform scale-95 translate-y-4 transition-all duration-300 flex flex-col">
         <div class="p-6 border-b border-white/10 shrink-0">
             <div class="flex items-start justify-between gap-4">
                 <div class="flex items-start gap-4">
@@ -516,7 +575,8 @@
                     data-title="EifelLog Richtlinien"
                     data-sender="Management"
                     data-date="Standard"
-                    data-needs-signature="true">
+                    data-needs-signature="true"
+                    data-doc-id="policy-eifellog-richtlinien">
                 <div class="flex items-center gap-4">
                     <div class="p-3 rounded-xl bg-[var(--brand-green)]/10 text-[var(--brand-green)] border border-[var(--brand-green)]/20 group-hover:scale-105 transition-transform">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -547,8 +607,9 @@
                     data-title="Fahrer Token Bestätigung"
                     data-sender="{{ fahrer_reg_handler }}"
                     data-date="{{ fahrer_token_created_at }}"
-                    data-needs-signature="false">
-                <span class="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[var(--brand-green)] shadow-[0_0_12px_rgba(137,190,50,0.9)] animate-pulse"></span>
+                    data-needs-signature="false"
+                    data-doc-id="{{ ('token-' ~ fahrer_reg_name ~ '-' ~ fahrer_token_created_at)|e }}">
+                <span class="doc-attention-dot absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[var(--brand-green)] shadow-[0_0_12px_rgba(137,190,50,0.9)] animate-pulse"></span>
 
                 <div class="flex items-center gap-4 pr-5">
                     <div class="p-3 rounded-xl bg-[var(--brand-green)]/10 text-[var(--brand-green)] border border-[var(--brand-green)]/20 group-hover:scale-105 transition-transform">
@@ -586,10 +647,11 @@
                             data-title="{{ doc.title }}"
                             data-sender="{{ doc.sender }}"
                             data-date="{{ doc.date }}"
-                            data-needs-signature="{{ 'true' if doc.needs_signature else 'false' }}">
+                            data-needs-signature="{{ 'true' if doc.needs_signature else 'false' }}"
+                            data-doc-id="{{ ('doc-' ~ loop.index ~ '-' ~ doc.title ~ '-' ~ doc.sender ~ '-' ~ doc.date)|e }}">
 
                         {% if doc.needs_signature %}
-                        <span class="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[var(--brand-yellow)] shadow-[0_0_12px_rgba(220,226,38,0.9)] animate-pulse"></span>
+                        <span class="doc-attention-dot absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[var(--brand-yellow)] shadow-[0_0_12px_rgba(220,226,38,0.9)] animate-pulse"></span>
                         {% endif %}
 
                         <div class="flex items-center gap-4 pr-5">
@@ -866,13 +928,20 @@
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const currentRole = {{ primary_role_display | tojson }};
+        const currentUserKey = {{ (current_user.id|default(current_user.username, true)) | string | tojson }};
         const fahrerRegistrationStatus = {{ fahrer_reg_status | tojson }};
 
         const alertBell = document.getElementById('alert-bell');
+        const alertBadge = document.getElementById('alert-badge');
         const alertsWrapper = document.getElementById('general-alerts-wrapper');
         const alertsPanel = document.getElementById('general-alerts-panel');
         const alertsBackdrop = document.getElementById('alerts-backdrop');
         const btnCloseAlerts = document.getElementById('btn-close-alerts');
+
+        const newDocAlertWrapper = document.getElementById('new-doc-alert-wrapper');
+        const newDocAlertPanel = document.getElementById('new-doc-alert-panel');
+        const btnOpenInboxFromAlert = document.getElementById('btn-open-inbox-from-alert');
+        const btnDismissNewDocAlert = document.getElementById('btn-dismiss-new-doc-alert');
 
         const univModal = document.getElementById('universal-doc-modal');
         const univPanel = document.getElementById('univ-doc-panel');
@@ -928,9 +997,10 @@
             const driverHidden = !driverRegistrationModal || driverRegistrationModal.classList.contains('hidden');
             const tokenHidden = !tokenRequestModal || tokenRequestModal.classList.contains('hidden');
             const alertsHidden = !alertsWrapper || alertsWrapper.classList.contains('hidden');
+            const newDocAlertHidden = !newDocAlertWrapper || newDocAlertWrapper.classList.contains('hidden');
             const docHidden = !univModal || univModal.classList.contains('hidden');
 
-            if (driverHidden && tokenHidden && alertsHidden && docHidden) {
+            if (driverHidden && tokenHidden && alertsHidden && newDocAlertHidden && docHidden) {
                 document.body.classList.remove('overflow-hidden');
             }
         }
@@ -967,12 +1037,162 @@
             }, 300);
         }
 
+        const readDocumentsStorageKey = `eifellog.dashboard.readDocuments.${currentUserKey || 'user'}`;
+        const inboxFingerprintStorageKey = `eifellog.dashboard.lastInboxFingerprint.${currentUserKey || 'user'}`;
+        let readDocumentIds = new Set();
+
+        function readJsonArrayFromStorage(key) {
+            try {
+                const raw = window.localStorage.getItem(key);
+                const parsed = raw ? JSON.parse(raw) : [];
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                console.warn('LocalStorage konnte nicht gelesen werden:', error);
+                return [];
+            }
+        }
+
+        function writeJsonArrayToStorage(key, values) {
+            try {
+                window.localStorage.setItem(key, JSON.stringify(Array.from(values)));
+            } catch (error) {
+                console.warn('LocalStorage konnte nicht geschrieben werden:', error);
+            }
+        }
+
+        function getDocumentButtons() {
+            return Array.from(document.querySelectorAll('.doc-trigger'));
+        }
+
+        function getDocumentId(button) {
+            if (!button) return '';
+
+            const explicitId = button.getAttribute('data-doc-id');
+            if (explicitId) return explicitId;
+
+            return [
+                button.getAttribute('data-title') || 'Dokument',
+                button.getAttribute('data-sender') || 'System',
+                button.getAttribute('data-date') || ''
+            ].join('|');
+        }
+
+        function ensureNewIndicator(button) {
+            if (!button || button.querySelector('.doc-new-indicator')) return;
+
+            const indicator = document.createElement('span');
+            indicator.className = 'doc-new-indicator absolute top-4 right-4 rounded-full bg-[var(--brand-yellow)] text-black border border-black/30 px-2 py-1 text-[9px] font-orbitron font-black uppercase tracking-widest shadow-[0_0_14px_rgba(220,226,38,0.65)]';
+            indicator.textContent = 'Neu';
+            button.appendChild(indicator);
+        }
+
+        function getInboxFingerprint() {
+            return getDocumentButtons()
+                .map(getDocumentId)
+                .filter(Boolean)
+                .sort()
+                .join('||');
+        }
+
+        function updateInboxNotificationState() {
+            const unreadButtons = [];
+
+            getDocumentButtons().forEach(button => {
+                const documentId = getDocumentId(button);
+                if (!documentId) return;
+
+                ensureNewIndicator(button);
+
+                const isUnread = !readDocumentIds.has(documentId);
+                button.dataset.read = isUnread ? 'false' : 'true';
+                button.classList.toggle('is-unread-doc', isUnread);
+
+                if (isUnread) {
+                    unreadButtons.push(button);
+                }
+            });
+
+            if (alertBadge) {
+                if (unreadButtons.length > 0) {
+                    alertBadge.textContent = unreadButtons.length > 99 ? '99+' : String(unreadButtons.length);
+                    alertBadge.classList.remove('hidden');
+                    alertBadge.classList.add('flex');
+                } else {
+                    alertBadge.textContent = '0';
+                    alertBadge.classList.add('hidden');
+                    alertBadge.classList.remove('flex');
+                }
+            }
+
+            if (alertBell) {
+                alertBell.setAttribute(
+                    'aria-label',
+                    unreadButtons.length > 0
+                        ? `System-Postfach öffnen, ${unreadButtons.length} ungelesene Dokumente`
+                        : 'System-Postfach öffnen'
+                );
+            }
+
+            return unreadButtons.length;
+        }
+
+        function rememberCurrentInboxFingerprint() {
+            const fingerprint = getInboxFingerprint();
+            if (!fingerprint) return;
+
+            try {
+                window.localStorage.setItem(inboxFingerprintStorageKey, fingerprint);
+            } catch (error) {
+                console.warn('Inbox-Fingerprint konnte nicht gespeichert werden:', error);
+            }
+        }
+
+        function markDocumentAsRead(button) {
+            const documentId = getDocumentId(button);
+            if (!documentId || readDocumentIds.has(documentId)) return;
+
+            readDocumentIds.add(documentId);
+            writeJsonArrayToStorage(readDocumentsStorageKey, readDocumentIds);
+            updateInboxNotificationState();
+        }
+
+        function openNewDocumentAlert() {
+            openAnimatedModal(newDocAlertWrapper, newDocAlertPanel);
+        }
+
+        function closeNewDocumentAlert(callback = null) {
+            closeAnimatedModal(newDocAlertWrapper, newDocAlertPanel, callback);
+        }
+
         function openSidebar() {
+            rememberCurrentInboxFingerprint();
             openAnimatedModal(alertsWrapper, alertsPanel);
         }
 
         function closeSidebar() {
             closeAnimatedModal(alertsWrapper, alertsPanel);
+        }
+
+        function initializeInboxNotifications() {
+            readDocumentIds = new Set(readJsonArrayFromStorage(readDocumentsStorageKey));
+            const unreadCount = updateInboxNotificationState();
+            const fingerprint = getInboxFingerprint();
+
+            if (!fingerprint || unreadCount === 0) return;
+
+            let lastSeenFingerprint = null;
+            try {
+                lastSeenFingerprint = window.localStorage.getItem(inboxFingerprintStorageKey);
+            } catch (error) {
+                console.warn('Inbox-Fingerprint konnte nicht gelesen werden:', error);
+            }
+
+            if (lastSeenFingerprint !== fingerprint) {
+                setTimeout(() => {
+                    rememberCurrentInboxFingerprint();
+                    openNewDocumentAlert();
+                }, 450);
+            }
         }
 
         function openDocumentModal(title, content, sender, requireSignature) {
@@ -1028,6 +1248,29 @@
         if (btnCloseAlerts) btnCloseAlerts.addEventListener('click', closeSidebar);
         if (alertsBackdrop) alertsBackdrop.addEventListener('click', closeSidebar);
 
+        if (btnOpenInboxFromAlert) {
+            btnOpenInboxFromAlert.addEventListener('click', () => {
+                rememberCurrentInboxFingerprint();
+                closeNewDocumentAlert(() => openSidebar());
+            });
+        }
+
+        if (btnDismissNewDocAlert) {
+            btnDismissNewDocAlert.addEventListener('click', () => {
+                rememberCurrentInboxFingerprint();
+                closeNewDocumentAlert();
+            });
+        }
+
+        if (newDocAlertWrapper) {
+            newDocAlertWrapper.addEventListener('click', (event) => {
+                if (event.target === newDocAlertWrapper) {
+                    rememberCurrentInboxFingerprint();
+                    closeNewDocumentAlert();
+                }
+            });
+        }
+
         if (driverRegistrationBtn) {
             driverRegistrationBtn.addEventListener('click', () => {
                 if (fahrerRegistrationStatus === 'approved') {
@@ -1066,6 +1309,7 @@
                 const content = contentElement ? contentElement.innerHTML : '';
                 const requiresSig = btn.getAttribute('data-needs-signature') === 'true';
 
+                markDocumentAsRead(btn);
                 closeSidebar();
 
                 setTimeout(() => {
@@ -1089,6 +1333,12 @@
         document.addEventListener('keydown', (event) => {
             if (event.key !== 'Escape') return;
 
+            if (newDocAlertWrapper && !newDocAlertWrapper.classList.contains('hidden')) {
+                rememberCurrentInboxFingerprint();
+                closeNewDocumentAlert();
+                return;
+            }
+
             if (alertsWrapper && !alertsWrapper.classList.contains('hidden')) {
                 closeSidebar();
                 return;
@@ -1109,8 +1359,8 @@
             }
         });
 
-        // Wichtig: Kein automatisches System-Alert-Popup mehr beim Laden.
-        // Der User öffnet das Postfach selbst über die Glocke.
+        // Dokument-Zähler initialisieren und bei wirklich neuen Postfach-Inhalten einmalig den System-Alert anzeigen.
+        initializeInboxNotifications();
 
         if (univSigInput) {
             univSigInput.addEventListener('input', (e) => {
