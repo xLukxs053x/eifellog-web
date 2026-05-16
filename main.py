@@ -36,6 +36,58 @@ TRACKER_API_KEY = os.getenv("TRACKER_API_KEY", "").strip()
 
 
 # ==========================================
+# TOUR-BELEG / PDF / ABRECHNUNG AUS .ENV
+# ==========================================
+
+def env_first(*names, default=""):
+    for name in names:
+        value = os.getenv(name)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return default
+
+
+def env_bool(*names, default=False):
+    value = env_first(*names, default="")
+    if value == "":
+        return bool(default)
+    return value.lower() in {"1", "true", "yes", "ja", "on", "enabled"}
+
+
+def env_float(*names, default=0.0):
+    value = env_first(*names, default="")
+    if value == "":
+        return float(default)
+    try:
+        return float(str(value).replace(",", "."))
+    except Exception:
+        return float(default)
+
+
+DISCORD_BOT_TOKEN = env_first("DISCORD_BOT_TOKEN", "BOT_TOKEN", "DISCORD_TOKEN", default="")
+TOUR_RECEIPT_CHANNEL_ID = env_first(
+    "TOUR_RECEIPT_CHANNEL_ID",
+    "DISCORD_TOUR_RECEIPT_CHANNEL_ID",
+    "DISCORD_ABRECHNUNG_CHANNEL_ID",
+    "ABRECHNUNG_CHANNEL_ID",
+    default="1473756766478270517"
+)
+TOUR_RECEIPT_ENABLED = env_bool("TOUR_RECEIPT_ENABLED", default=True)
+TOUR_RECEIPT_DISCORD_ENABLED = env_bool("TOUR_RECEIPT_DISCORD_ENABLED", default=True)
+TOUR_RECEIPT_FOLDER = env_first(
+    "TOUR_RECEIPT_FOLDER",
+    "RECEIPT_FOLDER",
+    default=os.path.join("static", "downloads", "tour_receipts")
+)
+TOUR_RECEIPT_PUBLIC_BASE_URL = env_first("TOUR_RECEIPT_PUBLIC_BASE_URL", "PUBLIC_BASE_URL", default="")
+TOUR_RECEIPT_COMPANY_NAME = env_first("TOUR_RECEIPT_COMPANY_NAME", "COMPANY_NAME", default="Eifel LOG")
+TOUR_RECEIPT_CURRENCY = env_first("TOUR_RECEIPT_CURRENCY", "DEFAULT_CURRENCY", default="EUR")
+TOUR_RECEIPT_RATE_PER_KM = env_float("TOUR_RECEIPT_RATE_PER_KM", "TRACKER_EURO_PER_KM", default=3.2)
+SERVER_HOST = env_first("SERVER_HOST", "HOST", default="0.0.0.0")
+SERVER_PORT = int(env_float("SERVER_PORT", "PORT", default=5005))
+
+
+# ==========================================
 # LOCAL TRACKER / WEBVIEW2 CORS
 # ==========================================
 
@@ -90,6 +142,7 @@ system_documents_collection = db["system_documents"]
 tasks_collection = db["tasks"]
 buchhaltung_requests_collection = db["buchhaltung_requests"]
 buchhaltung_entries_collection = db["buchhaltung_entries"]
+tour_receipts_collection = db["tour_receipts"]
 
 
 def ensure_indexes():
@@ -132,6 +185,12 @@ def ensure_indexes():
         buchhaltung_entries_collection.create_index([("payment_status", ASCENDING)], unique=False)
         buchhaltung_entries_collection.create_index([("receipt_status", ASCENDING)], unique=False)
         buchhaltung_entries_collection.create_index([("archived", ASCENDING)], unique=False)
+
+        tour_receipts_collection.create_index([("receipt_id", ASCENDING)], unique=False)
+        tour_receipts_collection.create_index([("job_id", ASCENDING)], unique=False)
+        tour_receipts_collection.create_index([("driver.discord_id", ASCENDING)], unique=False)
+        tour_receipts_collection.create_index([("submitted_at", DESCENDING)], unique=False)
+        tour_receipts_collection.create_index([("billing_relevant", ASCENDING)], unique=False)
     except Exception as error:
         print(f"MongoDB Index-Erstellung fehlgeschlagen: {error}")
 
@@ -1284,6 +1343,639 @@ def tracker_state_payload(user_doc):
         "activeDrivers": active_drivers
     }
 
+
+# ==========================================
+# TOUR-BELEG / PDF / ABRECHNUNG
+# ==========================================
+
+def bool_from_payload(value, fallback=False):
+    if value is None:
+        return fallback
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return safe_str(value).lower() in {"1", "true", "yes", "ja", "on", "aktiv", "active"}
+
+
+def format_money(value, currency=None):
+    currency = safe_str(currency, TOUR_RECEIPT_CURRENCY).upper()
+    number = parse_number(value, 0)
+    text = f"{number:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    if currency == "EUR":
+        return f"{text} €"
+    return f"{text} {currency}"
+
+
+def format_km(value):
+    number = parse_number(value, 0)
+    text = f"{number:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"{text} km"
+
+
+def format_percent(value):
+    number = parse_number(value, 0)
+    text = f"{number:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"{text} %"
+
+
+def format_liters(value):
+    number = parse_number(value, 0)
+    text = f"{number:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"{text} l"
+
+
+def pdf_safe_text(value):
+    value = safe_str(value, "-")
+    value = value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    return value
+
+
+def pdf_text_bytes(value):
+    return pdf_safe_text(value).encode("cp1252", errors="replace")
+
+
+def wrap_pdf_line(label, value, max_chars=96):
+    label = safe_str(label)
+    value = safe_str(value, "-")
+    prefix = f"{label}: " if label else ""
+    raw = prefix + value
+
+    if len(raw) <= max_chars:
+        return [raw]
+
+    lines = []
+    current = ""
+    for word in raw.split():
+        if len(current) + len(word) + 1 > max_chars:
+            if current:
+                lines.append(current)
+            current = word
+        else:
+            current = f"{current} {word}".strip()
+    if current:
+        lines.append(current)
+
+    if not lines:
+        return [raw[:max_chars]]
+    return lines
+
+
+def build_simple_pdf(title, sections):
+    # Minimaler PDF-Generator ohne externe Bibliothek.
+    # Nutzt Standard-Schrift Helvetica und erstellt bei Bedarf mehrere Seiten.
+    page_width = 595
+    page_height = 842
+    margin_left = 42
+    y_start = 800
+    y_min = 55
+    line_height = 15
+
+    pages = []
+    current_lines = []
+
+    def add_page():
+        nonlocal current_lines
+        if current_lines:
+            pages.append(current_lines)
+        current_lines = []
+
+    def add_line(text, size=10, bold=False, gap_after=0):
+        nonlocal current_lines
+        if len(current_lines) >= 46:
+            add_page()
+        current_lines.append({
+            "text": safe_str(text),
+            "size": size,
+            "bold": bool(bold),
+            "gap_after": gap_after
+        })
+
+    add_line(title, size=18, bold=True, gap_after=10)
+    add_line(f"Erstellt am {now_utc().strftime('%d.%m.%Y %H:%M')} UTC", size=9, gap_after=10)
+
+    for section_title, rows in sections:
+        add_line(section_title, size=13, bold=True, gap_after=4)
+        for label, value in rows:
+            for wrapped in wrap_pdf_line(label, value):
+                add_line(wrapped, size=10)
+        add_line("", size=6, gap_after=3)
+
+    add_page()
+
+    objects = []
+    objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
+    objects.append(b"")
+    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")
+    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")
+
+    page_object_numbers = []
+
+    for page_lines in pages:
+        y = y_start
+        stream = bytearray()
+        stream.extend(b"q\n")
+        stream.extend(b"0.08 w\n")
+        stream.extend(f"{margin_left} 820 m {page_width - margin_left} 820 l S\n".encode("ascii"))
+
+        for item in page_lines:
+            text_value = item["text"]
+            size = int(item["size"])
+            font = "F2" if item["bold"] else "F1"
+
+            if y < y_min:
+                y = y_start
+
+            stream.extend(b"BT\n")
+            stream.extend(f"/{font} {size} Tf\n".encode("ascii"))
+            stream.extend(f"1 0 0 1 {margin_left} {y} Tm\n".encode("ascii"))
+            stream.extend(b"(" + pdf_text_bytes(text_value) + b") Tj\n")
+            stream.extend(b"ET\n")
+
+            y -= line_height + int(item.get("gap_after") or 0)
+
+        stream.extend(f"{margin_left} 38 m {page_width - margin_left} 38 l S\n".encode("ascii"))
+        stream.extend(b"BT\n/F1 8 Tf\n")
+        stream.extend(f"1 0 0 1 {margin_left} 25 Tm\n".encode("ascii"))
+        stream.extend(b"(Eifel LOG Tour-Beleg / Abrechnung) Tj\nET\n")
+        stream.extend(b"Q\n")
+
+        content_object_number = len(objects) + 1
+        content_object = (
+            f"<< /Length {len(stream)} >>\nstream\n".encode("ascii")
+            + bytes(stream)
+            + b"\nendstream"
+        )
+        objects.append(content_object)
+
+        page_object_number = len(objects) + 1
+        page_object_numbers.append(page_object_number)
+        page_object = (
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_width} {page_height}] "
+            f"/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> "
+            f"/Contents {content_object_number} 0 R >>"
+        ).encode("ascii")
+        objects.append(page_object)
+
+    kids = " ".join(f"{number} 0 R" for number in page_object_numbers)
+    objects[1] = f"<< /Type /Pages /Kids [{kids}] /Count {len(page_object_numbers)} >>".encode("ascii")
+
+    pdf = bytearray()
+    pdf.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+
+    offsets = [0]
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(len(pdf))
+        pdf.extend(f"{index} 0 obj\n".encode("ascii"))
+        pdf.extend(obj)
+        pdf.extend(b"\nendobj\n")
+
+    xref_offset = len(pdf)
+    pdf.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+    pdf.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+
+    pdf.extend(
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{xref_offset}\n%%EOF\n".encode("ascii")
+    )
+    return bytes(pdf)
+
+
+def generate_receipt_number(job_id, discord_id="", submitted_at=None):
+    submitted_at = submitted_at or now_utc()
+    raw = f"{job_id}|{discord_id}|{submitted_at.isoformat()}|{secrets.token_hex(4)}"
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:8].upper()
+    return f"EL-{submitted_at.strftime('%Y%m%d')}-{digest}"
+
+
+def build_receipt_public_url(file_path):
+    base = safe_str(TOUR_RECEIPT_PUBLIC_BASE_URL)
+    if not base:
+        return ""
+    filename = os.path.basename(file_path)
+    return base.rstrip("/") + "/" + filename
+
+
+def save_tour_receipt_pdf(receipt_doc):
+    submitted_at = receipt_doc.get("submitted_at") or now_utc()
+    if not isinstance(submitted_at, datetime):
+        submitted_at = now_utc()
+
+    month_folder = submitted_at.strftime("%Y-%m")
+    target_folder = os.path.join(TOUR_RECEIPT_FOLDER, month_folder)
+    os.makedirs(target_folder, exist_ok=True)
+
+    safe_driver = re.sub(r"[^A-Za-z0-9_.-]+", "_", safe_str(receipt_doc.get("driver", {}).get("name"), "fahrer"))[:60]
+    safe_job = re.sub(r"[^A-Za-z0-9_.-]+", "_", safe_str(receipt_doc.get("job_id"), "job"))[:60]
+    filename = f"EifelLog_Beleg_{receipt_doc['receipt_number']}_{safe_driver}_{safe_job}.pdf"
+    file_path = os.path.join(target_folder, filename)
+
+    sections = []
+
+    sections.append(("Status", [
+        ("Status", "Abgegeben / Abgeschlossen"),
+        ("Abrechnung", "Ja, abrechnungsrelevant"),
+        ("Belegnummer", receipt_doc.get("receipt_number")),
+        ("Job-ID", receipt_doc.get("job_id")),
+        ("Eingereicht UTC", submitted_at.isoformat() + "Z"),
+    ]))
+
+    driver = receipt_doc.get("driver") or {}
+    sections.append(("Fahrer", [
+        ("Name", driver.get("name")),
+        ("Username", driver.get("username")),
+        ("Discord-ID", driver.get("discord_id")),
+        ("Rolle", driver.get("role")),
+    ]))
+
+    tour = receipt_doc.get("tour") or {}
+    sections.append(("Tourdaten", [
+        ("Spiel", tour.get("game")),
+        ("Truck", tour.get("truck")),
+        ("Start", tour.get("source_city")),
+        ("Ziel", tour.get("destination_city")),
+        ("Fracht", tour.get("cargo")),
+        ("Geplante Distanz", format_km(tour.get("planned_distance_km"))),
+        ("Gefahrene Distanz", format_km(tour.get("driven_distance_km"))),
+        ("Restdistanz", format_km(tour.get("remaining_distance_km"))),
+        ("Fortschritt", format_percent(tour.get("route_progress_percent"))),
+        ("Schaden", format_percent(tour.get("damage_percent"))),
+        ("Tank", format_percent(tour.get("fuel_percent"))),
+        ("RPM", str(parse_int(tour.get("rpm"), 0))),
+        ("Geschwindigkeit bei Abgabe", f"{parse_int(tour.get('speed_kmh'), 0)} km/h"),
+    ]))
+
+    billing = receipt_doc.get("billing") or {}
+    sections.append(("Abrechnung", [
+        ("Satz pro KM", format_money(billing.get("rate_per_km"), billing.get("currency"))),
+        ("Grundbetrag", format_money(billing.get("base_amount"), billing.get("currency"))),
+        ("Bonus", format_money(billing.get("bonus"), billing.get("currency"))),
+        ("Abzug", format_money(billing.get("penalty"), billing.get("currency"))),
+        ("Gesamtbetrag", format_money(billing.get("total_amount"), billing.get("currency"))),
+        ("Währung", billing.get("currency")),
+    ]))
+
+    extra = receipt_doc.get("extra") or {}
+    if extra:
+        rows = []
+        for key, value in sorted(extra.items()):
+            if isinstance(value, (dict, list)):
+                value = json.dumps(value, ensure_ascii=False)[:500]
+            rows.append((key, value))
+        sections.append(("Weitere Daten", rows))
+
+    pdf_bytes = build_simple_pdf(
+        f"{TOUR_RECEIPT_COMPANY_NAME} - Tour-Beleg / Abrechnung",
+        sections
+    )
+
+    with open(file_path, "wb") as file:
+        file.write(pdf_bytes)
+
+    return file_path, filename, pdf_bytes
+
+
+def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
+    if not TOUR_RECEIPT_DISCORD_ENABLED:
+        return {"sent": False, "reason": "TOUR_RECEIPT_DISCORD_ENABLED=false"}
+
+    if not DISCORD_BOT_TOKEN:
+        return {"sent": False, "reason": "DISCORD_BOT_TOKEN fehlt"}
+
+    channel_id = safe_str(TOUR_RECEIPT_CHANNEL_ID)
+    if not channel_id:
+        return {"sent": False, "reason": "TOUR_RECEIPT_CHANNEL_ID fehlt"}
+
+    driver = receipt_doc.get("driver") or {}
+    tour = receipt_doc.get("tour") or {}
+    billing = receipt_doc.get("billing") or {}
+
+    content = (
+        "📄 **Tour-Beleg / Abrechnung**\n"
+        f"**Fahrer:** {driver.get('name') or '-'}\n"
+        f"**Job:** `{receipt_doc.get('job_id')}`\n"
+        f"**Route:** {tour.get('source_city') or '-'} → {tour.get('destination_city') or '-'}\n"
+        f"**Fracht:** {tour.get('cargo') or '-'}\n"
+        "**Status:** ✅ als abgegeben und abgeschlossen gewertet\n"
+        f"**Abrechnung:** {format_money(billing.get('total_amount'), billing.get('currency'))}\n"
+        f"**Belegnummer:** `{receipt_doc.get('receipt_number')}`"
+    )
+
+    payload = {
+        "content": content,
+        "allowed_mentions": {"parse": []},
+        "attachments": [
+            {
+                "id": 0,
+                "filename": filename,
+                "description": f"Tour-Beleg {receipt_doc.get('receipt_number')}"
+            }
+        ]
+    }
+
+    response = requests.post(
+        f"https://discord.com/api/v10/channels/{channel_id}/messages",
+        headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"},
+        data={"payload_json": json.dumps(payload, ensure_ascii=False)},
+        files={"files[0]": (filename, pdf_bytes, "application/pdf")},
+        timeout=20
+    )
+
+    if response.status_code not in range(200, 300):
+        return {
+            "sent": False,
+            "status_code": response.status_code,
+            "error": response.text[:1000]
+        }
+
+    try:
+        message = response.json()
+    except Exception:
+        message = {}
+
+    return {
+        "sent": True,
+        "channel_id": channel_id,
+        "message_id": message.get("id"),
+        "raw": message
+    }
+
+
+def build_tour_receipt_doc(user_doc, payload, telemetry=None):
+    telemetry = telemetry or {}
+    submitted_at = now_utc()
+
+    job_id = (
+        safe_str(payload.get("jobId"))
+        or safe_str(payload.get("job_id"))
+        or safe_str(payload.get("id"))
+        or f"job-{submitted_at.strftime('%Y%m%d%H%M%S')}-{secrets.token_hex(3)}"
+    )
+
+    display_name = (
+        user_doc.get("display_name")
+        or user_doc.get("username")
+        or user_doc.get("discord_username")
+        or safe_str(payload.get("driverName"), "EifelLog Fahrer")
+    )
+
+    source_city = (
+        safe_str(payload.get("sourceCity"))
+        or safe_str(payload.get("source_city"))
+        or safe_str(telemetry.get("sourceCity"))
+        or "-"
+    )
+    destination_city = (
+        safe_str(payload.get("destinationCity"))
+        or safe_str(payload.get("destination_city"))
+        or safe_str(telemetry.get("destinationCity"))
+        or "-"
+    )
+    cargo = safe_str(payload.get("cargo") or telemetry.get("cargo"), "-")
+    game = safe_str(payload.get("game") or telemetry.get("game"), "ETS2/ATS")
+    truck = safe_str(payload.get("truck") or telemetry.get("truck"), "-")
+
+    planned_distance = parse_number(
+        payload.get("plannedDistanceKm")
+        or payload.get("planned_distance_km")
+        or telemetry.get("plannedDistanceKm"),
+        0
+    )
+    driven_distance = parse_number(
+        payload.get("drivenDistanceKm")
+        or payload.get("distanceKm")
+        or payload.get("distance")
+        or telemetry.get("tripDistanceKm"),
+        0
+    )
+    remaining_distance = parse_number(
+        payload.get("remainingDistanceKm")
+        or telemetry.get("remainingDistanceKm"),
+        0
+    )
+
+    if driven_distance <= 0 and planned_distance > 0 and remaining_distance >= 0:
+        driven_distance = max(planned_distance - remaining_distance, 0)
+
+    rate_per_km = parse_number(payload.get("ratePerKm") or payload.get("rate_per_km"), TOUR_RECEIPT_RATE_PER_KM)
+    base_amount = parse_number(payload.get("income") or payload.get("baseAmount") or payload.get("base_amount"), 0)
+    if base_amount <= 0:
+        base_amount = round(driven_distance * rate_per_km, 2)
+
+    bonus = parse_number(payload.get("bonus"), 0)
+    penalty = abs(parse_number(payload.get("penalty") or payload.get("deduction"), 0))
+    total_amount = round(base_amount + bonus - penalty, 2)
+    currency = safe_str(payload.get("currency"), TOUR_RECEIPT_CURRENCY).upper()
+
+    receipt_number = generate_receipt_number(job_id, user_doc.get("discord_id"), submitted_at)
+
+    extra = {}
+    for key, value in payload.items():
+        if key not in {
+            "clientToken", "jobId", "job_id", "id", "driverName", "sourceCity", "source_city",
+            "destinationCity", "destination_city", "cargo", "game", "truck", "plannedDistanceKm",
+            "planned_distance_km", "drivenDistanceKm", "distanceKm", "distance", "remainingDistanceKm",
+            "ratePerKm", "rate_per_km", "income", "baseAmount", "base_amount", "bonus", "penalty",
+            "deduction", "currency", "telemetry", "snapshot"
+        }:
+            extra[key] = value
+
+    return {
+        "receipt_id": uuid.uuid4().hex,
+        "receipt_number": receipt_number,
+        "job_id": job_id,
+        "status": "submitted",
+        "submitted": True,
+        "completed": True,
+        "billing_relevant": True,
+        "submitted_at": submitted_at,
+        "created_at": submitted_at,
+        "driver": {
+            "name": display_name,
+            "username": user_doc.get("username"),
+            "discord_id": user_doc.get("discord_id"),
+            "role": get_primary_role_name(user_doc.get("roles", []))
+        },
+        "tour": {
+            "game": game,
+            "truck": truck,
+            "source_city": source_city,
+            "destination_city": destination_city,
+            "cargo": cargo,
+            "planned_distance_km": planned_distance,
+            "driven_distance_km": driven_distance,
+            "remaining_distance_km": remaining_distance,
+            "route_progress_percent": parse_number(payload.get("routeProgressPercent") or telemetry.get("routeProgressPercent"), 100),
+            "damage_percent": parse_number(payload.get("damagePercent") or telemetry.get("damagePercent"), 0),
+            "fuel_percent": parse_number(payload.get("fuelPercent") or telemetry.get("fuelPercent"), 0),
+            "speed_kmh": parse_number(payload.get("speedKmh") or telemetry.get("speedKmh"), 0),
+            "rpm": parse_number(payload.get("rpm") or telemetry.get("rpm"), 0)
+        },
+        "billing": {
+            "rate_per_km": rate_per_km,
+            "base_amount": base_amount,
+            "bonus": bonus,
+            "penalty": penalty,
+            "total_amount": total_amount,
+            "currency": currency
+        },
+        "extra": extra,
+        "raw_telemetry": telemetry
+    }
+
+
+def write_receipt_into_user_stats(user_doc, receipt_doc):
+    billing = receipt_doc.get("billing") or {}
+    tour = receipt_doc.get("tour") or {}
+
+    distance = parse_number(tour.get("driven_distance_km"), 0)
+    income = parse_number(billing.get("total_amount"), 0)
+
+    stats = get_profile_stats(user_doc)
+    new_km = parse_number(stats.get("km"), 0) + distance
+    new_income = parse_number(stats.get("income") or stats.get("revenue"), 0) + income
+    new_deliveries = parse_int(stats.get("deliveries"), 0) + 1
+    new_jobs = parse_int(stats.get("jobs"), new_deliveries - 1) + 1
+
+    logbook_entry = {
+        "status": "Fertig",
+        "receiptId": receipt_doc.get("receipt_id"),
+        "receiptNumber": receipt_doc.get("receipt_number"),
+        "jobId": receipt_doc.get("job_id"),
+        "route": f"{tour.get('source_city', '-')} → {tour.get('destination_city', '-')}",
+        "sourceCity": tour.get("source_city", "-"),
+        "destinationCity": tour.get("destination_city", "-"),
+        "cargo": tour.get("cargo", "-"),
+        "distanceKm": distance,
+        "income": income,
+        "incomeText": format_money(income, billing.get("currency")),
+        "driverName": receipt_doc.get("driver", {}).get("name"),
+        "createdAt": receipt_doc.get("submitted_at").isoformat() + "Z",
+        "billingRelevant": True,
+        "pdfFilePath": receipt_doc.get("pdf", {}).get("file_path"),
+        "discordMessageId": receipt_doc.get("discord", {}).get("message_id")
+    }
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": {
+                "profile_km": str(round(new_km, 1)),
+                "profile_income": str(round(new_income, 2)),
+                "profile_revenue": str(round(new_income, 2)),
+                "profile_deliveries": str(new_deliveries),
+                "profile_jobs": str(new_jobs),
+                "tracker_online": False,
+                "tracker_current_job": None,
+                "tracker_last_receipt_id": receipt_doc.get("receipt_id"),
+                "tracker_last_receipt_number": receipt_doc.get("receipt_number"),
+                "tracker_last_job_completed_at": now_utc()
+            },
+            "$push": {
+                "job_history": {
+                    "$each": [logbook_entry],
+                    "$position": 0,
+                    "$slice": 100
+                }
+            }
+        }
+    )
+
+
+def complete_tracker_tour_from_request():
+    if not TOUR_RECEIPT_ENABLED:
+        return jsonify({"success": False, "error": "TOUR_RECEIPT_ENABLED ist deaktiviert."}), 503
+
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    if request.method == "GET":
+        return jsonify({"success": False, "message": "Method not allowed"}), 200
+
+    data = request.get_json(silent=True) or {}
+    client_token = get_client_token_from_request(data)
+    if not client_token:
+        return jsonify({"success": False, "error": "ClientToken fehlt."}), 401
+
+    user_doc = find_tracker_user_by_client_token(client_token)
+    if not user_doc:
+        return jsonify({"success": False, "error": "Tracker-Sitzung ungültig."}), 401
+    if not user_has_tracker_access(user_doc):
+        return jsonify({"success": False, "error": "Tracker-Zugriff deaktiviert."}), 403
+
+    telemetry = data.get("telemetry") or data.get("snapshot") or user_doc.get("tracker_live") or {}
+    if telemetry:
+        telemetry = normalize_telemetry_payload(telemetry)
+
+    receipt_doc = build_tour_receipt_doc(user_doc, data, telemetry=telemetry)
+
+    existing = tour_receipts_collection.find_one({
+        "job_id": receipt_doc["job_id"],
+        "driver.discord_id": safe_str(user_doc.get("discord_id")),
+        "archived": {"$ne": True}
+    })
+    if existing:
+        return jsonify({
+            "success": True,
+            "message": "Diese Tour wurde bereits abgegeben.",
+            "alreadySubmitted": True,
+            "receipt": {
+                "receiptId": existing.get("receipt_id"),
+                "receiptNumber": existing.get("receipt_number"),
+                "jobId": existing.get("job_id"),
+                "pdfFilePath": existing.get("pdf", {}).get("file_path"),
+                "discordMessageId": existing.get("discord", {}).get("message_id"),
+                "billingRelevant": bool(existing.get("billing_relevant", True)),
+                "totalAmount": existing.get("billing", {}).get("total_amount"),
+                "currency": existing.get("billing", {}).get("currency")
+            }
+        })
+
+    file_path, filename, pdf_bytes = save_tour_receipt_pdf(receipt_doc)
+
+    receipt_doc["pdf"] = {
+        "file_path": file_path,
+        "file_name": filename,
+        "public_url": build_receipt_public_url(file_path),
+        "size_bytes": len(pdf_bytes),
+        "content_type": "application/pdf"
+    }
+
+    discord_result = send_receipt_to_discord(receipt_doc, pdf_bytes, filename)
+    receipt_doc["discord"] = discord_result
+
+    tour_receipts_collection.insert_one(receipt_doc)
+    write_receipt_into_user_stats(user_doc, receipt_doc)
+
+    return jsonify({
+        "success": True,
+        "message": "Tour wurde vollständig abgegeben, als Job abgeschlossen und als Abrechnung erfasst.",
+        "submitted": True,
+        "completed": True,
+        "billingRelevant": True,
+        "receipt": {
+            "receiptId": receipt_doc.get("receipt_id"),
+            "receiptNumber": receipt_doc.get("receipt_number"),
+            "jobId": receipt_doc.get("job_id"),
+            "driverName": receipt_doc.get("driver", {}).get("name"),
+            "route": f"{receipt_doc.get('tour', {}).get('source_city', '-')} → {receipt_doc.get('tour', {}).get('destination_city', '-')}",
+            "cargo": receipt_doc.get("tour", {}).get("cargo"),
+            "pdfFilePath": file_path,
+            "pdfFileName": filename,
+            "pdfPublicUrl": receipt_doc.get("pdf", {}).get("public_url"),
+            "discordSent": bool(discord_result.get("sent")),
+            "discordChannelId": discord_result.get("channel_id") or TOUR_RECEIPT_CHANNEL_ID,
+            "discordMessageId": discord_result.get("message_id"),
+            "discordError": discord_result.get("error") or discord_result.get("reason"),
+            "totalAmount": receipt_doc.get("billing", {}).get("total_amount"),
+            "currency": receipt_doc.get("billing", {}).get("currency"),
+            "submittedAt": receipt_doc.get("submitted_at").isoformat() + "Z"
+        },
+        "state": tracker_state_payload(users_collection.find_one({"_id": user_doc["_id"]}))
+    })
+
+
 # ==========================================
 # ROUTES - ÖFFENTLICH
 # ==========================================
@@ -1583,6 +2275,16 @@ def tracker_telemetry_live():
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
 
     return jsonify(tracker_state_payload(fresh_user))
+
+@app.route("/api/tracker/tour/submit", methods=["GET", "POST", "OPTIONS"])
+def tracker_tour_submit():
+    return complete_tracker_tour_from_request()
+
+
+@app.route("/api/tracker/job/complete", methods=["GET", "POST", "OPTIONS"])
+def tracker_job_complete():
+    return complete_tracker_tour_from_request()
+
 
 @app.route("/api/tracker/logout", methods=["GET", "POST", "OPTIONS"])
 def tracker_logout():
@@ -3055,7 +3757,8 @@ def health_check():
         "time": now_utc().isoformat() + "Z",
         "trackerRoutes": [
             "/api/tracker/login", "/api/tracker/session", "/api/tracker/profile",
-            "/api/tracker/state", "/api/tracker/telemetry/live", "/api/tracker/logout"
+            "/api/tracker/state", "/api/tracker/telemetry/live",
+            "/api/tracker/tour/submit", "/api/tracker/job/complete", "/api/tracker/logout"
         ]
     })
 
@@ -3065,5 +3768,5 @@ def health_check():
 # ==========================================
 
 if __name__ == "__main__":
-    print(f"Starte Eifel LOG Server mit MongoDB DB '{MONGO_DB_NAME}' und Eventlet auf Port 5005...")
-    eventlet.wsgi.server(eventlet.listen(("0.0.0.0", 5005)), app)
+    print(f"Starte Eifel LOG Server mit MongoDB DB '{MONGO_DB_NAME}' und Eventlet auf {SERVER_HOST}:{SERVER_PORT}...")
+    eventlet.wsgi.server(eventlet.listen((SERVER_HOST, SERVER_PORT)), app)
