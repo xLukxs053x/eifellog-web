@@ -15,6 +15,7 @@ from functools import wraps
 from flask import Flask, render_template, redirect, request, session, url_for, flash, jsonify, abort
 from dotenv import load_dotenv
 from pymongo import MongoClient, ASCENDING, DESCENDING
+from bson.objectid import ObjectId
 from werkzeug.utils import secure_filename
 
 
@@ -83,6 +84,9 @@ db = mongo_client[MONGO_DB_NAME]
 users_collection = db["users"]
 profile_activity_collection = db["profile_activity"]
 profile_gallery_collection = db["profile_gallery"]
+fahrer_registration_collection = db["fahrer_registration_requests"]
+token_request_collection = db["token_requests"]
+system_documents_collection = db["system_documents"]
 
 
 def ensure_indexes():
@@ -93,6 +97,20 @@ def ensure_indexes():
         users_collection.create_index([("tracker_client_token_hash", ASCENDING)], unique=False)
         users_collection.create_index([("tracker_live_updated_at", DESCENDING)], unique=False)
         users_collection.create_index([("tracker_online", ASCENDING)], unique=False)
+
+        fahrer_registration_collection.create_index([("discord_id", ASCENDING)], unique=False)
+        fahrer_registration_collection.create_index([("status", ASCENDING)], unique=False)
+        fahrer_registration_collection.create_index([("created_at", DESCENDING)], unique=False)
+        fahrer_registration_collection.create_index([("claimed_by.discord_id", ASCENDING)], unique=False)
+        fahrer_registration_collection.create_index([("deadline_at", ASCENDING)], unique=False)
+
+        token_request_collection.create_index([("discord_id", ASCENDING)], unique=False)
+        token_request_collection.create_index([("status", ASCENDING)], unique=False)
+        token_request_collection.create_index([("created_at", DESCENDING)], unique=False)
+
+        system_documents_collection.create_index([("discord_id", ASCENDING)], unique=False)
+        system_documents_collection.create_index([("created_at", DESCENDING)], unique=False)
+        system_documents_collection.create_index([("type", ASCENDING)], unique=False)
     except Exception as error:
         print(f"MongoDB Index-Erstellung fehlgeschlagen: {error}")
 
@@ -458,6 +476,316 @@ def load_json_file(path):
     except Exception as error:
         print(f"Fehler beim Laden von {path}: {error}")
         return []
+
+
+
+# ==========================================
+# SYSTEM-DOKUMENTE / FAHRER-REGISTRIERUNG
+# ==========================================
+
+def object_id_or_none(value):
+    value = safe_str(value)
+
+    if value and ObjectId.is_valid(value):
+        return ObjectId(value)
+
+    return None
+
+
+def request_lookup_query(request_id):
+    request_id = safe_str(request_id)
+    query_items = [
+        {"request_id": request_id},
+        {"id": request_id}
+    ]
+
+    object_id = object_id_or_none(request_id)
+
+    if object_id:
+        query_items.append({"_id": object_id})
+
+    return {"$or": query_items}
+
+
+def current_staff_identity():
+    session_user = session.get("user") or {}
+    discord_id = safe_str(session_user.get("id"))
+    username = safe_str(session_user.get("username") or session_user.get("discord_username"), "Personalabteilung")
+
+    db_user = None
+    if discord_id:
+        db_user = users_collection.find_one({"discord_id": discord_id})
+
+    display_name = username
+
+    if db_user:
+        display_name = (
+            db_user.get("display_name")
+            or db_user.get("username")
+            or db_user.get("discord_username")
+            or username
+        )
+
+    return {
+        "discord_id": discord_id,
+        "username": username,
+        "display_name": display_name,
+        "at": now_utc()
+    }
+
+
+def calculate_registration_deadline(start_time=None):
+    start_time = start_time or now_utc()
+
+    # Werktags während normaler Zeiten: 1 Stunde, sonst 2 Stunden.
+    # Anzeige bleibt bewusst allgemein, weil Uhrzeit/Tag variieren können.
+    is_workday = start_time.weekday() < 5
+    is_business_time = 9 <= start_time.hour < 18
+    hours = 1 if is_workday and is_business_time else 2
+    deadline = start_time + timedelta(hours=hours)
+
+    return deadline, f"{hours} Stunde" if hours == 1 else f"{hours} Stunden"
+
+
+def create_system_document_for_user(discord_id, title, sender, content, doc_type="system", needs_signature=False, extra=None):
+    now = now_utc()
+    doc = {
+        "document_id": uuid.uuid4().hex,
+        "discord_id": str(discord_id),
+        "title": safe_str(title, "System Dokument"),
+        "sender": safe_str(sender, "System"),
+        "date": now.strftime("%d.%m.%Y %H:%M"),
+        "content": content or "",
+        "type": doc_type,
+        "needs_signature": bool(needs_signature),
+        "created_at": now,
+        "read": False
+    }
+
+    if extra:
+        doc.update(extra)
+
+    system_documents_collection.insert_one(doc)
+    return doc
+
+
+def prepare_system_document_for_dashboard(document):
+    return {
+        "title": document.get("title") or "System Dokument",
+        "sender": document.get("sender") or "System",
+        "date": document.get("date") or format_datetime_for_template(document.get("created_at")) or "Heute",
+        "content": document.get("content") or "",
+        "needs_signature": bool(document.get("needs_signature", False)),
+        "type": document.get("type") or "system"
+    }
+
+
+def get_system_documents_for_user(discord_id, limit=30):
+    documents = system_documents_collection.find(
+        {"discord_id": str(discord_id)},
+        {"_id": 0}
+    ).sort("created_at", DESCENDING).limit(limit)
+
+    return [prepare_system_document_for_dashboard(doc) for doc in documents]
+
+
+def get_latest_registration_request_for_user(discord_id):
+    return fahrer_registration_collection.find_one(
+        {"discord_id": str(discord_id)},
+        sort=[("created_at", DESCENDING)]
+    )
+
+
+def get_latest_token_request_for_user(discord_id):
+    return token_request_collection.find_one(
+        {"discord_id": str(discord_id)},
+        sort=[("created_at", DESCENDING)]
+    )
+
+
+def dashboard_registration_context(user_doc, latest_request=None):
+    user_doc = user_doc or {}
+    latest_request = latest_request or get_latest_registration_request_for_user(user_doc.get("discord_id"))
+
+    status = safe_str(user_doc.get("fahrer_registration_status"))
+
+    if latest_request and latest_request.get("status"):
+        status = safe_str(latest_request.get("status"))
+
+    if not status:
+        status = "none"
+
+    handler = "Noch nicht zugewiesen"
+
+    if latest_request:
+        claimed_by = latest_request.get("claimed_by") or {}
+        approved_by = latest_request.get("approved_by") or {}
+        rejected_by = latest_request.get("rejected_by") or {}
+        handler = (
+            approved_by.get("display_name")
+            or rejected_by.get("display_name")
+            or claimed_by.get("display_name")
+            or latest_request.get("handler_name")
+            or handler
+        )
+
+    if user_doc.get("fahrer_registration_handler"):
+        handler = user_doc.get("fahrer_registration_handler")
+
+    requested_at = "-"
+    deadline_display = "1-2 Stunden je nach Uhrzeit und Tag"
+    note = ""
+    name = user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username") or ""
+    role = get_primary_role_name(user_doc.get("roles", []))
+
+    if latest_request:
+        name = latest_request.get("name") or name
+        role = latest_request.get("role") or role
+        requested_at = format_datetime_for_template(latest_request.get("created_at")) or "-"
+        deadline_display = latest_request.get("deadline_display") or format_datetime_for_template(latest_request.get("deadline_at")) or deadline_display
+        note = latest_request.get("note") or latest_request.get("reject_reason") or ""
+
+    return {
+        "fahrer_registration_status": status,
+        "fahrer_registration_name": name,
+        "fahrer_registration_role": role,
+        "fahrer_registration_handler": handler,
+        "fahrer_registration_deadline": deadline_display,
+        "fahrer_registration_requested_at": requested_at,
+        "fahrer_registration_note": note,
+        "fahrer_token_value": "",
+        "fahrer_token_created_at": format_datetime_for_template(user_doc.get("tracker_code_created_at")) or "Heute"
+    }
+
+
+def tracker_confirmation_document_content(name, role, handler_name, tracker_code, reason=None):
+    reason_block = ""
+
+    if reason:
+        reason_block = f"""
+            <p class="mt-4"><strong>Grund / Hinweis:</strong><br>{reason}</p>
+        """
+
+    return f"""
+        <p><strong>Bestätigung Fahrer Registrierung</strong></p>
+        <p class="mt-4">
+            Hiermit wird bestätigt, dass <strong>{name}</strong> mit der Rolle
+            <strong>{role}</strong> durch die Personalabteilung genehmigt wurde.
+        </p>
+        <p class="mt-4">
+            <strong>Sachbearbeiter:</strong> {handler_name}<br>
+            <strong>Freigabe:</strong> {now_utc().strftime('%d.%m.%Y %H:%M')}
+        </p>
+        {reason_block}
+        <div class="mt-5 rounded-2xl bg-black/50 border border-[var(--brand-green)]/25 p-4">
+            <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest mb-2">Persönlicher Tracker Token</p>
+            <p class="text-lg font-orbitron font-bold text-white break-all">{tracker_code}</p>
+        </div>
+        <p class="mt-4 text-xs text-gray-400">
+            Bewahre diesen Token sicher auf. Gib ihn nicht öffentlich weiter.
+        </p>
+    """
+
+
+def rejection_document_content(title, reason, handler_name):
+    reason = safe_str(reason, "Kein Grund angegeben.")
+
+    return f"""
+        <p><strong>{title}</strong></p>
+        <p class="mt-4">
+            Dein Antrag wurde durch die Personalabteilung abgelehnt.
+        </p>
+        <p class="mt-4"><strong>Sachbearbeiter:</strong> {handler_name}</p>
+        <div class="mt-5 rounded-2xl bg-black/50 border border-[var(--danger)]/25 p-4">
+            <p class="text-[10px] font-orbitron text-[var(--danger)] uppercase tracking-widest mb-2">Begründung</p>
+            <p>{reason}</p>
+        </div>
+    """
+
+
+def create_tracker_code_for_user_doc(user_doc, actor=None):
+    actor = actor or current_staff_identity()
+    tracker_code = generate_tracker_code()
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": {
+                "tracker_code_hash": hash_secret(tracker_code),
+                "tracker_code_created_at": now_utc(),
+                "tracker_enabled": True,
+                "tracker_code_created_by": actor
+            },
+            "$unset": {
+                "tracker_code": ""
+            }
+        }
+    )
+
+    return tracker_code
+
+
+def prepare_registration_request_for_personalabteilung(request_doc):
+    item = dict(request_doc)
+    item["id"] = str(item.get("_id") or item.get("request_id") or "")
+    item["request_id"] = item.get("request_id") or item["id"]
+    item["name"] = item.get("name") or item.get("display_name") or item.get("username") or "Unbekannter User"
+    item["username"] = item.get("username") or item.get("discord_username") or item["name"]
+    item["role"] = item.get("role") or "Fahrer"
+    item["status"] = item.get("status") or "pending"
+    item["created_at"] = format_datetime_for_template(item.get("created_at")) or "-"
+    item["requested_at"] = item["created_at"]
+    item["deadline_display"] = item.get("deadline_display") or format_datetime_for_template(item.get("deadline_at")) or "1-2 Stunden"
+    item["deadline_iso"] = datetime_to_iso(item.get("deadline_at"))
+    item["avatar_url"] = item.get("avatar_url") or ""
+
+    claimed_by = item.get("claimed_by") or {}
+    approved_by = item.get("approved_by") or {}
+    rejected_by = item.get("rejected_by") or {}
+
+    item["claimed_by_name"] = (
+        approved_by.get("display_name")
+        or rejected_by.get("display_name")
+        or claimed_by.get("display_name")
+        or "Noch nicht geclaimt"
+    )
+    item["handler_name"] = item["claimed_by_name"]
+    item["sachbearbeiter_name"] = item["claimed_by_name"]
+    item["note"] = item.get("note") or item.get("reject_reason") or ""
+
+    return item
+
+
+def prepare_token_request_for_personalabteilung(request_doc):
+    item = dict(request_doc)
+    item["id"] = str(item.get("_id") or item.get("request_id") or "")
+    item["request_id"] = item.get("request_id") or item["id"]
+    item["name"] = item.get("name") or item.get("display_name") or item.get("username") or "Unbekannter User"
+    item["username"] = item.get("username") or item.get("discord_username") or item["name"]
+    item["role"] = item.get("role") or "Fahrer"
+    item["status"] = item.get("status") or "pending"
+    item["created_at"] = format_datetime_for_template(item.get("created_at")) or "-"
+    item["requested_at"] = item["created_at"]
+    item["reason"] = item.get("reason") or "Kein Grund angegeben"
+    item["avatar_url"] = item.get("avatar_url") or ""
+    return item
+
+
+def find_user_for_request_doc(request_doc):
+    discord_id = safe_str(request_doc.get("discord_id") or request_doc.get("user_id"))
+
+    if discord_id:
+        user_doc = users_collection.find_one({"discord_id": discord_id})
+
+        if user_doc:
+            return user_doc
+
+    username = safe_str(request_doc.get("username"))
+
+    if username:
+        return find_user_by_username(username)
+
+    return None
 
 
 def get_activity_for_user(username):
@@ -1817,19 +2145,30 @@ def dashboard():
         needs_signature = not db_user.get("policy_signed", False)
     else:
         needs_signature = True
+        db_user = {
+            "discord_id": str(user["id"]),
+            "username": user.get("username"),
+            "discord_username": user.get("discord_username"),
+            "display_name": user.get("username"),
+            "avatar": user.get("avatar"),
+            "roles": user_roles
+        }
 
     primary_role_name = get_primary_role_name(user_roles)
-
     news_items = load_json_file("news.json")
 
     user_documents = []
     all_documents = load_json_file("documents.json")
-
     user_id_str = str(user["id"])
 
     for document in all_documents:
         if str(document.get("discord_id")) == user_id_str:
             user_documents.append(document)
+
+    user_documents.extend(get_system_documents_for_user(user_id_str))
+
+    latest_registration = get_latest_registration_request_for_user(user_id_str)
+    registration_context = dashboard_registration_context(db_user, latest_registration)
 
     return render_template(
         "dashboard.html",
@@ -1837,8 +2176,184 @@ def dashboard():
         needs_signature=needs_signature,
         primary_role_name=primary_role_name,
         news_items=news_items,
-        user_documents=user_documents
+        user_documents=user_documents,
+        **registration_context
     )
+
+
+@app.route("/api/fahrer_registration", methods=["POST"])
+def api_fahrer_registration():
+    if "user" not in session:
+        return jsonify({
+            "success": False,
+            "message": "Bitte zuerst einloggen."
+        }), 401
+
+    session_user = session.get("user") or {}
+    discord_id = safe_str(session_user.get("id"))
+
+    if not discord_id:
+        return jsonify({
+            "success": False,
+            "message": "Session ist ungültig. Bitte erneut einloggen."
+        }), 401
+
+    db_user = users_collection.find_one({"discord_id": discord_id})
+
+    if not db_user:
+        return jsonify({
+            "success": False,
+            "message": "User wurde in der Datenbank nicht gefunden. Bitte erneut einloggen."
+        }), 404
+
+    data = request.get_json(silent=True) or {}
+    name = safe_str(data.get("name"), db_user.get("display_name") or db_user.get("username") or "")[:80]
+    role = safe_str(data.get("role"), get_primary_role_name(db_user.get("roles", [])))[:80]
+
+    if len(name) < 2 or len(role) < 2:
+        return jsonify({
+            "success": False,
+            "message": "Name und Rolle müssen ausgefüllt sein."
+        }), 400
+
+    existing_open = fahrer_registration_collection.find_one({
+        "discord_id": discord_id,
+        "status": {"$in": ["pending", "open", "claimed"]}
+    })
+
+    if existing_open:
+        return jsonify({
+            "success": True,
+            "message": "Du hast bereits eine offene Fahrer-Registrierung.",
+            "requestId": str(existing_open.get("_id")),
+            "status": existing_open.get("status", "pending")
+        })
+
+    now = now_utc()
+    deadline_at, deadline_label = calculate_registration_deadline(now)
+    request_id = uuid.uuid4().hex
+
+    request_doc = {
+        "request_id": request_id,
+        "discord_id": discord_id,
+        "user_id": discord_id,
+        "username": db_user.get("username") or session_user.get("username"),
+        "discord_username": db_user.get("discord_username") or session_user.get("discord_username"),
+        "display_name": db_user.get("display_name") or db_user.get("username") or session_user.get("username"),
+        "avatar_url": make_external_url(get_discord_avatar_url(db_user)),
+        "name": name,
+        "role": role,
+        "status": "pending",
+        "created_at": now,
+        "updated_at": now,
+        "deadline_at": deadline_at,
+        "deadline_display": f"bis {deadline_at.strftime('%d.%m.%Y %H:%M')} ({deadline_label})",
+        "source": "dashboard_quick_action",
+        "note": "Antrag wurde über das Web Dashboard gestellt."
+    }
+
+    fahrer_registration_collection.insert_one(request_doc)
+
+    users_collection.update_one(
+        {"discord_id": discord_id},
+        {
+            "$set": {
+                "fahrer_registration_status": "pending",
+                "fahrer_registration_requested_at": now,
+                "fahrer_registration_deadline_at": deadline_at,
+                "fahrer_registration_name": name,
+                "fahrer_registration_role": role,
+                "fahrer_registration_request_id": request_id,
+                "fahrer_registration_handler": "Noch nicht zugewiesen"
+            }
+        }
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "Deine Fahrer-Registrierung wurde an die Personalabteilung gesendet.",
+        "requestId": request_id,
+        "status": "pending",
+        "deadline": request_doc["deadline_display"]
+    })
+
+
+@app.route("/api/new_token_request", methods=["POST"])
+def api_new_token_request():
+    if "user" not in session:
+        return jsonify({
+            "success": False,
+            "message": "Bitte zuerst einloggen."
+        }), 401
+
+    session_user = session.get("user") or {}
+    discord_id = safe_str(session_user.get("id"))
+
+    if not discord_id:
+        return jsonify({
+            "success": False,
+            "message": "Session ist ungültig. Bitte erneut einloggen."
+        }), 401
+
+    db_user = users_collection.find_one({"discord_id": discord_id})
+
+    if not db_user:
+        return jsonify({
+            "success": False,
+            "message": "User wurde in der Datenbank nicht gefunden."
+        }), 404
+
+    is_approved = db_user.get("fahrer_registration_status") == "approved" or bool(db_user.get("tracker_code_hash"))
+
+    if not is_approved:
+        return jsonify({
+            "success": False,
+            "message": "Du bist noch nicht als Fahrer genehmigt."
+        }), 403
+
+    existing_open = token_request_collection.find_one({
+        "discord_id": discord_id,
+        "status": {"$in": ["pending", "open", "claimed"]}
+    })
+
+    if existing_open:
+        return jsonify({
+            "success": True,
+            "message": "Du hast bereits eine offene Token-Anfrage.",
+            "requestId": str(existing_open.get("_id")),
+            "status": existing_open.get("status", "pending")
+        })
+
+    data = request.get_json(silent=True) or {}
+    reason = safe_str(data.get("reason"), "Neuer Token wurde über das Dashboard angefordert.")[:400]
+    now = now_utc()
+    request_id = uuid.uuid4().hex
+
+    request_doc = {
+        "request_id": request_id,
+        "discord_id": discord_id,
+        "user_id": discord_id,
+        "username": db_user.get("username") or session_user.get("username"),
+        "discord_username": db_user.get("discord_username") or session_user.get("discord_username"),
+        "display_name": db_user.get("display_name") or db_user.get("username") or session_user.get("username"),
+        "avatar_url": make_external_url(get_discord_avatar_url(db_user)),
+        "name": db_user.get("display_name") or db_user.get("username") or session_user.get("username"),
+        "role": db_user.get("fahrer_registration_role") or get_primary_role_name(db_user.get("roles", [])),
+        "reason": reason or "Kein Grund angegeben",
+        "status": "pending",
+        "created_at": now,
+        "updated_at": now,
+        "source": "dashboard_new_token"
+    }
+
+    token_request_collection.insert_one(request_doc)
+
+    return jsonify({
+        "success": True,
+        "message": "Deine neue Token-Anfrage wurde an die Personalabteilung gesendet.",
+        "requestId": request_id,
+        "status": "pending"
+    })
 
 
 # ==========================================
@@ -1871,6 +2386,24 @@ def require_personalabteilung_permission():
     if not has_personalabteilung_permission(user_roles):
         flash("Zugriff verweigert. Du benötigst Personalabteilung, Geschäftsführung oder Projektleitung.", "error")
         return redirect(url_for("dashboard"))
+
+    return None
+
+
+def require_personalabteilung_api_permission():
+    if "user" not in session:
+        return jsonify({
+            "success": False,
+            "message": "Bitte zuerst einloggen."
+        }), 401
+
+    user_roles = session.get("user", {}).get("roles", [])
+
+    if not has_personalabteilung_permission(user_roles):
+        return jsonify({
+            "success": False,
+            "message": "Nicht berechtigt."
+        }), 403
 
     return None
 
@@ -1930,21 +2463,469 @@ def personalabteilung():
         for driver in drivers_cursor
     ]
 
+    registration_requests_cursor = fahrer_registration_collection.find({}).sort([
+        ("created_at", DESCENDING)
+    ]).limit(250)
+
+    registration_requests = [
+        prepare_registration_request_for_personalabteilung(item)
+        for item in registration_requests_cursor
+    ]
+
+    token_requests_cursor = token_request_collection.find({}).sort([
+        ("created_at", DESCENDING)
+    ]).limit(250)
+
+    token_requests = [
+        prepare_token_request_for_personalabteilung(item)
+        for item in token_requests_cursor
+    ]
+
     return render_template(
         "Personalabteilung.html",
-        drivers=drivers
+        drivers=drivers,
+        fahrer_registration_requests=registration_requests,
+        registration_requests=registration_requests,
+        token_requests=token_requests
     )
+
+
+@app.route("/api/personalabteilung/fahrer_registration/claim", methods=["POST"])
+def api_personalabteilung_claim_registration():
+    permission_response = require_personalabteilung_api_permission()
+
+    if permission_response:
+        return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+
+    if not request_id:
+        return jsonify({
+            "success": False,
+            "message": "Request-ID fehlt."
+        }), 400
+
+    request_doc = fahrer_registration_collection.find_one(request_lookup_query(request_id))
+
+    if not request_doc:
+        return jsonify({
+            "success": False,
+            "message": "Antrag wurde nicht gefunden."
+        }), 404
+
+    if request_doc.get("status") in {"approved", "rejected"}:
+        return jsonify({
+            "success": False,
+            "message": "Dieser Antrag ist bereits abgeschlossen."
+        }), 409
+
+    actor = current_staff_identity()
+    now = now_utc()
+
+    fahrer_registration_collection.update_one(
+        {"_id": request_doc["_id"]},
+        {
+            "$set": {
+                "status": "claimed",
+                "claimed_by": actor,
+                "claimed_at": now,
+                "updated_at": now
+            }
+        }
+    )
+
+    users_collection.update_one(
+        {"discord_id": str(request_doc.get("discord_id"))},
+        {
+            "$set": {
+                "fahrer_registration_status": "claimed",
+                "fahrer_registration_handler": actor.get("display_name"),
+                "fahrer_registration_claimed_at": now
+            }
+        }
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "Antrag wurde geclaimt.",
+        "handlerName": actor.get("display_name"),
+        "status": "claimed"
+    })
+
+
+@app.route("/api/personalabteilung/fahrer_registration/approve", methods=["POST"])
+def api_personalabteilung_approve_registration():
+    permission_response = require_personalabteilung_api_permission()
+
+    if permission_response:
+        return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+
+    if not request_id:
+        return jsonify({
+            "success": False,
+            "message": "Request-ID fehlt."
+        }), 400
+
+    request_doc = fahrer_registration_collection.find_one(request_lookup_query(request_id))
+
+    if not request_doc:
+        return jsonify({
+            "success": False,
+            "message": "Antrag wurde nicht gefunden."
+        }), 404
+
+    if request_doc.get("status") == "approved":
+        return jsonify({
+            "success": False,
+            "message": "Dieser Antrag ist bereits genehmigt."
+        }), 409
+
+    if request_doc.get("status") == "rejected":
+        return jsonify({
+            "success": False,
+            "message": "Ein abgelehnter Antrag kann nicht genehmigt werden. Bitte neuen Antrag stellen lassen."
+        }), 409
+
+    user_doc = find_user_for_request_doc(request_doc)
+
+    if not user_doc:
+        return jsonify({
+            "success": False,
+            "message": "Der User zum Antrag wurde nicht gefunden."
+        }), 404
+
+    actor = current_staff_identity()
+    now = now_utc()
+    tracker_code = create_tracker_code_for_user_doc(user_doc, actor)
+
+    approved_name = request_doc.get("name") or user_doc.get("display_name") or user_doc.get("username") or "EifelLog Fahrer"
+    approved_role = request_doc.get("role") or get_primary_role_name(user_doc.get("roles", []))
+    handler_name = actor.get("display_name") or "Personalabteilung"
+
+    document_content = tracker_confirmation_document_content(
+        approved_name,
+        approved_role,
+        handler_name,
+        tracker_code,
+        reason="Fahrer-Registrierung wurde genehmigt."
+    )
+
+    create_system_document_for_user(
+        user_doc.get("discord_id"),
+        "Fahrer Token Bestätigung",
+        handler_name,
+        document_content,
+        doc_type="driver_registration_approval",
+        needs_signature=False,
+        extra={
+            "request_id": str(request_doc.get("request_id") or request_doc.get("_id")),
+            "token_created_at": now,
+            "contains_tracker_code": True
+        }
+    )
+
+    fahrer_registration_collection.update_one(
+        {"_id": request_doc["_id"]},
+        {
+            "$set": {
+                "status": "approved",
+                "approved_by": actor,
+                "approved_at": now,
+                "updated_at": now,
+                "generated_token_at": now
+            }
+        }
+    )
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": {
+                "fahrer_registration_status": "approved",
+                "fahrer_registration_approved_at": now,
+                "fahrer_registration_handler": handler_name,
+                "fahrer_registration_name": approved_name,
+                "fahrer_registration_role": approved_role,
+                "fahrer_registration_request_id": str(request_doc.get("request_id") or request_doc.get("_id")),
+                "tracker_enabled": True
+            }
+        }
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "Fahrer wurde genehmigt. Der Token wurde als System-Dokument ins Postfach gesendet.",
+        "status": "approved",
+        "handlerName": handler_name,
+        "trackerCode": tracker_code
+    })
+
+
+@app.route("/api/personalabteilung/fahrer_registration/reject", methods=["POST"])
+def api_personalabteilung_reject_registration():
+    permission_response = require_personalabteilung_api_permission()
+
+    if permission_response:
+        return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+    reason = safe_str(data.get("reason"), "Kein Grund angegeben.")[:600]
+
+    if not request_id:
+        return jsonify({
+            "success": False,
+            "message": "Request-ID fehlt."
+        }), 400
+
+    request_doc = fahrer_registration_collection.find_one(request_lookup_query(request_id))
+
+    if not request_doc:
+        return jsonify({
+            "success": False,
+            "message": "Antrag wurde nicht gefunden."
+        }), 404
+
+    if request_doc.get("status") in {"approved", "rejected"}:
+        return jsonify({
+            "success": False,
+            "message": "Dieser Antrag ist bereits abgeschlossen."
+        }), 409
+
+    user_doc = find_user_for_request_doc(request_doc)
+    actor = current_staff_identity()
+    now = now_utc()
+    handler_name = actor.get("display_name") or "Personalabteilung"
+
+    fahrer_registration_collection.update_one(
+        {"_id": request_doc["_id"]},
+        {
+            "$set": {
+                "status": "rejected",
+                "rejected_by": actor,
+                "rejected_at": now,
+                "reject_reason": reason,
+                "updated_at": now
+            }
+        }
+    )
+
+    if user_doc:
+        users_collection.update_one(
+            {"_id": user_doc["_id"]},
+            {
+                "$set": {
+                    "fahrer_registration_status": "rejected",
+                    "fahrer_registration_rejected_at": now,
+                    "fahrer_registration_reject_reason": reason,
+                    "fahrer_registration_handler": handler_name
+                }
+            }
+        )
+
+        create_system_document_for_user(
+            user_doc.get("discord_id"),
+            "Fahrer Registrierung abgelehnt",
+            handler_name,
+            rejection_document_content("Fahrer Registrierung abgelehnt", reason, handler_name),
+            doc_type="driver_registration_rejection",
+            needs_signature=False,
+            extra={
+                "request_id": str(request_doc.get("request_id") or request_doc.get("_id"))
+            }
+        )
+
+    return jsonify({
+        "success": True,
+        "message": "Fahrer-Registrierung wurde abgelehnt.",
+        "status": "rejected",
+        "handlerName": handler_name
+    })
+
+
+@app.route("/api/personalabteilung/token_request/approve", methods=["POST"])
+def api_personalabteilung_approve_token_request():
+    permission_response = require_personalabteilung_api_permission()
+
+    if permission_response:
+        return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+
+    if not request_id:
+        return jsonify({
+            "success": False,
+            "message": "Request-ID fehlt."
+        }), 400
+
+    request_doc = token_request_collection.find_one(request_lookup_query(request_id))
+
+    if not request_doc:
+        return jsonify({
+            "success": False,
+            "message": "Token-Anfrage wurde nicht gefunden."
+        }), 404
+
+    if request_doc.get("status") in {"approved", "rejected"}:
+        return jsonify({
+            "success": False,
+            "message": "Diese Token-Anfrage ist bereits abgeschlossen."
+        }), 409
+
+    user_doc = find_user_for_request_doc(request_doc)
+
+    if not user_doc:
+        return jsonify({
+            "success": False,
+            "message": "Der User zur Token-Anfrage wurde nicht gefunden."
+        }), 404
+
+    actor = current_staff_identity()
+    now = now_utc()
+    handler_name = actor.get("display_name") or "Personalabteilung"
+    tracker_code = create_tracker_code_for_user_doc(user_doc, actor)
+
+    name = request_doc.get("name") or user_doc.get("display_name") or user_doc.get("username") or "EifelLog Fahrer"
+    role = request_doc.get("role") or user_doc.get("fahrer_registration_role") or get_primary_role_name(user_doc.get("roles", []))
+    reason = request_doc.get("reason") or "Neuer Token wurde genehmigt."
+
+    document_content = tracker_confirmation_document_content(
+        name,
+        role,
+        handler_name,
+        tracker_code,
+        reason=reason
+    )
+
+    create_system_document_for_user(
+        user_doc.get("discord_id"),
+        "Neuer Fahrer Token",
+        handler_name,
+        document_content,
+        doc_type="new_token_approval",
+        needs_signature=False,
+        extra={
+            "request_id": str(request_doc.get("request_id") or request_doc.get("_id")),
+            "token_created_at": now,
+            "contains_tracker_code": True
+        }
+    )
+
+    token_request_collection.update_one(
+        {"_id": request_doc["_id"]},
+        {
+            "$set": {
+                "status": "approved",
+                "approved_by": actor,
+                "approved_at": now,
+                "updated_at": now,
+                "generated_token_at": now
+            }
+        }
+    )
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": {
+                "fahrer_registration_status": "approved",
+                "fahrer_registration_handler": handler_name,
+                "last_token_request_approved_at": now,
+                "tracker_enabled": True
+            }
+        }
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "Neuer Token wurde erstellt und ins System-Postfach gesendet.",
+        "status": "approved",
+        "handlerName": handler_name,
+        "trackerCode": tracker_code
+    })
+
+
+@app.route("/api/personalabteilung/token_request/reject", methods=["POST"])
+def api_personalabteilung_reject_token_request():
+    permission_response = require_personalabteilung_api_permission()
+
+    if permission_response:
+        return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+    reason = safe_str(data.get("reason"), "Kein Grund angegeben.")[:600]
+
+    if not request_id:
+        return jsonify({
+            "success": False,
+            "message": "Request-ID fehlt."
+        }), 400
+
+    request_doc = token_request_collection.find_one(request_lookup_query(request_id))
+
+    if not request_doc:
+        return jsonify({
+            "success": False,
+            "message": "Token-Anfrage wurde nicht gefunden."
+        }), 404
+
+    if request_doc.get("status") in {"approved", "rejected"}:
+        return jsonify({
+            "success": False,
+            "message": "Diese Token-Anfrage ist bereits abgeschlossen."
+        }), 409
+
+    user_doc = find_user_for_request_doc(request_doc)
+    actor = current_staff_identity()
+    now = now_utc()
+    handler_name = actor.get("display_name") or "Personalabteilung"
+
+    token_request_collection.update_one(
+        {"_id": request_doc["_id"]},
+        {
+            "$set": {
+                "status": "rejected",
+                "rejected_by": actor,
+                "rejected_at": now,
+                "reject_reason": reason,
+                "updated_at": now
+            }
+        }
+    )
+
+    if user_doc:
+        create_system_document_for_user(
+            user_doc.get("discord_id"),
+            "Token Anfrage abgelehnt",
+            handler_name,
+            rejection_document_content("Token Anfrage abgelehnt", reason, handler_name),
+            doc_type="new_token_rejection",
+            needs_signature=False,
+            extra={
+                "request_id": str(request_doc.get("request_id") or request_doc.get("_id"))
+            }
+        )
+
+    return jsonify({
+        "success": True,
+        "message": "Token-Anfrage wurde abgelehnt.",
+        "status": "rejected",
+        "handlerName": handler_name
+    })
 
 
 @app.route("/personalabteilung/tracker-code/create", methods=["POST"])
 def personalabteilung_create_tracker_code():
-    permission_response = require_personalabteilung_permission()
+    permission_response = require_personalabteilung_api_permission()
 
     if permission_response:
-        return jsonify({
-            "success": False,
-            "error": "Nicht berechtigt."
-        }), 403
+        return permission_response
 
     data = request.get_json(silent=True) or {}
 
@@ -1979,32 +2960,43 @@ def personalabteilung_create_tracker_code():
             "driver": tracker_profile_payload(user_doc)
         })
 
-    tracker_code = generate_tracker_code()
+    actor = current_staff_identity()
+    tracker_code = create_tracker_code_for_user_doc(user_doc, actor)
 
     users_collection.update_one(
         {"_id": user_doc["_id"]},
         {
             "$set": {
-                "tracker_code_hash": hash_secret(tracker_code),
-                "tracker_code_created_at": now_utc(),
-                "tracker_enabled": True,
-                "tracker_code_created_by": {
-                    "discord_id": str(session.get("user", {}).get("id", "")),
-                    "username": str(session.get("user", {}).get("username", "")),
-                    "created_at": now_utc()
-                }
-            },
-            "$unset": {
-                "tracker_code": ""
+                "fahrer_registration_status": "approved",
+                "fahrer_registration_handler": actor.get("display_name") or "Personalabteilung"
             }
         }
     )
 
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
 
+    create_system_document_for_user(
+        fresh_user.get("discord_id"),
+        "Fahrer Token Bestätigung",
+        actor.get("display_name") or "Personalabteilung",
+        tracker_confirmation_document_content(
+            fresh_user.get("display_name") or fresh_user.get("username") or "EifelLog Fahrer",
+            get_primary_role_name(fresh_user.get("roles", [])),
+            actor.get("display_name") or "Personalabteilung",
+            tracker_code,
+            reason="Tracker-Code wurde durch die Personalabteilung erstellt."
+        ),
+        doc_type="manual_token_create",
+        needs_signature=False,
+        extra={
+            "token_created_at": now_utc(),
+            "contains_tracker_code": True
+        }
+    )
+
     return jsonify({
         "success": True,
-        "message": "Tracker-Code wurde erstellt.",
+        "message": "Tracker-Code wurde erstellt und als System-Dokument gesendet.",
         "trackerCode": tracker_code,
         "driver": tracker_profile_payload(fresh_user)
     })
