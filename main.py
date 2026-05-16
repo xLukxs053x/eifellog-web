@@ -1898,6 +1898,8 @@ def personalabteilung():
         tasks=tasks
     )
 
+
+
 @app.route("/api/buchhaltung/request", methods=["POST"])
 def api_buchhaltung_request():
     if "user" not in session: return jsonify({"success": False, "message": "Bitte einloggen"}), 401
@@ -1935,23 +1937,39 @@ def api_buchhaltung_request():
     
     return jsonify({"success": True, "message": "Anfrage erfolgreich an die Personalabteilung gesendet."})
 
-@app.route("/api/personalabteilung/tasks/add", methods=["POST"])
+@app.route("/api/personalabteilung/task/create", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/personalabteilung/tasks/add", methods=["GET", "POST", "OPTIONS"])
 def api_add_task():
-    if "user" not in session: return jsonify({"success": False, "message": "Bitte einloggen"}), 401
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    if request.method == "GET":
+        return jsonify({
+            "success": True,
+            "message": "Task-Create-Endpunkt ist erreichbar. Aufgaben werden über POST erstellt.",
+            "expectedMethod": "POST",
+            "endpoint": "/api/personalabteilung/task/create"
+        })
+
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
+
     user_roles = session.get("user", {}).get("roles", [])
-    
+
     # Manuelles Hinzufügen strikt limitiert
     if ROLE_GESCHAEFTSFUEHRUNG_ID not in user_roles and ROLE_PROJEKTLEITUNG_ID not in user_roles:
         return jsonify({"success": False, "message": "Nur Geschäftsführung oder Projektleitung darf manuell Aufgaben erstellen."}), 403
-        
+
     data = request.get_json(silent=True) or {}
     title = safe_str(data.get("title"))
     type_ = safe_str(data.get("type"), "Allgemein")
     priority = safe_str(data.get("priority"), "medium")
     description = safe_str(data.get("description"), "")
-    
-    if not title: return jsonify({"success": False, "message": "Titel fehlt."}), 400
-    
+
+    if not title:
+        return jsonify({"success": False, "message": "Titel fehlt."}), 400
+
     task_doc = {
         "title": title,
         "type": type_,
@@ -1961,9 +1979,13 @@ def api_add_task():
         "created_at": now_utc(),
         "assignee": None
     }
-    tasks_collection.insert_one(task_doc)
-    
-    return jsonify({"success": True, "message": "Aufgabe im System hinterlegt."})
+    insert_result = tasks_collection.insert_one(task_doc)
+
+    return jsonify({
+        "success": True,
+        "message": "Aufgabe im System hinterlegt.",
+        "taskId": str(insert_result.inserted_id)
+    })
 
 @app.route("/api/personalabteilung/driver/document/send", methods=["POST"])
 def api_personalabteilung_send_document():
