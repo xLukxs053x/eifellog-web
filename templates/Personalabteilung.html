@@ -6,6 +6,7 @@
 {% set safe_drivers = drivers|default([], true) %}
 {% set safe_requests = fahrer_registration_requests|default(registration_requests|default([], true), true) %}
 {% set safe_token_requests = token_requests|default([], true) %}
+{% set safe_accounting_requests = buchhaltung_requests|default(accounting_requests|default(accounting_department_requests|default([], true), true), true) %}
 {% set safe_tasks = tasks|default([], true) %} <!-- Neu für den Aufgaben Pool -->
 
 <style>
@@ -1018,6 +1019,133 @@
         }
     }
 
+
+
+    /* === Buchhaltungs-Anfragen Sidebar / Panel === */
+    .department-layout {
+        display: grid;
+        grid-template-columns: minmax(280px, 0.32fr) minmax(0, 1fr);
+        gap: 22px;
+        align-items: start;
+    }
+
+    .department-sidebar {
+        padding: 22px;
+        position: sticky;
+        top: 92px;
+        display: grid;
+        gap: 16px;
+    }
+
+    .sidebar-kicker {
+        color: var(--el-yellow);
+        font-family: "Orbitron", sans-serif;
+        font-size: 9px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.17em;
+    }
+
+    .sidebar-title {
+        margin: 0;
+        color: #fff;
+        font-family: "Orbitron", sans-serif;
+        font-size: 20px;
+        font-weight: 900;
+        line-height: 1.15;
+    }
+
+    .sidebar-text {
+        margin: 0;
+        color: var(--el-muted);
+        font-size: 12px;
+        line-height: 1.6;
+    }
+
+    .sidebar-stat-grid {
+        display: grid;
+        gap: 10px;
+    }
+
+    .sidebar-stat {
+        padding: 13px 14px;
+        border-radius: 16px;
+        background: rgba(0, 0, 0, 0.30);
+        border: 1px solid rgba(255, 255, 255, 0.065);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .sidebar-stat small {
+        color: var(--el-muted);
+        font-family: "Orbitron", sans-serif;
+        font-size: 8px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+    }
+
+    .sidebar-stat strong {
+        color: var(--el-green-soft);
+        font-family: "Orbitron", sans-serif;
+        font-size: 15px;
+        font-weight: 900;
+    }
+
+    .accounting-detail-card {
+        padding: 15px;
+        border-radius: 18px;
+        background: rgba(0, 0, 0, 0.26);
+        border: 1px solid rgba(var(--el-green-rgb), 0.18);
+        display: grid;
+        gap: 12px;
+    }
+
+    .accounting-detail-card strong {
+        color: var(--el-green-soft);
+        font-family: "Orbitron", sans-serif;
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.13em;
+    }
+
+    .detail-line {
+        display: grid;
+        gap: 5px;
+    }
+
+    .detail-line small {
+        color: var(--el-muted-2);
+        font-family: "Orbitron", sans-serif;
+        font-size: 8px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.13em;
+    }
+
+    .detail-line span,
+    .detail-line p {
+        margin: 0;
+        color: var(--el-muted);
+        font-size: 12px;
+        line-height: 1.55;
+        overflow-wrap: anywhere;
+    }
+
+    .request-message-preview {
+        max-width: 360px;
+        color: var(--el-muted);
+        font-size: 12px;
+        line-height: 1.45;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
     @media (max-width: 1120px) {
         .page-head {
             grid-template-columns: 1fr;
@@ -1035,6 +1163,14 @@
         .toolbar,
         .toolbar.requests {
             grid-template-columns: 1fr;
+        }
+
+        .department-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .department-sidebar {
+            position: static;
         }
     }
 
@@ -1141,6 +1277,7 @@
         <section class="glass-card tabbar">
             <button class="tab-btn active" type="button" data-tab-target="registrations">Fahrer Registrierungen</button>
             <button class="tab-btn" type="button" data-tab-target="tokenRequests">Token Anfragen</button>
+            <button class="tab-btn" type="button" data-tab-target="accountingRequests">Anfragen der Buchhaltung</button>
             <button class="tab-btn" type="button" data-tab-target="drivers">Fahrer Datenbank</button>
             <!-- NEU: Aufgaben Pool Tab -->
             <button class="tab-btn" type="button" data-tab-target="taskPool">Aufgaben Pool</button>
@@ -1470,6 +1607,215 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+            </section>
+        </div>
+
+
+        <div id="accountingRequests" class="tab-panel">
+            <section class="department-layout">
+                <aside class="glass-card department-sidebar" aria-label="Sidebar Buchhaltungsanfragen">
+                    <div>
+                        <div class="sidebar-kicker">Buchhaltung → Personal</div>
+                        <h2 class="sidebar-title">Anfragen der Buchhaltung</h2>
+                        <p class="sidebar-text">
+                            Hier landen interne Rückfragen, die über das Formular der Buchhaltung an die Personalabteilung gesendet werden.
+                            Wähle einen Eintrag aus, um die vollständigen Details in dieser Sidebar zu sehen.
+                        </p>
+                    </div>
+
+                    <div class="sidebar-stat-grid">
+                        <div class="sidebar-stat">
+                            <small>Gesamt</small>
+                            <strong id="statAccountingTotal">{{ safe_accounting_requests|length }}</strong>
+                        </div>
+                        <div class="sidebar-stat">
+                            <small>Offen</small>
+                            <strong id="statAccountingOpen">0</strong>
+                        </div>
+                        <div class="sidebar-stat">
+                            <small>Gefiltert sichtbar</small>
+                            <strong id="statAccountingVisible">0</strong>
+                        </div>
+                    </div>
+
+                    <div class="accounting-detail-card" id="accountingRequestDetails">
+                        <strong>Keine Anfrage ausgewählt</strong>
+                        <div class="detail-line">
+                            <p>Klicke in der Tabelle auf „Details“, um Betreff, Kategorie, Priorität, Bezug und Nachricht der Buchhaltung hier anzuzeigen.</p>
+                        </div>
+                    </div>
+                </aside>
+
+                <div>
+                    <section class="glass-card toolbar">
+                        <input
+                            class="search-box"
+                            id="accountingRequestSearch"
+                            type="search"
+                            placeholder="Buchhaltungsanfrage suchen: Absender, Betreff, Kategorie, Nachricht..."
+                            autocomplete="off"
+                        />
+
+                        <select class="filter-select" id="accountingRequestStatusFilter">
+                            <option value="all">Alle Status</option>
+                            <option value="open">Offen</option>
+                            <option value="pending">Ausstehend</option>
+                            <option value="claimed">In Bearbeitung</option>
+                            <option value="done">Erledigt</option>
+                            <option value="rejected">Abgelehnt</option>
+                        </select>
+
+                        <select class="filter-select" id="accountingRequestPriorityFilter">
+                            <option value="all">Alle Prioritäten</option>
+                            <option value="Normal">Normal</option>
+                            <option value="Wichtig">Wichtig</option>
+                            <option value="Dringend">Dringend</option>
+                        </select>
+                    </section>
+
+                    <section class="glass-card table-card">
+                        <div class="table-head">
+                            <h2>Anfragen der Buchhaltung</h2>
+                            <span>
+                                Quelle: <strong>/api/buchhaltung/request</strong>
+                            </span>
+                        </div>
+
+                        <div class="request-table-wrap">
+                            <table class="request-table">
+                                <thead>
+                                    <tr>
+                                        <th>Absender</th>
+                                        <th>Kategorie</th>
+                                        <th>Priorität</th>
+                                        <th>Betreff</th>
+                                        <th>Nachricht</th>
+                                        <th>Status</th>
+                                        <th>Eingang</th>
+                                        <th style="text-align: right;">Aktion</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody id="accountingRequestTableBody">
+                                    {% for acc_req in safe_accounting_requests %}
+                                        {% set acc_req_id = acc_req.id or acc_req._id or acc_req.request_id %}
+                                        {% set acc_status = acc_req.status or "open" %}
+                                        {% set acc_sender = acc_req.sender_name or acc_req.requester_name or acc_req.created_by_name or acc_req.user_name or acc_req.username or acc_req.display_name or acc_req.name or "Buchhaltung" %}
+                                        {% set acc_username = acc_req.username or acc_req.discord_username or acc_sender %}
+                                        {% set acc_discord_id = acc_req.discord_id or acc_req.user_id or "-" %}
+                                        {% set acc_category = acc_req.category or "Allgemeine Personalfrage" %}
+                                        {% set acc_priority = acc_req.priority or "Normal" %}
+                                        {% set acc_subject = acc_req.subject or acc_req.title or "Ohne Betreff" %}
+                                        {% set acc_reference = acc_req.reference or acc_req.ref or acc_req.bezug or acc_req.case_reference or "" %}
+                                        {% set acc_message = acc_req.message or acc_req.description or acc_req.text or acc_req.body or "" %}
+                                        {% set acc_created = acc_req.created_at or acc_req.requested_at or acc_req.submitted_at or "-" %}
+                                        {% set acc_handler = acc_req.claimed_by_name or acc_req.handler_name or acc_req.sachbearbeiter_name or acc_req.claimed_by or "Noch nicht zugewiesen" %}
+
+                                        <tr
+                                            data-accounting-request-row
+                                            data-accounting-request-id="{{ acc_req_id }}"
+                                            data-accounting-status="{{ acc_status }}"
+                                            data-accounting-priority="{{ acc_priority }}"
+                                            data-accounting-sender="{{ acc_sender }}"
+                                            data-accounting-username="{{ acc_username }}"
+                                            data-accounting-discord-id="{{ acc_discord_id }}"
+                                            data-accounting-category="{{ acc_category }}"
+                                            data-accounting-subject="{{ acc_subject }}"
+                                            data-accounting-reference="{{ acc_reference }}"
+                                            data-accounting-message="{{ acc_message }}"
+                                            data-accounting-created="{{ acc_created }}"
+                                            data-accounting-handler="{{ acc_handler }}"
+                                            data-search="{{ (acc_sender ~ ' ' ~ acc_username ~ ' ' ~ acc_discord_id ~ ' ' ~ acc_category ~ ' ' ~ acc_priority ~ ' ' ~ acc_subject ~ ' ' ~ acc_reference ~ ' ' ~ acc_message ~ ' ' ~ acc_handler)|lower }}"
+                                        >
+                                            <td>
+                                                <div class="driver-cell">
+                                                    <div class="driver-avatar">
+                                                        {% if acc_req.avatar_url %}
+                                                            <img src="{{ acc_req.avatar_url }}" alt="{{ acc_sender }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                                                            <span style="display:none;">BH</span>
+                                                        {% else %}
+                                                            <span>BH</span>
+                                                        {% endif %}
+                                                    </div>
+
+                                                    <div class="driver-meta">
+                                                        <strong>{{ acc_sender }}</strong>
+                                                        <span>@{{ acc_username }}</span>
+                                                        <span class="mono">{{ acc_discord_id }}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            <td>
+                                                <span class="role-badge">{{ acc_category }}</span>
+                                            </td>
+
+                                            <td>
+                                                {% if acc_priority == "Dringend" %}
+                                                    <span class="deadline-badge expired">Dringend</span>
+                                                {% elif acc_priority == "Wichtig" %}
+                                                    <span class="deadline-badge">Wichtig</span>
+                                                {% else %}
+                                                    <span class="status-badge approved">Normal</span>
+                                                {% endif %}
+                                            </td>
+
+                                            <td>
+                                                <div class="driver-meta">
+                                                    <strong>{{ acc_subject }}</strong>
+                                                    {% if acc_reference %}
+                                                        <span>Bezug: {{ acc_reference }}</span>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+
+                                            <td>
+                                                <div class="request-message-preview">{{ acc_message or "Keine Nachricht hinterlegt" }}</div>
+                                            </td>
+
+                                            <td>
+                                                {% if acc_status == "done" or acc_status == "closed" or acc_status == "resolved" or acc_status == "completed" %}
+                                                    <span class="status-badge approved">Erledigt</span>
+                                                {% elif acc_status == "rejected" %}
+                                                    <span class="status-badge rejected">Abgelehnt</span>
+                                                {% elif acc_status == "claimed" or acc_status == "in-progress" %}
+                                                    <span class="status-badge claimed">In Bearbeitung</span>
+                                                {% else %}
+                                                    <span class="status-badge pending">Offen</span>
+                                                {% endif %}
+                                            </td>
+
+                                            <td>
+                                                <span class="mono">{{ acc_created }}</span>
+                                            </td>
+
+                                            <td>
+                                                <div class="action-wrap">
+                                                    <button
+                                                        class="request-btn blue"
+                                                        type="button"
+                                                        data-accounting-select="true"
+                                                    >
+                                                        Details
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="8">
+                                                <div class="empty-state">
+                                                    <strong>Keine Buchhaltungsanfragen</strong>
+                                                    Sobald die Buchhaltung das Anfrageformular absendet, erscheinen die Vorgänge hier.
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                 </div>
             </section>
         </div>
@@ -1900,6 +2246,11 @@
         const requestSearch = document.getElementById("requestSearch");
         const requestStatusFilter = document.getElementById("requestStatusFilter");
 
+        const accountingRequestSearch = document.getElementById("accountingRequestSearch");
+        const accountingRequestStatusFilter = document.getElementById("accountingRequestStatusFilter");
+        const accountingRequestPriorityFilter = document.getElementById("accountingRequestPriorityFilter");
+        const accountingRequestDetails = document.getElementById("accountingRequestDetails");
+
         const taskSearch = document.getElementById("taskSearch");
         const taskStatusFilter = document.getElementById("taskStatusFilter");
 
@@ -1935,6 +2286,10 @@
             return Array.from(document.querySelectorAll("[data-token-request-row]"));
         }
 
+        function getAccountingRequestRows() {
+            return Array.from(document.querySelectorAll("[data-accounting-request-row]"));
+        }
+
         function getTaskRows() {
             return Array.from(document.querySelectorAll("[data-task-row]"));
         }
@@ -1962,10 +2317,18 @@
                 return row.dataset.requestStatus === "claimed";
             }).length;
 
+            const accountingRows = getAccountingRequestRows();
+            const openAccountingRequests = accountingRows.filter((row) => {
+                const status = row.dataset.accountingStatus || "open";
+                return status === "open" || status === "pending" || status === "claimed" || status === "in-progress";
+            }).length;
+
             setText("statTotalDrivers", total);
             setText("statWithToken", withToken);
             setText("statOpenRequests", openRequests);
             setText("statClaimedRequests", claimedRequests);
+            setText("statAccountingTotal", accountingRows.length);
+            setText("statAccountingOpen", openAccountingRequests);
         }
 
         function showToast(title, message, type = "success", code = null) {
@@ -2043,6 +2406,85 @@
 
                 row.style.display = matchesSearch && matchesStatus ? "" : "none";
             });
+        }
+
+        function applyAccountingRequestFilters() {
+            const rows = getAccountingRequestRows();
+            const query = String(accountingRequestSearch?.value || "").trim().toLowerCase();
+            const statusValue = accountingRequestStatusFilter?.value || "all";
+            const priorityValue = accountingRequestPriorityFilter?.value || "all";
+            let visible = 0;
+
+            rows.forEach((row) => {
+                const rowStatus = row.dataset.accountingStatus || "open";
+                const normalizedDone = ["done", "closed", "resolved", "completed"].includes(rowStatus) ? "done" : rowStatus;
+                const matchesSearch = !query || String(row.dataset.search || "").includes(query);
+                const matchesStatus = statusValue === "all" || rowStatus === statusValue || normalizedDone === statusValue;
+                const matchesPriority = priorityValue === "all" || row.dataset.accountingPriority === priorityValue;
+                const isVisible = matchesSearch && matchesStatus && matchesPriority;
+
+                row.style.display = isVisible ? "" : "none";
+                if (isVisible) visible += 1;
+            });
+
+            setText("statAccountingVisible", visible);
+        }
+
+        function statusLabel(status) {
+            if (["done", "closed", "resolved", "completed"].includes(status)) return "Erledigt";
+            if (status === "rejected") return "Abgelehnt";
+            if (status === "claimed" || status === "in-progress") return "In Bearbeitung";
+            if (status === "pending") return "Ausstehend";
+            return "Offen";
+        }
+
+        function renderAccountingRequestDetails(row) {
+            if (!accountingRequestDetails || !row) return;
+
+            const sender = row.dataset.accountingSender || "Buchhaltung";
+            const username = row.dataset.accountingUsername || sender;
+            const discordId = row.dataset.accountingDiscordId || "-";
+            const category = row.dataset.accountingCategory || "Allgemeine Personalfrage";
+            const priority = row.dataset.accountingPriority || "Normal";
+            const subject = row.dataset.accountingSubject || "Ohne Betreff";
+            const reference = row.dataset.accountingReference || "-";
+            const message = row.dataset.accountingMessage || "Keine Nachricht hinterlegt.";
+            const created = row.dataset.accountingCreated || "-";
+            const handler = row.dataset.accountingHandler || "Noch nicht zugewiesen";
+            const status = statusLabel(row.dataset.accountingStatus || "open");
+
+            accountingRequestDetails.innerHTML = `
+                <strong>${escapeHtml(subject)}</strong>
+                <div class="detail-line">
+                    <small>Absender</small>
+                    <span>${escapeHtml(sender)} · @${escapeHtml(username)} · ${escapeHtml(discordId)}</span>
+                </div>
+                <div class="detail-line">
+                    <small>Kategorie / Priorität</small>
+                    <span>${escapeHtml(category)} · ${escapeHtml(priority)}</span>
+                </div>
+                <div class="detail-line">
+                    <small>Status / Eingang</small>
+                    <span>${escapeHtml(status)} · ${escapeHtml(created)}</span>
+                </div>
+                <div class="detail-line">
+                    <small>Bezug</small>
+                    <span>${escapeHtml(reference || "-")}</span>
+                </div>
+                <div class="detail-line">
+                    <small>Sachbearbeiter</small>
+                    <span>${escapeHtml(handler)}</span>
+                </div>
+                <div class="detail-line">
+                    <small>Nachricht</small>
+                    <p>${escapeHtml(message)}</p>
+                </div>
+            `;
+        }
+
+        function selectFirstVisibleAccountingRequest() {
+            const firstVisible = getAccountingRequestRows().find((row) => row.style.display !== "none");
+            if (firstVisible) renderAccountingRequestDetails(firstVisible);
         }
 
         function applyTaskFilters() {
@@ -2316,6 +2758,32 @@
         
         if (requestSearch) requestSearch.addEventListener("input", applyRequestFilters);
         if (requestStatusFilter) requestStatusFilter.addEventListener("change", applyRequestFilters);
+
+        if (accountingRequestSearch) {
+            accountingRequestSearch.addEventListener("input", () => {
+                applyAccountingRequestFilters();
+                selectFirstVisibleAccountingRequest();
+            });
+        }
+        if (accountingRequestStatusFilter) {
+            accountingRequestStatusFilter.addEventListener("change", () => {
+                applyAccountingRequestFilters();
+                selectFirstVisibleAccountingRequest();
+            });
+        }
+        if (accountingRequestPriorityFilter) {
+            accountingRequestPriorityFilter.addEventListener("change", () => {
+                applyAccountingRequestFilters();
+                selectFirstVisibleAccountingRequest();
+            });
+        }
+
+        document.querySelectorAll("[data-accounting-select]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const row = button.closest("[data-accounting-request-row]");
+                renderAccountingRequestDetails(row);
+            });
+        });
 
         if (taskSearch) taskSearch.addEventListener("input", applyTaskFilters);
         if (taskStatusFilter) taskStatusFilter.addEventListener("change", applyTaskFilters);
@@ -2682,6 +3150,8 @@
 
         updateStats();
         applyRequestFilters();
+        applyAccountingRequestFilters();
+        selectFirstVisibleAccountingRequest();
         applyDriverFilters();
         applyTaskFilters();
     });
