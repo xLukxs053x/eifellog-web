@@ -110,8 +110,8 @@
             height: 100%;
             object-fit: cover;
             object-position: center;
-            /* Helligkeit von 0.3 auf 0.65 angehoben, damit die Bilder besser sichtbar sind */
-            filter: saturate(1.05) brightness(0.65);
+            /* Helligkeit wieder etwas dunkler gesetzt */
+            filter: saturate(1.05) brightness(0.50);
             opacity: 0;
             animation: fadeZoom 24s infinite;
         }
@@ -157,9 +157,9 @@
             position: absolute;
             inset: 0;
             background:
-                /* Abdunklung an den Rändern und im Zentrum reduziert */
-                radial-gradient(circle at 50% 32%, rgba(10, 20, 15, 0.10) 0%, rgba(4, 10, 6, 0.65) 58%, rgba(2, 5, 3, 0.85) 100%),
-                linear-gradient(180deg, rgba(0, 0, 0, 0.10), rgba(0, 0, 0, 0.40));
+                /* Abdunklung wieder leicht verstärkt */
+                radial-gradient(circle at 50% 32%, rgba(10, 20, 15, 0.16) 0%, rgba(4, 10, 6, 0.72) 58%, rgba(2, 5, 3, 0.90) 100%),
+                linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.48));
         }
 
         /* === UI ELEMENTE & GLASSMORPHISM === */
