@@ -2034,38 +2034,6 @@ def changelog():
     return render_template('changelog.html', changelog=changelog_data, roadmap=roadmap_data)
 
 
-@app.route("/dispo")
-@login_required
-def dispo():
-    current_user_roles = getattr(current_user, "roles", []) or []
-
-    allowed_role_ids = [
-        "Disposition",  # Hier echte Discord-Rollen-ID eintragen, falls vorhanden
-    ]
-
-    has_dispo_role = any(
-        str(role_id) in [str(role) for role in current_user_roles]
-        for role_id in allowed_role_ids
-    )
-
-    primary_role_name = getattr(current_user, "primary_role_name", "") or getattr(current_user, "role", "")
-
-    if primary_role_name == "Disposition":
-        has_dispo_role = True
-
-    if not has_dispo_role:
-        flash("Du hast keine Berechtigung für die Disposition.", "error")
-        return redirect(url_for("dashboard"))
-
-    return render_template(
-        "dispo.html",
-        primary_role_name=primary_role_name,
-        dispo_tours=[],
-        dispo_drivers=[],
-        dispo_requests=[],
-        dispo_notes=[],
-    )
-
 # ==========================================
 # AUTHENTIFIZIERUNG
 # ==========================================
