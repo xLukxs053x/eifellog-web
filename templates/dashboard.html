@@ -66,65 +66,6 @@
 
 {% block content %}
 <style>
-    /* Modal-Zentrierung: immer exakt im Viewport, unabhängig vom Dashboard-Layout. */
-    :where(#new-doc-alert-wrapper,
-           #general-alerts-wrapper,
-           #universal-doc-modal,
-           #driver-registration-modal,
-           #token-request-modal) {
-        position: fixed !important;
-        inset: 0 !important;
-        width: 100vw !important;
-        min-height: 100vh !important;
-        min-height: 100dvh !important;
-        align-items: center !important;
-        justify-content: center !important;
-        padding: 1.5rem 1rem !important;
-        box-sizing: border-box !important;
-        overflow-y: auto !important;
-    }
-
-    :where(#new-doc-alert-wrapper,
-           #general-alerts-wrapper,
-           #universal-doc-modal,
-           #driver-registration-modal,
-           #token-request-modal).hidden {
-        display: none !important;
-    }
-
-    :where(#new-doc-alert-wrapper,
-           #general-alerts-wrapper,
-           #universal-doc-modal,
-           #driver-registration-modal,
-           #token-request-modal).flex {
-        display: flex !important;
-    }
-
-    :where(#new-doc-alert-panel,
-           #general-alerts-panel,
-           #univ-doc-panel,
-           #driver-registration-panel,
-           #token-request-panel) {
-        margin: auto !important;
-        position: relative !important;
-        left: auto !important;
-        right: auto !important;
-        top: auto !important;
-        bottom: auto !important;
-        transform-origin: center center !important;
-    }
-
-    #universal-doc-modal.flex {
-        display: flex !important;
-        place-items: center !important;
-    }
-
-    #univ-doc-panel {
-        width: min(100%, 42rem) !important;
-        max-height: calc(100dvh - 3rem) !important;
-    }
-
-
     #alert-badge {
         line-height: 1.25rem;
     }
@@ -141,7 +82,24 @@
     .doc-trigger[data-read="false"] .doc-new-indicator {
         display: inline-flex;
     }
+
+    /* Schmale Custom-Scrollbar für Modals */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
 </style>
+
 <div class="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 mt-6">
     <div class="flex items-center gap-4">
         <div class="w-16 h-16 rounded-full border-2 border-[var(--brand-green)] overflow-hidden shadow-[0_0_15px_rgba(137,190,50,0.3)]">
@@ -557,7 +515,7 @@
                 Eifel LOG News
                 <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse"></span>
             </h2>
-            <div class="flex-grow space-y-4 overflow-y-auto pr-2">
+            <div class="flex-grow space-y-4 overflow-y-auto custom-scrollbar pr-2">
                 {% if safe_news_items %}
                     {% for news in safe_news_items %}
                         <div class="border-l-2 {% if loop.index == 1 %}border-[var(--brand-green)]{% else %}border-[var(--brand-yellow)]{% endif %} pl-3">
@@ -599,8 +557,8 @@
     </div>
 </div>
 
-<div id="new-doc-alert-wrapper" aria-hidden="true" class="fixed inset-0 z-[130] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
-    <div id="new-doc-alert-panel" class="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-[var(--brand-yellow)]/25 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.8)] transform scale-95 translate-y-4 transition-all duration-300">
+<div id="new-doc-alert-wrapper" aria-hidden="true" class="fixed inset-0 z-[130] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
+    <div id="new-doc-alert-panel" class="relative z-10 w-full max-w-lg mx-auto overflow-hidden rounded-3xl border border-[var(--brand-yellow)]/25 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.8)] transform scale-95 translate-y-4 transition-all duration-300">
         <div class="p-6 md:p-7">
             <div class="flex items-start gap-4">
                 <div class="w-12 h-12 rounded-2xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/30 flex items-center justify-center text-[var(--brand-yellow)] shrink-0 shadow-[0_0_25px_rgba(220,226,38,0.08)]">
@@ -630,10 +588,10 @@
     </div>
 </div>
 
-<div id="general-alerts-wrapper" aria-hidden="true" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/60 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
+<div id="general-alerts-wrapper" aria-hidden="true" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/60 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
     <div id="alerts-backdrop" class="absolute inset-0 cursor-pointer"></div>
 
-    <div id="general-alerts-panel" class="relative z-10 w-full max-w-xl mx-auto max-h-[86vh] overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.75)] transform scale-95 translate-y-4 transition-all duration-300 flex flex-col">
+    <div id="general-alerts-panel" class="relative z-10 w-full max-w-xl mx-auto flex flex-col max-h-[85vh] overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.75)] transform scale-95 translate-y-4 transition-all duration-300">
         <div class="p-6 border-b border-white/10 shrink-0">
             <div class="flex items-start justify-between gap-4">
                 <div class="flex items-start gap-4">
@@ -659,7 +617,7 @@
             </div>
         </div>
 
-        <div class="p-6 space-y-3 overflow-y-auto flex-grow custom-scrollbar">
+        <div class="p-6 space-y-3 flex-grow overflow-y-auto custom-scrollbar">
             {% if needs_signature_flag %}
             <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-green)]/70 hover:bg-white/[0.07] hover:-translate-y-0.5 transition-all duration-300 group relative"
                     data-title="EifelLog Richtlinien"
@@ -774,8 +732,8 @@
     </div>
 </div>
 
-<div id="universal-doc-modal" aria-hidden="true" class="fixed inset-0 z-[200] hidden items-center justify-center bg-black/80 backdrop-blur-2xl transition-opacity duration-300 opacity-0 px-4 py-6">
-    <div id="univ-doc-panel" class="glass-card relative z-10 w-full max-w-2xl mx-auto max-h-[86vh] overflow-hidden rounded-3xl border border-white/10 border-t-[var(--brand-green)]/50 shadow-[0_0_60px_rgba(137,190,50,0.12)] flex flex-col transform transition-all duration-300 scale-95 translate-y-4">
+<div id="universal-doc-modal" aria-hidden="true" class="fixed inset-0 z-[200] hidden items-center justify-center bg-black/80 backdrop-blur-2xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
+    <div id="univ-doc-panel" class="relative z-10 w-full max-w-2xl mx-auto flex flex-col max-h-[90vh] overflow-hidden rounded-3xl border border-white/10 border-t-[var(--brand-green)]/50 bg-[#0d0f0c]/95 shadow-[0_0_60px_rgba(137,190,50,0.12)] transform transition-all duration-300 scale-95 translate-y-4">
         <div class="p-6 md:p-8 pb-5 border-b border-white/10 shrink-0">
             <div class="flex justify-between items-start gap-4">
                 <div class="flex items-start gap-3 min-w-0">
@@ -811,7 +769,7 @@
             </div>
         </div>
 
-        <div class="px-6 md:px-8 py-5 overflow-y-auto flex-grow custom-scrollbar">
+        <div class="px-6 md:px-8 py-5 flex-grow overflow-y-auto custom-scrollbar">
             <div id="univ-doc-content" class="bg-black/30 border border-white/5 rounded-2xl p-6 text-sm text-gray-300 font-inter leading-relaxed space-y-4"></div>
         </div>
 
@@ -839,8 +797,8 @@
     </div>
 </div>
 
-<div id="driver-registration-modal" aria-hidden="true" class="fixed inset-0 z-[180] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
-    <div id="driver-registration-panel" class="relative z-10 w-full max-w-xl max-h-[90vh] overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.75)] transform scale-95 translate-y-4 transition-all duration-300 flex flex-col">
+<div id="driver-registration-modal" aria-hidden="true" class="fixed inset-0 z-[180] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
+    <div id="driver-registration-panel" class="relative z-10 w-full max-w-xl mx-auto flex flex-col max-h-[90vh] overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.75)] transform scale-95 translate-y-4 transition-all duration-300">
         <div class="p-6 border-b border-white/10 shrink-0">
             <div class="flex items-start justify-between gap-4">
                 <div class="flex items-start gap-4">
@@ -876,7 +834,7 @@
             </div>
         </div>
 
-        <div class="p-6 overflow-y-auto custom-scrollbar">
+        <div class="p-6 flex-grow overflow-y-auto custom-scrollbar">
             {% if fahrer_reg_status in ['pending', 'claimed'] %}
                 <div class="rounded-2xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 p-5">
                     <p class="text-[10px] font-orbitron text-[var(--brand-yellow)] uppercase tracking-widest mb-2">
@@ -955,8 +913,8 @@
     </div>
 </div>
 
-<div id="token-request-modal" aria-hidden="true" class="fixed inset-0 z-[180] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 px-4 py-6">
-    <div id="token-request-panel" class="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.75)] transform scale-95 translate-y-4 transition-all duration-300">
+<div id="token-request-modal" aria-hidden="true" class="fixed inset-0 z-[180] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
+    <div id="token-request-panel" class="relative z-10 w-full max-w-lg mx-auto overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.75)] transform scale-95 translate-y-4 transition-all duration-300">
         <div class="p-6 border-b border-white/10">
             <div class="flex items-start justify-between gap-4">
                 <div class="flex items-start gap-4">
@@ -1064,9 +1022,7 @@
 
         /*
          * Wichtig für echtes Viewport-Centering:
-         * Falls base.html oder ein Parent-Container transform/filter/perspective nutzt,
-         * würden fixed-Modals sonst relativ zu diesem Parent statt zum Viewport sitzen.
-         * Darum werden alle Modal-Wrapper direkt an <body> gehängt.
+         * Modals immer als direktes Kind von <body> anhängen
          */
         [
             newDocAlertWrapper,
@@ -1088,7 +1044,7 @@
         function showCenteredOverlay(element) {
             if (!element) return;
             element.classList.remove('hidden');
-            element.classList.add('flex');
+            element.classList.add('flex'); // Nutzt flex für saubere Zentrierung
             element.setAttribute('aria-hidden', 'false');
             element.scrollTop = 0;
         }
@@ -1470,7 +1426,7 @@
             }
         });
 
-        // Dokument-Zähler initialisieren und bei wirklich neuen Postfach-Inhalten einmalig den System-Alert anzeigen.
+        // Dokument-Zähler initialisieren
         initializeInboxNotifications();
 
         if (univSigInput) {
