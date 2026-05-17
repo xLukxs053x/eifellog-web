@@ -143,6 +143,9 @@ tasks_collection = db["tasks"]
 buchhaltung_requests_collection = db["buchhaltung_requests"]
 buchhaltung_entries_collection = db["buchhaltung_entries"]
 tour_receipts_collection = db["tour_receipts"]
+dispo_tours_collection = db["dispo_tours"]
+dispo_notes_collection = db["dispo_notes"]
+dispo_messages_collection = db["dispo_messages"]
 
 
 def ensure_indexes():
@@ -191,6 +194,22 @@ def ensure_indexes():
         tour_receipts_collection.create_index([("driver.discord_id", ASCENDING)], unique=False)
         tour_receipts_collection.create_index([("submitted_at", DESCENDING)], unique=False)
         tour_receipts_collection.create_index([("billing_relevant", ASCENDING)], unique=False)
+
+        dispo_tours_collection.create_index([("tour_id", ASCENDING)], unique=False)
+        dispo_tours_collection.create_index([("status", ASCENDING)], unique=False)
+        dispo_tours_collection.create_index([("priority", ASCENDING)], unique=False)
+        dispo_tours_collection.create_index([("created_at", DESCENDING)], unique=False)
+        dispo_tours_collection.create_index([("assigned_driver_id", ASCENDING)], unique=False)
+        dispo_tours_collection.create_index([("assigned_driver.discord_id", ASCENDING)], unique=False)
+        dispo_tours_collection.create_index([("archived", ASCENDING)], unique=False)
+
+        dispo_notes_collection.create_index([("created_at", DESCENDING)], unique=False)
+        dispo_notes_collection.create_index([("created_by.discord_id", ASCENDING)], unique=False)
+        dispo_notes_collection.create_index([("archived", ASCENDING)], unique=False)
+
+        dispo_messages_collection.create_index([("created_at", DESCENDING)], unique=False)
+        dispo_messages_collection.create_index([("priority", ASCENDING)], unique=False)
+        dispo_messages_collection.create_index([("archived", ASCENDING)], unique=False)
     except Exception as error:
         print(f"MongoDB Index-Erstellung fehlgeschlagen: {error}")
 
@@ -218,6 +237,7 @@ ROLE_GESCHAEFTSFUEHRUNG_ID = "1473721587122438322"
 ROLE_PROJEKTLEITUNG_ID = "1473721587122438321"
 ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID = "1473721587122438320"
 ROLE_BUCHHALTUNG_ID = "1473730533593845951"
+ROLE_DISPOSITION_ID = env_first("ROLE_DISPOSITION_ID", "DISPOSITION_ROLE_ID", default=ROLE_DISPOSITION or "")
 
 ALLOWED_HUB_ROLES = [
     ROLE_FAHRER,
@@ -228,6 +248,7 @@ ALLOWED_HUB_ROLES = [
     ROLE_BUCHHALTUNG,
     ROLE_HR_CONTROLLING,
     ROLE_DISPOSITION,
+    ROLE_DISPOSITION_ID,
     ROLE_PERSONALMANAGEMENT,
     ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID
 ]
@@ -236,6 +257,14 @@ PERSONALABTEILUNG_ALLOWED_ROLES = {
     ROLE_PERSONALABTEILUNG_ID,
     ROLE_GESCHAEFTSFUEHRUNG_ID,
     ROLE_PROJEKTLEITUNG_ID
+}
+
+DISPOSITION_ALLOWED_ROLES = {
+    ROLE_DISPOSITION,
+    ROLE_DISPOSITION_ID,
+    "Disposition",
+    "disposition",
+    "dispo"
 }
 
 
@@ -261,6 +290,14 @@ def has_dashboard_permission(user_roles):
     clean_user_roles = clean_roles(user_roles)
     clean_allowed_roles = clean_roles(ALLOWED_HUB_ROLES)
     return any(role in clean_user_roles for role in clean_allowed_roles)
+
+
+def has_disposition_permission(user_roles):
+    clean_user_roles = set(clean_roles(user_roles))
+    clean_allowed_roles = set(clean_roles(DISPOSITION_ALLOWED_ROLES))
+    if clean_user_roles.intersection(clean_allowed_roles):
+        return True
+    return get_primary_role_name(user_roles) == "Disposition"
 
 
 def get_primary_role_name(user_roles):
@@ -2034,6 +2071,8 @@ def changelog():
     return render_template('changelog.html', changelog=changelog_data, roadmap=roadmap_data)
 
 
+
+
 # ==========================================
 # AUTHENTIFIZIERUNG
 # ==========================================
@@ -2174,6 +2213,8 @@ def logout():
     session.pop("user", None)
     flash("Erfolgreich abgemeldet.", "success")
     return redirect(url_for("home"))
+
+
 
 
 # ==========================================
@@ -2712,6 +2753,450 @@ def fuhrpark():
 
 
 # ==========================================
+# DISPOSITION
+# ==========================================
+
+def require_disposition_permission():
+    if "user" not in session:
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for("hub"))
+
+    user_roles = session.get("user", {}).get("roles", [])
+    if not has_disposition_permission(user_roles):
+        flash("Zugriff verweigert. Du benötigst die Rolle Disposition.", "error")
+        return redirect(url_for("dashboard"))
+
+    return None
+
+
+def current_disposition_identity():
+    session_user = session.get("user") or {}
+    discord_id = safe_str(session_user.get("id"))
+    username = safe_str(session_user.get("username") or session_user.get("discord_username"), "Disposition")
+
+    db_user = None
+    if discord_id:
+        db_user = users_collection.find_one({"discord_id": discord_id})
+
+    display_name = username
+    if db_user:
+        display_name = (
+            db_user.get("display_name")
+            or db_user.get("username")
+            or db_user.get("discord_username")
+            or username
+        )
+
+    return {
+        "discord_id": discord_id,
+        "username": username,
+        "display_name": display_name,
+        "roles": session_user.get("roles", []),
+        "at": now_utc()
+    }
+
+
+def dispo_tour_lookup_query(tour_id):
+    tour_id = safe_str(tour_id)
+    query_items = [{"tour_id": tour_id}, {"id": tour_id}]
+    object_id = object_id_or_none(tour_id)
+    if object_id:
+        query_items.append({"_id": object_id})
+    return {"$or": query_items}
+
+
+def normalize_dispo_priority(priority):
+    priority = safe_str(priority, "normal").lower()
+    if priority in {"critical", "kritisch", "urgent", "dringend"}:
+        return "critical"
+    if priority in {"high", "hoch", "wichtig"}:
+        return "high"
+    return "normal"
+
+
+def normalize_dispo_status(status):
+    status = safe_str(status, "open").lower()
+    if status in {"assigned", "active", "in_progress", "unterwegs", "laufend"}:
+        return "active"
+    if status in {"done", "completed", "finished", "abgeschlossen"}:
+        return "done"
+    if status in {"cancelled", "canceled", "storniert"}:
+        return "cancelled"
+    return "open"
+
+
+def prepare_dispo_tour_for_template(tour_doc):
+    item = dict(tour_doc or {})
+    mongo_id = str(item.get("_id")) if item.get("_id") else ""
+    assigned_driver = item.get("assigned_driver") or {}
+
+    item["id"] = safe_str(item.get("tour_id") or item.get("id") or mongo_id)
+    item["tour_id"] = item["id"]
+    item["route_from"] = safe_str(item.get("route_from") or item.get("from") or item.get("source") or item.get("sourceCity"), "-")
+    item["route_to"] = safe_str(item.get("route_to") or item.get("to") or item.get("destination") or item.get("destinationCity"), "-")
+    item["cargo"] = safe_str(item.get("cargo") or item.get("cargoName"), "-")
+    item["payout"] = safe_str(item.get("payout") or item.get("reward") or item.get("income"), "-")
+    item["priority"] = normalize_dispo_priority(item.get("priority"))
+    item["status"] = normalize_dispo_status(item.get("status"))
+    item["deadline"] = safe_str(item.get("deadline") or item.get("deadline_display"), "-")
+    item["created_at"] = format_datetime_for_template(item.get("created_at")) or safe_str(item.get("created_at"), "-")
+    item["updated_at"] = format_datetime_for_template(item.get("updated_at")) or safe_str(item.get("updated_at"), "-")
+    item["assigned_driver"] = safe_str(
+        item.get("assigned_driver_name")
+        or assigned_driver.get("display_name")
+        or assigned_driver.get("username")
+        or item.get("driver")
+        or item.get("assigned_to"),
+        "Nicht gesetzt"
+    )
+
+    progress = parse_int(item.get("progress") or item.get("route_progress_percent") or item.get("progress_percent"), 0)
+    item["progress"] = max(0, min(progress, 100))
+    return item
+
+
+def prepare_dispo_note_for_template(note_doc):
+    item = dict(note_doc or {})
+    created_by = item.get("created_by") or {}
+    return {
+        "id": safe_str(item.get("note_id") or item.get("id") or item.get("_id")),
+        "content": safe_str(item.get("content") or item.get("note"), "-"),
+        "note": safe_str(item.get("content") or item.get("note"), "-"),
+        "author": safe_str(item.get("author") or created_by.get("display_name") or created_by.get("username"), "Disposition"),
+        "created_at": format_datetime_for_template(item.get("created_at")) or "-"
+    }
+
+
+def prepare_dispo_message_for_template(message_doc):
+    item = dict(message_doc or {})
+    return {
+        "id": safe_str(item.get("message_id") or item.get("id") or item.get("_id")),
+        "title": safe_str(item.get("title"), "Meldung"),
+        "content": safe_str(item.get("content") or item.get("message"), "-"),
+        "message": safe_str(item.get("content") or item.get("message"), "-"),
+        "priority": normalize_dispo_priority(item.get("priority")),
+        "created_at": format_datetime_for_template(item.get("created_at")) or "-"
+    }
+
+
+def build_dispo_driver_for_template(user_doc):
+    live = user_doc.get("tracker_live") or {}
+    display_name = (
+        user_doc.get("display_name")
+        or user_doc.get("username")
+        or user_doc.get("discord_username")
+        or "EifelLog Fahrer"
+    )
+
+    source_city = safe_str(live.get("sourceCity"), "")
+    destination_city = safe_str(live.get("destinationCity"), "")
+    current_location = "Standort unbekannt"
+    if source_city and destination_city and destination_city != "-":
+        current_location = f"{source_city} → {destination_city}"
+    elif source_city:
+        current_location = source_city
+    elif user_doc.get("tracker_online"):
+        current_location = "Online"
+
+    return {
+        "id": str(user_doc.get("_id")),
+        "discord_id": user_doc.get("discord_id"),
+        "username": display_name,
+        "name": display_name,
+        "truck": safe_str(live.get("truck") or user_doc.get("favorite_truck"), "Kein Fahrzeug gesetzt"),
+        "current_location": current_location,
+        "avatar_url": make_external_url(get_discord_avatar_url(user_doc)),
+        "online": bool(user_doc.get("tracker_online", False))
+    }
+
+
+def get_dispo_available_drivers(limit=100):
+    clauses = [
+        {"fahrer_registration_status": "approved"},
+        {"tracker_enabled": True},
+        {"tracker_online": True}
+    ]
+
+    fahrer_roles = clean_roles([ROLE_FAHRER])
+    if fahrer_roles:
+        clauses.append({"roles": {"$in": fahrer_roles}})
+
+    active_tours = list(dispo_tours_collection.find(
+        {"archived": {"$ne": True}, "status": {"$in": ["assigned", "active", "in_progress"]}},
+        {"assigned_driver_id": 1, "assigned_driver.discord_id": 1}
+    ))
+    busy_driver_ids = {safe_str(tour.get("assigned_driver_id")) for tour in active_tours if safe_str(tour.get("assigned_driver_id"))}
+    busy_discord_ids = {safe_str((tour.get("assigned_driver") or {}).get("discord_id")) for tour in active_tours if safe_str((tour.get("assigned_driver") or {}).get("discord_id"))}
+
+    drivers_cursor = users_collection.find({"$or": clauses}).sort([("tracker_online", DESCENDING), ("display_name", ASCENDING), ("username", ASCENDING)]).limit(limit)
+
+    drivers = []
+    seen = set()
+    for driver in drivers_cursor:
+        driver_id = str(driver.get("_id"))
+        discord_id = safe_str(driver.get("discord_id"))
+        if driver_id in seen or discord_id in seen:
+            continue
+        if driver_id in busy_driver_ids or discord_id in busy_discord_ids:
+            continue
+        seen.add(driver_id)
+        if discord_id:
+            seen.add(discord_id)
+        drivers.append(build_dispo_driver_for_template(driver))
+
+    return drivers
+
+
+@app.route("/dispo", methods=["GET"])
+def dispo():
+    permission_response = require_disposition_permission()
+    if permission_response:
+        return permission_response
+
+    user = session.get("user") or {}
+    user_roles = user.get("roles", [])
+    primary_role_name = get_primary_role_name(user_roles)
+
+    if isinstance(session.get("user"), dict):
+        session["user"]["is_disposition"] = True
+        permissions = set(item for item in session["user"].get("permissions", []) if item)
+        permissions.add("disposition.view")
+        permissions.add("disposition.manage")
+        session["user"]["permissions"] = sorted(permissions)
+        session.modified = True
+
+    open_tours_cursor = dispo_tours_collection.find(
+        {"archived": {"$ne": True}, "status": {"$in": ["open", "pending"]}}
+    ).sort([("created_at", DESCENDING)]).limit(250)
+
+    active_tours_cursor = dispo_tours_collection.find(
+        {"archived": {"$ne": True}, "status": {"$in": ["assigned", "active", "in_progress"]}}
+    ).sort([("updated_at", DESCENDING), ("created_at", DESCENDING)]).limit(250)
+
+    messages_cursor = dispo_messages_collection.find(
+        {"archived": {"$ne": True}}
+    ).sort([("created_at", DESCENDING)]).limit(50)
+
+    notes_cursor = dispo_notes_collection.find(
+        {"archived": {"$ne": True}}
+    ).sort([("created_at", DESCENDING)]).limit(50)
+
+    dispo_open_tours = [prepare_dispo_tour_for_template(tour) for tour in open_tours_cursor]
+    dispo_active_tours = [prepare_dispo_tour_for_template(tour) for tour in active_tours_cursor]
+    dispo_available_drivers = get_dispo_available_drivers()
+    dispo_messages = [prepare_dispo_message_for_template(message) for message in messages_cursor]
+    dispo_notes = [prepare_dispo_note_for_template(note) for note in notes_cursor]
+
+    return render_template(
+        "dispo.html",
+        current_user=user,
+        primary_role_name=primary_role_name,
+        dispo_open_tours=dispo_open_tours,
+        dispo_active_tours=dispo_active_tours,
+        dispo_available_drivers=dispo_available_drivers,
+        dispo_messages=dispo_messages,
+        dispo_notes=dispo_notes,
+        dispo_recent_events=[],
+        open_tours_count=len(dispo_open_tours),
+        active_tours_count=len(dispo_active_tours),
+        available_drivers_count=len(dispo_available_drivers),
+        critical_messages_count=len([message for message in dispo_messages if message.get("priority") == "critical"])
+    )
+
+
+@app.route("/dispo/tour/create", methods=["POST"])
+def dispo_create_tour():
+    permission_response = require_disposition_permission()
+    if permission_response:
+        return permission_response
+
+    actor = current_disposition_identity()
+    route_from = safe_str(request.form.get("route_from"))[:120]
+    route_to = safe_str(request.form.get("route_to"))[:120]
+    cargo = safe_str(request.form.get("cargo"))[:160]
+    payout = safe_str(request.form.get("payout"))[:80]
+    priority = normalize_dispo_priority(request.form.get("priority"))
+    deadline = safe_str(request.form.get("deadline"))[:120]
+    notes = safe_str(request.form.get("notes"))[:1200]
+
+    if len(route_from) < 2 or len(route_to) < 2 or len(cargo) < 2:
+        flash("Startort, Zielort und Fracht müssen ausgefüllt sein.", "error")
+        return redirect(url_for("dispo"))
+
+    now = now_utc()
+    tour_id = uuid.uuid4().hex
+    tour_doc = {
+        "tour_id": tour_id,
+        "route_from": route_from,
+        "route_to": route_to,
+        "cargo": cargo,
+        "payout": payout,
+        "priority": priority,
+        "deadline": deadline,
+        "notes": notes,
+        "status": "open",
+        "progress": 0,
+        "archived": False,
+        "created_at": now,
+        "updated_at": now,
+        "created_by": {
+            "discord_id": actor.get("discord_id"),
+            "username": actor.get("username"),
+            "display_name": actor.get("display_name")
+        }
+    }
+
+    dispo_tours_collection.insert_one(tour_doc)
+    dispo_messages_collection.insert_one({
+        "message_id": uuid.uuid4().hex,
+        "title": "Neue Tour angelegt",
+        "content": f"{route_from} → {route_to} · {cargo}",
+        "priority": priority,
+        "tour_id": tour_id,
+        "archived": False,
+        "created_at": now,
+        "created_by": actor
+    })
+
+    flash("Tour wurde erfolgreich für die Disposition angelegt.", "success")
+    return redirect(url_for("dispo"))
+
+
+@app.route("/dispo/note/create", methods=["POST"])
+def dispo_create_note():
+    permission_response = require_disposition_permission()
+    if permission_response:
+        return permission_response
+
+    actor = current_disposition_identity()
+    note = safe_str(request.form.get("note"))[:2000]
+
+    if len(note) < 2:
+        flash("Die Notiz darf nicht leer sein.", "error")
+        return redirect(url_for("dispo"))
+
+    dispo_notes_collection.insert_one({
+        "note_id": uuid.uuid4().hex,
+        "content": note,
+        "author": actor.get("display_name") or actor.get("username") or "Disposition",
+        "archived": False,
+        "created_at": now_utc(),
+        "created_by": {
+            "discord_id": actor.get("discord_id"),
+            "username": actor.get("username"),
+            "display_name": actor.get("display_name")
+        }
+    })
+
+    flash("Leitstellen-Notiz wurde gespeichert.", "success")
+    return redirect(url_for("dispo"))
+
+
+@app.route("/dispo/tour/assign", methods=["POST"])
+@app.route("/dispo/tour/<tour_id>/assign", methods=["POST"])
+def dispo_assign_tour(tour_id=None):
+    permission_response = require_disposition_permission()
+    if permission_response:
+        return permission_response
+
+    actor = current_disposition_identity()
+    tour_id = safe_str(tour_id or request.form.get("tour_id"))
+    driver_id = safe_str(request.form.get("driver_id"))
+    assign_note = safe_str(request.form.get("assign_note"))[:1200]
+
+    if not tour_id or not driver_id:
+        flash("Bitte Tour und Fahrer auswählen.", "error")
+        return redirect(url_for("dispo"))
+
+    tour_doc = dispo_tours_collection.find_one(dispo_tour_lookup_query(tour_id))
+    if not tour_doc:
+        flash("Tour wurde nicht gefunden.", "error")
+        return redirect(url_for("dispo"))
+
+    driver_query_items = []
+    driver_object_id = object_id_or_none(driver_id)
+    if driver_object_id:
+        driver_query_items.append({"_id": driver_object_id})
+    driver_query_items.extend([
+        {"discord_id": driver_id},
+        {"username": driver_id},
+        {"username_lc": driver_id.lower()}
+    ])
+    driver_doc = users_collection.find_one({"$or": driver_query_items})
+
+    if not driver_doc:
+        flash("Fahrer wurde nicht gefunden.", "error")
+        return redirect(url_for("dispo"))
+
+    now = now_utc()
+    driver_name = (
+        driver_doc.get("display_name")
+        or driver_doc.get("username")
+        or driver_doc.get("discord_username")
+        or "EifelLog Fahrer"
+    )
+
+    assigned_driver = {
+        "id": str(driver_doc.get("_id")),
+        "discord_id": safe_str(driver_doc.get("discord_id")),
+        "username": safe_str(driver_doc.get("username") or driver_doc.get("discord_username")),
+        "display_name": driver_name
+    }
+
+    dispo_tours_collection.update_one(
+        {"_id": tour_doc["_id"]},
+        {
+            "$set": {
+                "status": "assigned",
+                "assigned_driver": assigned_driver,
+                "assigned_driver_id": assigned_driver["id"],
+                "assigned_driver_name": driver_name,
+                "assigned_note": assign_note,
+                "assigned_at": now,
+                "assigned_by": actor,
+                "updated_at": now
+            }
+        }
+    )
+
+    route_from = safe_str(tour_doc.get("route_from"), "-")
+    route_to = safe_str(tour_doc.get("route_to"), "-")
+    cargo = safe_str(tour_doc.get("cargo"), "-")
+
+    dispo_messages_collection.insert_one({
+        "message_id": uuid.uuid4().hex,
+        "title": "Tour zugewiesen",
+        "content": f"{driver_name} wurde für {route_from} → {route_to} eingeteilt.",
+        "priority": "normal",
+        "tour_id": safe_str(tour_doc.get("tour_id") or tour_doc.get("_id")),
+        "archived": False,
+        "created_at": now,
+        "created_by": actor
+    })
+
+    if assigned_driver.get("discord_id"):
+        note_block = f'<p class="mt-4"><strong>Hinweis der Disposition:</strong><br>{assign_note}</p>' if assign_note else ""
+        create_system_document_for_user(
+            assigned_driver["discord_id"],
+            "Neue Tour zugewiesen",
+            "Disposition",
+            f'''
+                <p><strong>Dir wurde eine neue Tour zugewiesen.</strong></p>
+                <p class="mt-4"><strong>Route:</strong> {route_from} → {route_to}<br>
+                <strong>Fracht:</strong> {cargo}<br>
+                <strong>Deadline:</strong> {safe_str(tour_doc.get("deadline"), "-")}</p>
+                {note_block}
+            ''',
+            doc_type="disposition_tour_assignment",
+            needs_signature=False,
+            extra={"tour_id": safe_str(tour_doc.get("tour_id") or tour_doc.get("_id")), "important": True}
+        )
+
+    flash("Tour wurde erfolgreich zugewiesen.", "success")
+    return redirect(url_for("dispo"))
+
+
+# ==========================================
 # PERSONALABTEILUNG / BUCHHALTUNG / TASKS
 # ==========================================
 
@@ -2815,6 +3300,8 @@ def personalabteilung():
         accounting_department_requests=buchhaltung_requests,
         tasks=tasks
     )
+
+
 
 # ==========================================
 # BUCHHALTUNG / PERSONALABTEILUNG DOKUMENTE
