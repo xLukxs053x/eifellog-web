@@ -34,6 +34,12 @@ ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
 
 TRACKER_API_KEY = os.getenv("TRACKER_API_KEY", "").strip()
 
+# Discord Webhook für Job-Abschluss-Meldungen vom Tracker
+DISCORD_JOB_COMPLETE_WEBHOOK_URL = os.getenv(
+    "DISCORD_JOB_COMPLETE_WEBHOOK_URL",
+    "https://discord.com/api/webhooks/1505648390648762498/eDP1AtdUVWWgxkEnMGNtNmLx1JbPFhd_qV16ohpj6hiVXp7rJHmS_ScIj7XiRF46-kWf"
+).strip()
+
 
 # ==========================================
 # TOUR-BELEG / PDF / ABRECHNUNG AUS .ENV
@@ -1695,29 +1701,28 @@ def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
     if not TOUR_RECEIPT_DISCORD_ENABLED:
         return {"sent": False, "reason": "TOUR_RECEIPT_DISCORD_ENABLED=false"}
 
-    if not DISCORD_BOT_TOKEN:
-        return {"sent": False, "reason": "DISCORD_BOT_TOKEN fehlt"}
-
-    channel_id = safe_str(TOUR_RECEIPT_CHANNEL_ID)
-    if not channel_id:
-        return {"sent": False, "reason": "TOUR_RECEIPT_CHANNEL_ID fehlt"}
-
     driver = receipt_doc.get("driver") or {}
     tour = receipt_doc.get("tour") or {}
     billing = receipt_doc.get("billing") or {}
 
     content = (
-        "📄 **Tour-Beleg / Abrechnung**\n"
+        "✅ **Job abgeschlossen**\n"
+        "\n"
         f"**Fahrer:** {driver.get('name') or '-'}\n"
-        f"**Job:** `{receipt_doc.get('job_id')}`\n"
+        f"**Job-ID:** `{receipt_doc.get('job_id')}`\n"
         f"**Route:** {tour.get('source_city') or '-'} → {tour.get('destination_city') or '-'}\n"
         f"**Fracht:** {tour.get('cargo') or '-'}\n"
-        "**Status:** ✅ als abgegeben und abgeschlossen gewertet\n"
+        f"**Spiel:** {tour.get('game') or 'ETS2/ATS'}\n"
+        f"**Gefahrene Distanz:** {format_km(tour.get('driven_distance_km'))}\n"
+        f"**Schaden:** {format_percent(tour.get('damage_percent'))}\n"
         f"**Abrechnung:** {format_money(billing.get('total_amount'), billing.get('currency'))}\n"
-        f"**Belegnummer:** `{receipt_doc.get('receipt_number')}`"
+        f"**Belegnummer:** `{receipt_doc.get('receipt_number')}`\n"
+        "\n"
+        "📄 Der Tour-Beleg wurde automatisch erstellt und angehängt."
     )
 
     payload = {
+        "username": "EifelLog Tracker",
         "content": content,
         "allowed_mentions": {"parse": []},
         "attachments": [
@@ -1728,6 +1733,50 @@ def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
             }
         ]
     }
+
+    webhook_url = safe_str(DISCORD_JOB_COMPLETE_WEBHOOK_URL)
+
+    if webhook_url:
+        webhook_post_url = webhook_url
+        if "?" not in webhook_post_url:
+            webhook_post_url += "?wait=true"
+        elif "wait=" not in webhook_post_url:
+            webhook_post_url += "&wait=true"
+
+        response = requests.post(
+            webhook_post_url,
+            data={"payload_json": json.dumps(payload, ensure_ascii=False)},
+            files={"files[0]": (filename, pdf_bytes, "application/pdf")},
+            timeout=20
+        )
+
+        if response.status_code not in range(200, 300):
+            return {
+                "sent": False,
+                "method": "webhook",
+                "status_code": response.status_code,
+                "error": response.text[:1000]
+            }
+
+        try:
+            message = response.json()
+        except Exception:
+            message = {}
+
+        return {
+            "sent": True,
+            "method": "webhook",
+            "channel_id": message.get("channel_id"),
+            "message_id": message.get("id"),
+            "raw": message
+        }
+
+    if not DISCORD_BOT_TOKEN:
+        return {"sent": False, "reason": "DISCORD_BOT_TOKEN fehlt und DISCORD_JOB_COMPLETE_WEBHOOK_URL fehlt"}
+
+    channel_id = safe_str(TOUR_RECEIPT_CHANNEL_ID)
+    if not channel_id:
+        return {"sent": False, "reason": "TOUR_RECEIPT_CHANNEL_ID fehlt"}
 
     response = requests.post(
         f"https://discord.com/api/v10/channels/{channel_id}/messages",
@@ -1740,6 +1789,7 @@ def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
     if response.status_code not in range(200, 300):
         return {
             "sent": False,
+            "method": "bot",
             "status_code": response.status_code,
             "error": response.text[:1000]
         }
@@ -1751,11 +1801,11 @@ def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
 
     return {
         "sent": True,
+        "method": "bot",
         "channel_id": channel_id,
         "message_id": message.get("id"),
         "raw": message
     }
-
 
 def build_tour_receipt_doc(user_doc, payload, telemetry=None):
     telemetry = telemetry or {}
