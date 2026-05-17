@@ -346,315 +346,6 @@ def get_primary_role_name(user_roles):
     return "Fahrer"
 
 
-# ==========================================
-# TRACKER ROLLEN-ID RECHTE (STRICT)
-# ==========================================
-# Für den Desktop-Tracker zählen ausschließlich echte Discord-Rollen-IDs.
-# Rollennamen wie "Buchhaltung", "Disposition" usw. werden hier bewusst ignoriert.
-
-TRACKER_TAB_ORDER = [
-    "dashboard",
-    "driving",
-    "company",
-    "logbook",
-    "fahrer",
-    "disposition",
-    "personal",
-    "buchhaltung",
-    "fuhrpark",
-    "leitung",
-    "settings"
-]
-
-TRACKER_ROLE_TAB_BY_KEY = {
-    "driver": "fahrer",
-    "disposition": "disposition",
-    "personal": "personal",
-    "buchhaltung": "buchhaltung",
-    "fuhrpark": "fuhrpark",
-    "leitung": "leitung"
-}
-
-TRACKER_ROLE_DISPLAY_BY_KEY = {
-    "leitung": "Leitung",
-    "disposition": "Disposition",
-    "personal": "Personal",
-    "buchhaltung": "Buchhaltung",
-    "fuhrpark": "Fuhrparkmanagement",
-    "driver": "Fahrer"
-}
-
-TRACKER_ROLE_PRIORITY = [
-    "leitung",
-    "disposition",
-    "personal",
-    "buchhaltung",
-    "fuhrpark",
-    "driver"
-]
-
-
-def is_discord_role_id(value):
-    value = safe_str(value)
-    return bool(re.fullmatch(r"\d{10,32}", value))
-
-
-def clean_role_ids(values):
-    if values is None:
-        return []
-
-    if isinstance(values, (str, int)):
-        values = [values]
-
-    cleaned = []
-
-    for value in values:
-        if isinstance(value, dict):
-            possible = value.get("id") or value.get("role_id") or value.get("roleId")
-            if is_discord_role_id(possible):
-                cleaned.append(safe_str(possible))
-            continue
-
-        if is_discord_role_id(value):
-            cleaned.append(safe_str(value))
-
-    return list(dict.fromkeys(cleaned))
-
-
-def tracker_config_role_ids(*values):
-    return set(clean_role_ids(values))
-
-
-def tracker_role_id_config():
-    return {
-        "fahrer": tracker_config_role_ids(
-            ROLE_FAHRER,
-            env_first("ROLE_FAHRER_ID", "FAHRER_ROLE_ID", "DRIVER_ROLE_ID", default="")
-        ),
-        "disposition": tracker_config_role_ids(
-            ROLE_DISPOSITION,
-            ROLE_DISPOSITION_ID,
-            env_first("ROLE_DISPOSITION_ID", "DISPOSITION_ROLE_ID", default="")
-        ),
-        "personalmanagement": tracker_config_role_ids(
-            ROLE_PERSONALMANAGEMENT,
-            env_first("ROLE_PERSONALMANAGEMENT_ID", "PERSONALMANAGEMENT_ROLE_ID", default="")
-        ),
-        "fuhrparkmanagement": tracker_config_role_ids(
-            ROLE_FUHRPARKMANAGEMENT,
-            env_first("ROLE_FUHRPARKMANAGEMENT_ID", "FUHRPARKMANAGEMENT_ROLE_ID", default="")
-        ),
-        "geschaeftsleitung": tracker_config_role_ids(
-            ROLE_GESCHAEFTSLEITUNG,
-            ROLE_GESCHAEFTSFUEHRUNG_ID,
-            env_first("ROLE_GESCHAEFTSLEITUNG_ID", "GESCHAEFTSLEITUNG_ROLE_ID", default="")
-        ),
-        "projektleitung": tracker_config_role_ids(
-            ROLE_PROJEKTLEITUNG,
-            ROLE_PROJEKTLEITUNG_ID,
-            env_first("ROLE_PROJEKTLEITUNG_ID", "PROJEKTLEITUNG_ROLE_ID", default="")
-        ),
-        "stellvertretendeProjektleitung": tracker_config_role_ids(
-            ROLE_STELLVERTRETENDE_PROJEKTLEITUNG,
-            ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID,
-            env_first("ROLE_STELLVERTRETENDE_PROJEKTLEITUNG_ID", "STELLVERTRETENDE_PROJEKTLEITUNG_ROLE_ID", default="")
-        ),
-        "personalabteilung": tracker_config_role_ids(
-            ROLE_PERSONALABTEILUNG_ID,
-            env_first("ROLE_PERSONALABTEILUNG_ID", "PERSONALABTEILUNG_ROLE_ID", default="")
-        ),
-        "buchhaltung": tracker_config_role_ids(
-            ROLE_BUCHHALTUNG,
-            ROLE_BUCHHALTUNG_ID,
-            env_first("ROLE_BUCHHALTUNG_ID", "BUCHHALTUNG_ROLE_ID", default="")
-        ),
-        "hrControlling": tracker_config_role_ids(
-            ROLE_HR_CONTROLLING,
-            ROLE_HR_CONTROLLING_ID,
-            env_first("ROLE_HR_CONTROLLING_ID", "HR_CONTROLLING_ROLE_ID", default="")
-        )
-    }
-
-
-def tracker_role_id_list(*keys):
-    config = tracker_role_id_config()
-    role_ids = set()
-
-    for key in keys:
-        role_ids.update(config.get(key, set()))
-
-    return role_ids
-
-
-def tracker_role_access_definitions():
-    return {
-        "driver": tracker_role_id_list("fahrer"),
-        "disposition": tracker_role_id_list(
-            "disposition",
-            "geschaeftsleitung",
-            "projektleitung",
-            "stellvertretendeProjektleitung"
-        ),
-        "personal": tracker_role_id_list(
-            "personalabteilung",
-            "personalmanagement",
-            "hrControlling",
-            "geschaeftsleitung",
-            "projektleitung"
-        ),
-        "buchhaltung": tracker_role_id_list(
-            "buchhaltung",
-            "geschaeftsleitung",
-            "projektleitung",
-            "stellvertretendeProjektleitung"
-        ),
-        "fuhrpark": tracker_role_id_list(
-            "fuhrparkmanagement",
-            "disposition",
-            "geschaeftsleitung",
-            "projektleitung",
-            "stellvertretendeProjektleitung"
-        ),
-        "leitung": tracker_role_id_list(
-            "geschaeftsleitung",
-            "projektleitung",
-            "stellvertretendeProjektleitung"
-        )
-    }
-
-
-def tracker_base_tab_access_definitions():
-    return {
-        "dashboard": {"*"},
-        "settings": {"*"},
-        "driving": tracker_role_id_list(
-            "fahrer",
-            "disposition",
-            "fuhrparkmanagement",
-            "geschaeftsleitung",
-            "projektleitung",
-            "stellvertretendeProjektleitung"
-        ),
-        "logbook": tracker_role_id_list(
-            "fahrer",
-            "disposition",
-            "buchhaltung",
-            "geschaeftsleitung",
-            "projektleitung",
-            "stellvertretendeProjektleitung"
-        ),
-        "company": tracker_role_id_list(
-            "disposition",
-            "buchhaltung",
-            "fuhrparkmanagement",
-            "personalabteilung",
-            "personalmanagement",
-            "hrControlling",
-            "geschaeftsleitung",
-            "projektleitung",
-            "stellvertretendeProjektleitung"
-        )
-    }
-
-
-def get_tracker_role_ids_from_user_doc(user_doc):
-    user_doc = user_doc or {}
-    collected = []
-
-    for field_name in ("roles", "role_ids", "roleIds", "discord_roles", "discordRoles"):
-        collected.extend(clean_role_ids(user_doc.get(field_name)))
-
-    return list(dict.fromkeys(collected))
-
-
-def tracker_role_matches(user_doc, role_key):
-    user_role_ids = set(get_tracker_role_ids_from_user_doc(user_doc))
-    allowed_role_ids = tracker_role_access_definitions().get(role_key, set())
-
-    if not user_role_ids or not allowed_role_ids:
-        return False
-
-    return bool(user_role_ids.intersection(allowed_role_ids))
-
-
-def tracker_tab_matches(user_doc, tab_key):
-    tab_key = safe_str(tab_key)
-    definitions = tracker_base_tab_access_definitions()
-
-    if tab_key in definitions:
-        allowed_role_ids = definitions.get(tab_key, set())
-        if "*" in allowed_role_ids:
-            return True
-
-        user_role_ids = set(get_tracker_role_ids_from_user_doc(user_doc))
-        return bool(user_role_ids and allowed_role_ids and user_role_ids.intersection(allowed_role_ids))
-
-    for role_key, role_tab in TRACKER_ROLE_TAB_BY_KEY.items():
-        if tab_key == role_tab:
-            return tracker_role_matches(user_doc, role_key)
-
-    return False
-
-
-def get_tracker_matched_role_keys(user_doc):
-    return [role_key for role_key in TRACKER_ROLE_PRIORITY if tracker_role_matches(user_doc, role_key)]
-
-
-def get_tracker_allowed_tabs(user_doc):
-    allowed_tabs = set()
-
-    for tab_key in tracker_base_tab_access_definitions().keys():
-        if tracker_tab_matches(user_doc, tab_key):
-            allowed_tabs.add(tab_key)
-
-    for role_key, role_tab in TRACKER_ROLE_TAB_BY_KEY.items():
-        if tracker_role_matches(user_doc, role_key):
-            allowed_tabs.add(role_tab)
-
-    return [tab for tab in TRACKER_TAB_ORDER if tab in allowed_tabs]
-
-
-def get_tracker_primary_role_name(user_doc):
-    matched_role_keys = get_tracker_matched_role_keys(user_doc)
-    if matched_role_keys:
-        return TRACKER_ROLE_DISPLAY_BY_KEY.get(matched_role_keys[0], "Fahrer")
-    return "Fahrer"
-
-
-def user_has_any_tracker_role_id(user_doc):
-    matched = get_tracker_matched_role_keys(user_doc)
-    return bool(matched)
-
-
-def tracker_access_payload(user_doc):
-    role_ids = get_tracker_role_ids_from_user_doc(user_doc)
-    matched_role_keys = get_tracker_matched_role_keys(user_doc)
-    allowed_tabs = get_tracker_allowed_tabs(user_doc)
-
-    role_tabs = [
-        TRACKER_ROLE_TAB_BY_KEY[role_key]
-        for role_key in matched_role_keys
-        if role_key in TRACKER_ROLE_TAB_BY_KEY
-    ]
-
-    base_tabs = [
-        tab for tab in allowed_tabs
-        if tab in tracker_base_tab_access_definitions()
-    ]
-
-    return {
-        "strict": True,
-        "requiresDiscordRoleId": True,
-        "roleIds": role_ids,
-        "matchedRoleKeys": matched_role_keys,
-        "primaryRole": get_tracker_primary_role_name(user_doc),
-        "allowedTabs": allowed_tabs,
-        "baseTabs": base_tabs,
-        "roleTabs": role_tabs,
-        "canSee": {tab: tab in allowed_tabs for tab in TRACKER_TAB_ORDER}
-    }
-
-
 def normalize_username(username, fallback="driver"):
     username = str(username or "").strip()
     username = username.replace(" ", "-")
@@ -1431,16 +1122,13 @@ def find_tracker_user_by_client_token(client_token):
 def user_has_tracker_access(user_doc):
     if not user_doc: return False
     if user_doc.get("tracker_enabled") is False: return False
-    if not user_registration_is_approved(user_doc.get("discord_id"), user_doc=user_doc): return False
-    return user_has_any_tracker_role_id(user_doc)
+    return user_registration_is_approved(user_doc.get("discord_id"), user_doc=user_doc)
 
 def tracker_profile_payload(user_doc):
     profile = prepare_profile_data(user_doc)
     stats = get_profile_stats(user_doc)
     avatar_url = make_external_url(profile.get("avatar_url"))
     banner_url = make_external_url(user_doc.get("banner_url"))
-    role_ids = get_tracker_role_ids_from_user_doc(user_doc)
-    access = tracker_access_payload(user_doc)
 
     return {
         "id": str(user_doc.get("_id")),
@@ -1451,13 +1139,8 @@ def tracker_profile_payload(user_doc):
         "discordUsername": safe_str(user_doc.get("discord_username")),
         "avatarUrl": avatar_url,
         "bannerUrl": banner_url,
-        "role": access.get("primaryRole"),
-        "primaryRole": access.get("primaryRole"),
-        "roles": role_ids,
-        "roleIds": role_ids,
-        "discordRoles": role_ids,
-        "allowedTabs": access.get("allowedTabs", []),
-        "trackerAccess": access,
+        "role": get_primary_role_name(user_doc.get("roles", [])),
+        "roles": user_doc.get("roles", []),
         "status": profile.get("status"),
         "bio": profile.get("bio"),
         "location": profile.get("location"),
@@ -1659,62 +1342,6 @@ def build_logbook_payload(limit=30):
         clean_entries.append(entry)
     return clean_entries
 
-
-def build_user_logbook_payload(user_doc, limit=30):
-    entries = []
-    user_doc = user_doc or {}
-
-    for raw_entry in get_user_job_entries(user_doc):
-        entries.append(normalize_logbook_entry(raw_entry, user_doc))
-
-    live = user_doc.get("tracker_live") or {}
-    updated_at = user_doc.get("tracker_live_updated_at")
-
-    if user_doc.get("tracker_online") and isinstance(updated_at, datetime):
-        if updated_at >= now_utc() - timedelta(minutes=2):
-            current_job = current_job_from_live(live)
-            if current_job:
-                entries.append({
-                    "status": "Aktiv",
-                    "route": f"{current_job.get('sourceCity', '-')} → {current_job.get('destinationCity', '-')}",
-                    "sourceCity": current_job.get("sourceCity", "-"),
-                    "destinationCity": current_job.get("destinationCity", "-"),
-                    "cargo": current_job.get("cargo", "-"),
-                    "distanceKm": parse_number(live.get("tripDistanceKm"), 0),
-                    "income": round(parse_number(live.get("tripDistanceKm"), 0) * 3.2),
-                    "driverName": (user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username") or "EifelLog Fahrer"),
-                    "createdAt": datetime_to_iso(updated_at),
-                    "_sortDate": updated_at
-                })
-
-    entries.sort(key=lambda item: item.get("_sortDate") or datetime.min, reverse=True)
-    clean_entries = []
-
-    for entry in entries[:limit]:
-        entry.pop("_sortDate", None)
-        clean_entries.append(entry)
-
-    return clean_entries
-
-
-def empty_company_stats_payload():
-    return {
-        "companyIncome": 0,
-        "income": 0,
-        "revenue": 0,
-        "allTimeKilometers": 0,
-        "allTimeKm": 0,
-        "kilometers": 0,
-        "jobsAllTime": 0,
-        "jobs": 0,
-        "totalJobs": 0,
-        "deliveries": 0,
-        "totalDeliveries": 0,
-        "activeDrivers": 0,
-        "monthlyKilometers": [0, 0, 0, 0, 0, 0],
-        "incomeSeries": [0, 0, 0, 0, 0, 0]
-    }
-
 def build_company_stats_payload():
     users = list(users_collection.find({}))
     company_income = 0.0
@@ -1772,37 +1399,15 @@ def build_company_stats_payload():
     }
 
 def tracker_state_payload(user_doc):
-    access = tracker_access_payload(user_doc)
-    allowed_tabs = set(access.get("allowedTabs", []))
-    matched_role_keys = set(access.get("matchedRoleKeys", []))
+    active_drivers = get_active_drivers()
+    company_stats = build_company_stats_payload()
+    logbook = build_logbook_payload(limit=30)
     live = user_doc.get("tracker_live") or {}
     current_job = current_job_from_live(live)
-
-    can_see_company = "company" in allowed_tabs
-    can_see_logbook = "logbook" in allowed_tabs
-    can_see_active_drivers = bool(
-        matched_role_keys.intersection({"disposition", "fuhrpark", "leitung"})
-        or "company" in allowed_tabs
-    )
-
-    company_stats = build_company_stats_payload() if can_see_company else empty_company_stats_payload()
-
-    if can_see_logbook:
-        staff_logbook_roles = {"disposition", "buchhaltung", "leitung"}
-        if matched_role_keys.intersection(staff_logbook_roles):
-            logbook = build_logbook_payload(limit=30)
-        else:
-            logbook = build_user_logbook_payload(user_doc, limit=30)
-    else:
-        logbook = []
-
-    active_drivers = get_active_drivers() if can_see_active_drivers else []
 
     return {
         "success": True,
         "profile": tracker_profile_payload(user_doc),
-        "trackerAccess": access,
-        "allowedTabs": access.get("allowedTabs", []),
         "company": company_stats,
         "companyStats": company_stats,
         "currentJob": current_job,
@@ -2705,10 +2310,7 @@ def tracker_login():
 
     user_doc = find_user_for_tracker_name(driver_name)
     if not user_doc: return jsonify({"success": False, "error": "Fahrer wurde nicht gefunden."}), 404
-    if not user_has_tracker_access(user_doc):
-        if not user_has_any_tracker_role_id(user_doc):
-            return jsonify({"success": False, "error": "Keine gültige Tracker-Rollen-ID gefunden.", "reason": "missing_tracker_role_id"}), 403
-        return jsonify({"success": False, "error": "Zugriff deaktiviert."}), 403
+    if not user_has_tracker_access(user_doc): return jsonify({"success": False, "error": "Zugriff deaktiviert."}), 403
 
     incoming_code_hash = hash_secret(tracker_code)
     stored_hash = user_doc.get("tracker_code_hash", "")
@@ -2740,15 +2342,12 @@ def tracker_login():
     )
 
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
-    profile_payload = tracker_profile_payload(fresh_user)
     return jsonify({
         "success": True,
         "message": "Tracker freigeschaltet.",
         "remember": remember,
         "clientToken": client_token,
-        "profile": profile_payload,
-        "trackerAccess": profile_payload.get("trackerAccess", {}),
-        "allowedTabs": profile_payload.get("allowedTabs", [])
+        "profile": tracker_profile_payload(fresh_user)
     })
 
 @app.route("/api/tracker/session", methods=["GET", "POST", "OPTIONS"])
@@ -2762,22 +2361,12 @@ def tracker_session_login():
 
     user_doc = find_tracker_user_by_client_token(client_token)
     if not user_doc: return jsonify({"success": False, "error": "Ungültig"}), 401
-    if not user_has_tracker_access(user_doc):
-        if not user_has_any_tracker_role_id(user_doc):
-            return jsonify({"success": False, "error": "Keine gültige Tracker-Rollen-ID gefunden.", "reason": "missing_tracker_role_id"}), 403
-        return jsonify({"success": False, "error": "Deaktiviert"}), 403
+    if not user_has_tracker_access(user_doc): return jsonify({"success": False, "error": "Deaktiviert"}), 403
 
     users_collection.update_one({"_id": user_doc["_id"]}, {"$set": {"tracker_last_session_login": now_utc(), "tracker_online": True}})
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
 
-    profile_payload = tracker_profile_payload(fresh_user)
-    return jsonify({
-        "success": True,
-        "message": "Tracker-Sitzung gültig.",
-        "profile": profile_payload,
-        "trackerAccess": profile_payload.get("trackerAccess", {}),
-        "allowedTabs": profile_payload.get("allowedTabs", [])
-    })
+    return jsonify({"success": True, "message": "Tracker-Sitzung gültig.", "profile": tracker_profile_payload(fresh_user)})
 
 @app.route("/api/tracker/profile", methods=["GET", "POST", "OPTIONS"])
 def tracker_profile():
@@ -2788,18 +2377,9 @@ def tracker_profile():
 
     user_doc = find_tracker_user_by_client_token(client_token)
     if not user_doc: return jsonify({"success": False, "error": "Ungültig"}), 401
-    if not user_has_tracker_access(user_doc):
-        if not user_has_any_tracker_role_id(user_doc):
-            return jsonify({"success": False, "error": "Keine gültige Tracker-Rollen-ID gefunden.", "reason": "missing_tracker_role_id"}), 403
-        return jsonify({"success": False, "error": "Deaktiviert"}), 403
+    if not user_has_tracker_access(user_doc): return jsonify({"success": False, "error": "Deaktiviert"}), 403
 
-    profile_payload = tracker_profile_payload(user_doc)
-    return jsonify({
-        "success": True,
-        "profile": profile_payload,
-        "trackerAccess": profile_payload.get("trackerAccess", {}),
-        "allowedTabs": profile_payload.get("allowedTabs", [])
-    })
+    return jsonify({"success": True, "profile": tracker_profile_payload(user_doc)})
 
 @app.route("/api/tracker/state", methods=["GET", "POST", "OPTIONS"])
 def tracker_state():
@@ -2810,10 +2390,7 @@ def tracker_state():
 
     user_doc = find_tracker_user_by_client_token(client_token)
     if not user_doc: return jsonify({"success": False, "error": "Ungültig"}), 401
-    if not user_has_tracker_access(user_doc):
-        if not user_has_any_tracker_role_id(user_doc):
-            return jsonify({"success": False, "error": "Keine gültige Tracker-Rollen-ID gefunden.", "reason": "missing_tracker_role_id"}), 403
-        return jsonify({"success": False, "error": "Deaktiviert"}), 403
+    if not user_has_tracker_access(user_doc): return jsonify({"success": False, "error": "Deaktiviert"}), 403
 
     users_collection.update_one({"_id": user_doc["_id"]}, {"$set": {"tracker_state_requested_at": now_utc()}})
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
@@ -2831,10 +2408,7 @@ def tracker_telemetry_live():
 
     user_doc = find_tracker_user_by_client_token(client_token)
     if not user_doc: return jsonify({"success": False, "error": "Ungültig"}), 401
-    if not user_has_tracker_access(user_doc):
-        if not user_has_any_tracker_role_id(user_doc):
-            return jsonify({"success": False, "error": "Keine gültige Tracker-Rollen-ID gefunden.", "reason": "missing_tracker_role_id"}), 403
-        return jsonify({"success": False, "error": "Deaktiviert"}), 403
+    if not user_has_tracker_access(user_doc): return jsonify({"success": False, "error": "Deaktiviert"}), 403
 
     raw_telemetry = data.get("telemetry") or data.get("snapshot") or {}
     telemetry = normalize_telemetry_payload(raw_telemetry)
