@@ -1,0 +1,722 @@
+{% extends "base.html" %}
+
+{#
+    EifelLog - Disposition Dashboard
+    Zugriff:
+    - Diese Template-Ansicht rendert den Inhalt nur für User mit der Rolle "Disposition".
+    - Trage bei Bedarf die echte Discord-Rollen-ID in disposition_role_ids ein.
+    - Backend sollte die Route zusätzlich serverseitig schützen.
+#}
+
+{% set primary_role_display = primary_role_name|default('User', true) %}
+{% set current_user_roles = current_user.roles|default([], true) %}
+
+{# Rolle / Rollen-ID für Disposition #}
+{% set disposition_role_ids = [
+    'Disposition'
+] %}
+{% set disposition_access = namespace(allowed=false) %}
+{% for role_id in disposition_role_ids %}
+    {% if role_id in current_user_roles or (role_id|int) in current_user_roles %}
+        {% set disposition_access.allowed = true %}
+    {% endif %}
+{% endfor %}
+{% if primary_role_display == 'Disposition' %}
+    {% set disposition_access.allowed = true %}
+{% endif %}
+
+{# Defensive Defaults, damit die Seite auch ohne Backend-Daten sauber rendert #}
+{% set safe_open_tours = dispo_open_tours|default([], true) %}
+{% set safe_active_tours = dispo_active_tours|default([], true) %}
+{% set safe_available_drivers = dispo_available_drivers|default([], true) %}
+{% set safe_dispatch_messages = dispo_messages|default([], true) %}
+{% set safe_dispatch_notes = dispo_notes|default([], true) %}
+{% set safe_recent_events = dispo_recent_events|default([], true) %}
+
+{% set open_tours_count = open_tours_count|default(safe_open_tours|length, true) %}
+{% set active_tours_count = active_tours_count|default(safe_active_tours|length, true) %}
+{% set available_drivers_count = available_drivers_count|default(safe_available_drivers|length, true) %}
+{% set critical_messages_count = critical_messages_count|default(safe_dispatch_messages|selectattr('priority', 'equalto', 'critical')|list|length, true) %}
+
+{% block title %}EifelLog - Disposition{% endblock %}
+
+{% block content %}
+<style>
+    .dispo-scrollbar::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    .dispo-scrollbar::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.12);
+        border-radius: 999px;
+    }
+
+    .dispo-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+    }
+
+    .dispo-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.22);
+    }
+
+    .dispo-status-dot {
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 999px;
+        display: inline-block;
+        box-shadow: 0 0 12px currentColor;
+    }
+
+    .dispo-input {
+        width: 100%;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.35);
+        padding: 0.85rem 1rem;
+        color: white;
+        font-family: Inter, sans-serif;
+        outline: none;
+        transition: all 0.2s ease;
+    }
+
+    .dispo-input:focus {
+        border-color: rgba(137, 190, 50, 0.7);
+        box-shadow: 0 0 0 1px rgba(137, 190, 50, 0.25), 0 0 18px rgba(137, 190, 50, 0.06);
+    }
+
+    .dispo-input::placeholder {
+        color: rgba(255, 255, 255, 0.32);
+    }
+
+    .dispo-label {
+        display: block;
+        margin-bottom: 0.45rem;
+        color: var(--muted);
+        font-family: Orbitron, sans-serif;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    .dispo-select option {
+        background: #0d0f0c;
+        color: white;
+    }
+
+    .dispo-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        padding: 0.35rem 0.65rem;
+        font-family: Orbitron, sans-serif;
+        font-size: 0.55rem;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+</style>
+
+{% if not disposition_access.allowed %}
+<div class="min-h-[70vh] flex items-center justify-center relative z-10 px-4">
+    <div class="glass-card max-w-xl w-full p-8 text-center border border-[var(--danger)]/25 shadow-[0_0_60px_rgba(255,0,0,0.08)]">
+        <div class="w-16 h-16 rounded-3xl mx-auto mb-5 bg-[var(--danger)]/10 border border-[var(--danger)]/30 text-[var(--danger)] flex items-center justify-center">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v3.75m0 3.75h.008v.008H12V16.5zm9-4.5a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </div>
+        <span class="font-orbitron text-[10px] font-bold text-[var(--danger)] tracking-[0.22em] uppercase">Zugriff verweigert</span>
+        <h1 class="font-orbitron text-2xl font-bold text-white mt-2">Disposition nur für berechtigte User</h1>
+        <p class="text-sm text-[var(--muted)] font-inter mt-4 leading-relaxed">
+            Dieses Dashboard ist ausschließlich für User mit der Rolle <strong class="text-white">Disposition</strong> sichtbar.
+        </p>
+        <a href="{{ url_for('dashboard') }}"
+           class="mt-6 inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+            Zurück zum Dashboard
+        </a>
+    </div>
+</div>
+{% else %}
+
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 mb-8 mt-6 relative z-10">
+    <div class="flex items-center gap-4">
+        <div class="w-16 h-16 rounded-full border-2 border-[#5865F2] overflow-hidden shadow-[0_0_18px_rgba(88,101,242,0.32)] bg-black/40">
+            {% if current_user.avatar %}
+                <img src="https://cdn.discordapp.com/avatars/{{ current_user.id }}/{{ current_user.avatar }}.png" alt="Avatar" class="w-full h-full object-cover">
+            {% else %}
+                <div class="w-full h-full bg-black/50 flex items-center justify-center text-white font-orbitron font-bold">D</div>
+            {% endif %}
+        </div>
+
+        <div>
+            <span class="font-orbitron text-[10px] font-bold text-[#5865F2] tracking-[0.22em] uppercase">EifelLog Leitstelle</span>
+            <h1 class="text-2xl md:text-3xl font-orbitron font-bold text-white flex flex-wrap items-center gap-3 mt-1">
+                Disposition
+                <span class="px-2.5 py-1 rounded bg-[#5865F2]/10 border border-[#5865F2]/30 text-[#7b8cff] text-[9px] uppercase tracking-widest font-bold">
+                    {{ current_user.username }}
+                </span>
+            </h1>
+            <p class="text-xs text-[var(--muted)] font-inter mt-2">
+                Touren planen, Fahrer zuweisen und Statusmeldungen überwachen.
+            </p>
+        </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+        <a href="{{ url_for('dashboard') }}"
+           class="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 hover:border-white/20 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"></path>
+            </svg>
+            Dashboard
+        </a>
+        <button id="btn-refresh-dispo"
+                type="button"
+                class="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[#5865F2]/10 border border-[#5865F2]/35 text-[#7b8cff] hover:bg-[#5865F2]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v6h6M20 20v-6h-6M20 8A8 8 0 006.343 5.657M4 16a8 8 0 0013.657 2.343"></path>
+            </svg>
+            Aktualisieren
+        </button>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8 relative z-10">
+    <div class="glass-card p-6 relative overflow-hidden">
+        <div class="absolute -right-8 -top-8 opacity-5">
+            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 6h6m-6 4h6"></path>
+            </svg>
+        </div>
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <span class="dispo-status-dot text-[var(--brand-yellow)] bg-[var(--brand-yellow)]"></span>
+            Offene Touren
+        </h3>
+        <p class="text-3xl font-bold text-white mt-2">{{ open_tours_count }}</p>
+        <p class="text-xs text-[var(--muted)] font-inter mt-2">Nicht zugewiesene Aufträge</p>
+    </div>
+
+    <div class="glass-card p-6 relative overflow-hidden">
+        <div class="absolute -right-8 -top-8 opacity-5">
+            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 12c2.761 0 5-2.239 5-5S14.761 2 12 2 7 4.239 7 7s2.239 5 5 5zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5z"></path>
+            </svg>
+        </div>
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <span class="dispo-status-dot text-[var(--brand-green)] bg-[var(--brand-green)]"></span>
+            Verfügbare Fahrer
+        </h3>
+        <p class="text-3xl font-bold text-white mt-2">{{ available_drivers_count }}</p>
+        <p class="text-xs text-[var(--muted)] font-inter mt-2">Aktuell disponierbar</p>
+    </div>
+
+    <div class="glass-card p-6 relative overflow-hidden">
+        <div class="absolute -right-8 -top-8 opacity-5">
+            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M20 8h-3V6a2 2 0 00-2-2H3a2 2 0 00-2 2v11h2a3 3 0 106 0h6a3 3 0 106 0h2v-5l-3-4zM6 18.5A1.5 1.5 0 117.5 17 1.5 1.5 0 016 18.5zm12 0a1.5 1.5 0 111.5-1.5 1.5 1.5 0 01-1.5 1.5zM17 12h-4V6h2a2 2 0 012 2z"></path>
+            </svg>
+        </div>
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <span class="dispo-status-dot text-[#5865F2] bg-[#5865F2]"></span>
+            Aktive Touren
+        </h3>
+        <p class="text-3xl font-bold text-white mt-2">{{ active_tours_count }}</p>
+        <p class="text-xs text-[var(--muted)] font-inter mt-2">Laufende Einsätze</p>
+    </div>
+
+    <div class="glass-card p-6 relative overflow-hidden">
+        <div class="absolute -right-8 -top-8 opacity-5">
+            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L1 21h22L12 2zm1 16h-2v-2h2v2zm0-4h-2v-4h2v4z"></path>
+            </svg>
+        </div>
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <span class="dispo-status-dot text-[var(--danger)] bg-[var(--danger)]"></span>
+            Kritische Meldungen
+        </h3>
+        <p class="text-3xl font-bold text-white mt-2">{{ critical_messages_count }}</p>
+        <p class="text-xs text-[var(--muted)] font-inter mt-2">Benötigen Prüfung</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 2xl:grid-cols-3 gap-6 relative z-10 mb-10">
+    <div class="2xl:col-span-2 flex flex-col gap-6">
+        <div class="glass-card p-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                <div>
+                    <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Tour Management</span>
+                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Neue Tour anlegen</h2>
+                </div>
+                <span class="dispo-chip text-[var(--brand-green)] bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25">
+                    Leitstelle
+                </span>
+            </div>
+
+            <form id="create-tour-form" action="/dispo/tour/create" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% if csrf_token is defined %}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% endif %}
+
+                <div>
+                    <label class="dispo-label" for="route_from">Startort</label>
+                    <input id="route_from" name="route_from" type="text" class="dispo-input" placeholder="z. B. Köln" required>
+                </div>
+
+                <div>
+                    <label class="dispo-label" for="route_to">Zielort</label>
+                    <input id="route_to" name="route_to" type="text" class="dispo-input" placeholder="z. B. München" required>
+                </div>
+
+                <div>
+                    <label class="dispo-label" for="cargo">Fracht</label>
+                    <input id="cargo" name="cargo" type="text" class="dispo-input" placeholder="z. B. Baustoffe" required>
+                </div>
+
+                <div>
+                    <label class="dispo-label" for="payout">Vergütung</label>
+                    <input id="payout" name="payout" type="text" class="dispo-input" placeholder="z. B. 12.500 €">
+                </div>
+
+                <div>
+                    <label class="dispo-label" for="priority">Priorität</label>
+                    <select id="priority" name="priority" class="dispo-input dispo-select">
+                        <option value="normal">Normal</option>
+                        <option value="high">Hoch</option>
+                        <option value="critical">Kritisch</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="dispo-label" for="deadline">Deadline</label>
+                    <input id="deadline" name="deadline" type="text" class="dispo-input" placeholder="z. B. Heute 22:00 Uhr">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="dispo-label" for="notes">Dispo-Notiz</label>
+                    <textarea id="notes" name="notes" rows="3" class="dispo-input resize-none" placeholder="Besondere Hinweise zur Tour..."></textarea>
+                </div>
+
+                <div class="md:col-span-2 flex flex-col sm:flex-row gap-3 justify-end mt-2">
+                    <button type="reset" class="inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+                        Zurücksetzen
+                    </button>
+                    <button type="submit" class="btn-primary justify-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Tour erstellen
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="glass-card p-6 flex flex-col min-h-[420px]">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+                <div>
+                    <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase">Auftragsliste</span>
+                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Offene Touren</h2>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input id="tour-search" type="search" class="dispo-input min-w-[220px]" placeholder="Tour suchen...">
+                    <select id="tour-priority-filter" class="dispo-input dispo-select sm:w-[170px]">
+                        <option value="all">Alle Prioritäten</option>
+                        <option value="normal">Normal</option>
+                        <option value="high">Hoch</option>
+                        <option value="critical">Kritisch</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto dispo-scrollbar flex-grow">
+                <table class="w-full text-left border-collapse min-w-[900px]">
+                    <thead>
+                        <tr class="border-b border-white/10 text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                            <th class="pb-3 px-2">Eingang</th>
+                            <th class="pb-3 px-2">Route</th>
+                            <th class="pb-3 px-2">Fracht</th>
+                            <th class="pb-3 px-2">Priorität</th>
+                            <th class="pb-3 px-2">Deadline</th>
+                            <th class="pb-3 px-2 text-right">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="open-tours-table" class="text-sm font-inter text-gray-300">
+                        {% if safe_open_tours %}
+                            {% for tour in safe_open_tours %}
+                                {% set tour_priority = tour.priority|default('normal', true) %}
+                                <tr class="tour-row border-b border-white/5 hover:bg-white/5 transition-colors"
+                                    data-search="{{ (tour.route_from|default('', true) ~ ' ' ~ tour.route_to|default('', true) ~ ' ' ~ tour.cargo|default('', true))|lower }}"
+                                    data-priority="{{ tour_priority }}">
+                                    <td class="py-4 px-2 text-xs text-[var(--muted)] whitespace-nowrap">
+                                        {{ tour.created_at|default('-', true) }}
+                                    </td>
+                                    <td class="py-4 px-2">
+                                        <div class="font-bold text-white">{{ tour.route_from|default('-', true) }} → {{ tour.route_to|default('-', true) }}</div>
+                                        <div class="text-xs text-[var(--muted)] mt-1">ID: {{ tour.id|default(loop.index, true) }}</div>
+                                    </td>
+                                    <td class="py-4 px-2">{{ tour.cargo|default('-', true) }}</td>
+                                    <td class="py-4 px-2">
+                                        {% if tour_priority == 'critical' %}
+                                            <span class="dispo-chip text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/25">Kritisch</span>
+                                        {% elif tour_priority == 'high' %}
+                                            <span class="dispo-chip text-[var(--brand-yellow)] bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25">Hoch</span>
+                                        {% else %}
+                                            <span class="dispo-chip text-[var(--brand-green)] bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25">Normal</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-4 px-2 text-xs text-[var(--muted)] whitespace-nowrap">
+                                        {{ tour.deadline|default('-', true) }}
+                                    </td>
+                                    <td class="py-4 px-2 text-right">
+                                        <button type="button"
+                                                class="btn-open-assign inline-flex items-center justify-center px-4 py-2 rounded-full bg-[#5865F2]/10 border border-[#5865F2]/35 text-[#7b8cff] hover:bg-[#5865F2]/20 hover:text-white transition-all font-orbitron text-[9px] font-bold uppercase tracking-[0.14em]"
+                                                data-tour-id="{{ tour.id|default(loop.index, true) }}"
+                                                data-tour-title="{{ tour.route_from|default('-', true) }} → {{ tour.route_to|default('-', true) }}">
+                                            Zuweisen
+                                        </button>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr class="border-b border-white/5">
+                                <td colspan="6" class="py-8 px-2 text-center text-white/50">
+                                    Keine offenen Touren vorhanden.
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="glass-card p-6 flex flex-col min-h-[360px]">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+                <div>
+                    <span class="font-orbitron text-[10px] font-bold text-[#5865F2] tracking-[0.22em] uppercase">Live Monitoring</span>
+                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Aktive Touren</h2>
+                </div>
+            </div>
+
+            <div class="space-y-3 overflow-y-auto dispo-scrollbar pr-1">
+                {% if safe_active_tours %}
+                    {% for tour in safe_active_tours %}
+                        {% set progress = tour.progress|default(0, true) %}
+                        <div class="rounded-2xl bg-black/30 border border-white/10 p-4 hover:border-[#5865F2]/40 transition-all">
+                            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-center gap-2 mb-2">
+                                        <span class="dispo-chip text-[#7b8cff] bg-[#5865F2]/10 border border-[#5865F2]/25">Aktiv</span>
+                                        <span class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">{{ tour.id|default(loop.index, true) }}</span>
+                                    </div>
+                                    <h3 class="font-orbitron text-sm font-bold text-white uppercase tracking-wide">
+                                        {{ tour.route_from|default('-', true) }} → {{ tour.route_to|default('-', true) }}
+                                    </h3>
+                                    <p class="text-xs text-[var(--muted)] mt-2 font-inter">
+                                        Fahrer: <span class="text-white font-bold">{{ tour.assigned_driver|default('Nicht gesetzt', true) }}</span> · Fracht: {{ tour.cargo|default('-', true) }}
+                                    </p>
+                                </div>
+                                <div class="min-w-[170px] text-right">
+                                    <p class="text-xs text-[var(--muted)] font-inter mb-2">Fortschritt</p>
+                                    <p class="font-orbitron font-bold text-white">{{ progress }}%</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 h-2 rounded-full bg-white/10 overflow-hidden">
+                                <div class="h-full rounded-full bg-gradient-to-r from-[#5865F2] to-[var(--brand-green)]" style="width: {{ progress }}%;"></div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="rounded-2xl bg-black/30 border border-white/10 p-8 text-center text-white/50">
+                        Aktuell laufen keine disponierten Touren.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="flex flex-col gap-6">
+        <div class="glass-card p-6">
+            <div class="flex items-center justify-between gap-3 mb-5">
+                <div>
+                    <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Fahrerpool</span>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mt-1">Verfügbare Fahrer</h2>
+                </div>
+                <span class="dispo-chip text-[var(--brand-green)] bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25">Online</span>
+            </div>
+
+            <div class="space-y-3 max-h-[430px] overflow-y-auto dispo-scrollbar pr-1">
+                {% if safe_available_drivers %}
+                    {% for driver in safe_available_drivers %}
+                        <div class="rounded-2xl bg-black/30 border border-white/10 p-4 hover:border-[var(--brand-green)]/40 hover:bg-white/[0.04] transition-all">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex items-start gap-3 min-w-0">
+                                    <div class="w-10 h-10 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 text-[var(--brand-green)] flex items-center justify-center shrink-0">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A9 9 0 1118.879 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <h3 class="text-sm font-orbitron font-bold text-white truncate">{{ driver.username|default(driver.name|default('Fahrer', true), true) }}</h3>
+                                        <p class="text-xs text-[var(--muted)] font-inter mt-1 truncate">{{ driver.truck|default('Kein Fahrzeug gesetzt', true) }}</p>
+                                        <p class="text-[10px] text-[var(--brand-green)] font-orbitron uppercase tracking-widest mt-2">
+                                            {{ driver.current_location|default('Standort unbekannt', true) }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <span class="w-2.5 h-2.5 rounded-full bg-[var(--brand-green)] shadow-[0_0_12px_rgba(137,190,50,0.8)] shrink-0 mt-1"></span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="rounded-2xl bg-black/30 border border-white/10 p-6 text-center text-white/50 text-sm">
+                        Keine verfügbaren Fahrer gemeldet.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="glass-card p-6">
+            <div class="flex items-center justify-between gap-3 mb-5">
+                <div>
+                    <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase">Meldungen</span>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mt-1">Dispo-Postfach</h2>
+                </div>
+            </div>
+
+            <div class="space-y-3 max-h-[360px] overflow-y-auto dispo-scrollbar pr-1">
+                {% if safe_dispatch_messages %}
+                    {% for message in safe_dispatch_messages %}
+                        {% set msg_priority = message.priority|default('normal', true) %}
+                        <div class="rounded-2xl p-4 border bg-black/30 {% if msg_priority == 'critical' %}border-[var(--danger)]/25{% elif msg_priority == 'high' %}border-[var(--brand-yellow)]/25{% else %}border-white/10{% endif %}">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <h3 class="text-sm font-orbitron font-bold text-white truncate">{{ message.title|default('Meldung', true) }}</h3>
+                                    <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">{{ message.content|default(message.message|default('-', true), true) }}</p>
+                                    <p class="text-[10px] text-white/40 font-orbitron uppercase tracking-widest mt-3">{{ message.created_at|default('-', true) }}</p>
+                                </div>
+                                {% if msg_priority == 'critical' %}
+                                    <span class="dispo-chip text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/25">Kritisch</span>
+                                {% elif msg_priority == 'high' %}
+                                    <span class="dispo-chip text-[var(--brand-yellow)] bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25">Hoch</span>
+                                {% else %}
+                                    <span class="dispo-chip text-white/60 bg-white/5 border border-white/10">Info</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="rounded-2xl bg-black/30 border border-white/10 p-6 text-center text-white/50 text-sm">
+                        Keine aktuellen Dispo-Meldungen.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="glass-card p-6 bg-gradient-to-br from-black/40 to-black/80">
+            <div class="flex items-center justify-between gap-3 mb-5">
+                <div>
+                    <span class="font-orbitron text-[10px] font-bold text-[#5865F2] tracking-[0.22em] uppercase">Notizen</span>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mt-1">Leitstellen-Log</h2>
+                </div>
+            </div>
+
+            <form action="/dispo/note/create" method="POST" class="mb-4">
+                {% if csrf_token is defined %}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% endif %}
+                <label class="dispo-label" for="dispatch_note">Neue Notiz</label>
+                <textarea id="dispatch_note" name="note" rows="3" class="dispo-input resize-none" placeholder="Kurze interne Leitstellen-Notiz..."></textarea>
+                <button type="submit" class="mt-3 w-full inline-flex items-center justify-center px-5 py-3 rounded-full bg-[#5865F2]/10 border border-[#5865F2]/35 text-[#7b8cff] hover:bg-[#5865F2]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+                    Notiz speichern
+                </button>
+            </form>
+
+            <div class="space-y-3 max-h-[260px] overflow-y-auto dispo-scrollbar pr-1">
+                {% if safe_dispatch_notes %}
+                    {% for note in safe_dispatch_notes %}
+                        <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-4">
+                            <p class="text-sm text-gray-300 font-inter leading-relaxed">{{ note.content|default(note.note|default('-', true), true) }}</p>
+                            <p class="text-[10px] text-white/40 font-orbitron uppercase tracking-widest mt-3">
+                                {{ note.author|default('Disposition', true) }} · {{ note.created_at|default('-', true) }}
+                            </p>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="rounded-2xl bg-black/30 border border-white/10 p-5 text-center text-white/50 text-sm">
+                        Noch keine Leitstellen-Notizen vorhanden.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="assign-tour-modal" aria-hidden="true" class="fixed inset-0 z-[180] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
+    <div id="assign-tour-panel" class="relative z-10 w-full max-w-lg mx-auto overflow-hidden rounded-3xl border border-[#5865F2]/30 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(88,101,242,0.16)] transform transition-all duration-300">
+        <div class="p-6 border-b border-white/10">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-[#5865F2]/10 border border-[#5865F2]/30 flex items-center justify-center text-[#7b8cff] shrink-0">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7V3m8 4V3M5 11h14M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="font-orbitron text-[10px] font-bold text-[#7b8cff] tracking-[0.22em] uppercase">Tour zuweisen</span>
+                        <h2 id="assign-tour-title" class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Tour</h2>
+                        <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">
+                            Wähle einen verfügbaren Fahrer aus und bestätige die Disposition.
+                        </p>
+                    </div>
+                </div>
+
+                <button id="btn-close-assign-modal" type="button" class="p-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[var(--muted)] hover:text-white transition-colors shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <form id="assign-tour-form" action="/dispo/tour/assign" method="POST" class="p-6 space-y-4">
+            {% if csrf_token is defined %}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% endif %}
+            <input id="assign-tour-id" type="hidden" name="tour_id" value="">
+
+            <div>
+                <label class="dispo-label" for="driver_id">Fahrer</label>
+                <select id="driver_id" name="driver_id" class="dispo-input dispo-select" required>
+                    <option value="">Fahrer auswählen...</option>
+                    {% for driver in safe_available_drivers %}
+                        <option value="{{ driver.id|default(driver.username|default(loop.index, true), true) }}">
+                            {{ driver.username|default(driver.name|default('Fahrer', true), true) }}{% if driver.truck is defined %} · {{ driver.truck }}{% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="dispo-label" for="assign_note">Hinweis an Fahrer</label>
+                <textarea id="assign_note" name="assign_note" rows="3" class="dispo-input resize-none" placeholder="Optionaler Hinweis zur Tour..."></textarea>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                <button type="button" id="btn-cancel-assign" class="w-full inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+                    Abbrechen
+                </button>
+                <button type="submit" class="btn-primary w-full justify-center">
+                    Disposition bestätigen
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const refreshButton = document.getElementById('btn-refresh-dispo');
+        const tourSearch = document.getElementById('tour-search');
+        const priorityFilter = document.getElementById('tour-priority-filter');
+        const tourRows = Array.from(document.querySelectorAll('.tour-row'));
+
+        const assignModal = document.getElementById('assign-tour-modal');
+        const assignPanel = document.getElementById('assign-tour-panel');
+        const assignTitle = document.getElementById('assign-tour-title');
+        const assignTourId = document.getElementById('assign-tour-id');
+        const assignForm = document.getElementById('assign-tour-form');
+        const closeAssignModal = document.getElementById('btn-close-assign-modal');
+        const cancelAssign = document.getElementById('btn-cancel-assign');
+        const assignButtons = Array.from(document.querySelectorAll('.btn-open-assign'));
+
+        function filterTours() {
+            const query = (tourSearch?.value || '').trim().toLowerCase();
+            const priority = priorityFilter?.value || 'all';
+
+            tourRows.forEach((row) => {
+                const matchesQuery = !query || (row.dataset.search || '').includes(query);
+                const matchesPriority = priority === 'all' || row.dataset.priority === priority;
+                row.classList.toggle('hidden', !(matchesQuery && matchesPriority));
+            });
+        }
+
+        function openAssignModal(tourId, tourTitle) {
+            if (!assignModal || !assignPanel) return;
+
+            assignTourId.value = tourId || '';
+            assignTitle.textContent = tourTitle || 'Tour zuweisen';
+            assignForm.action = tourId ? `/dispo/tour/${encodeURIComponent(tourId)}/assign` : '/dispo/tour/assign';
+
+            document.body.classList.add('overflow-hidden');
+            assignModal.classList.remove('hidden');
+            assignModal.classList.add('flex');
+            assignModal.setAttribute('aria-hidden', 'false');
+
+            setTimeout(() => {
+                assignModal.classList.remove('opacity-0');
+            }, 10);
+        }
+
+        function closeModal() {
+            if (!assignModal) return;
+            assignModal.classList.add('opacity-0');
+
+            setTimeout(() => {
+                assignModal.classList.add('hidden');
+                assignModal.classList.remove('flex');
+                assignModal.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('overflow-hidden');
+            }, 250);
+        }
+
+        if (refreshButton) {
+            refreshButton.addEventListener('click', function () {
+                window.location.reload();
+            });
+        }
+
+        if (tourSearch) {
+            tourSearch.addEventListener('input', filterTours);
+        }
+
+        if (priorityFilter) {
+            priorityFilter.addEventListener('change', filterTours);
+        }
+
+        assignButtons.forEach((button) => {
+            button.addEventListener('click', function () {
+                openAssignModal(button.dataset.tourId, button.dataset.tourTitle);
+            });
+        });
+
+        if (closeAssignModal) {
+            closeAssignModal.addEventListener('click', closeModal);
+        }
+
+        if (cancelAssign) {
+            cancelAssign.addEventListener('click', closeModal);
+        }
+
+        if (assignModal) {
+            assignModal.addEventListener('click', function (event) {
+                if (event.target === assignModal) {
+                    closeModal();
+                }
+            });
+        }
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && assignModal && !assignModal.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+    });
+</script>
+
+{% endif %}
+{% endblock %}
