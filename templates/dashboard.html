@@ -7,6 +7,7 @@
     - "claimed" bedeutet nur: Sachbearbeiter hat übernommen, nicht freigegeben.
     - Token-Anforderung ist nur bei approved möglich.
     - NEU: Blaues Tutorial-Alert, welches nur 1x pro User erscheint.
+    - NEU: Tutorial-Status (Abgeschlossen / Ausstehend) landet sortiert nach Datum/Uhrzeit im Postfach.
 #}
 
 {% set primary_role_display = primary_role_name|default('User', true) %}
@@ -558,7 +559,7 @@
     </div>
 </div>
 
-<!-- NEU: Blaues Tutorial-Alert-Modal -->
+<!-- Blaues Tutorial-Alert-Modal -->
 <div id="tutorial-alert-wrapper" aria-hidden="true" class="fixed inset-0 z-[140] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
     <div id="tutorial-alert-panel" class="relative z-10 w-full max-w-lg mx-auto overflow-hidden rounded-3xl border border-[#5865F2]/30 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(88,101,242,0.15)] transform transition-all duration-300">
         <div class="p-6 md:p-7">
@@ -650,7 +651,7 @@
             </div>
         </div>
 
-        <div class="p-6 space-y-3 flex-grow overflow-y-auto custom-scrollbar">
+        <div id="postfach-container" class="p-6 space-y-3 flex-grow overflow-y-auto custom-scrollbar">
             {% if needs_signature_flag %}
             <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-green)]/70 hover:bg-white/[0.07] hover:-translate-y-0.5 transition-all duration-300 group relative"
                     data-title="EifelLog Richtlinien"
@@ -1060,6 +1061,95 @@
         const tokenRequestError = document.getElementById('token-request-error');
         const tokenRequestReason = document.getElementById('token-request-reason');
 
+        /* Helper für aktuelles Datum im Format DD.MM.YYYY HH:mm */
+        function getFormattedDate() {
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            return `${day}.${month}.${year} ${hours}:${minutes}`;
+        }
+
+        /* Fügt das Tutorial dynamisch in das Postfach ein */
+        function addTutorialToPostfach(status, dateStr) {
+            const container = document.getElementById('postfach-container');
+            if (!container) return;
+
+            const existing = document.getElementById('tutorial-doc-item');
+            if (existing) existing.remove();
+
+            const isCompleted = status === 'completed';
+            const title = isCompleted ? 'Tutorial abgeschlossen' : 'Tutorial ausstehend';
+            const colorClass = isCompleted ? 'text-[var(--brand-green)]' : 'text-[#5865F2]';
+            const bgClass = isCompleted ? 'bg-[var(--brand-green)]/10' : 'bg-[#5865F2]/10';
+            const borderClass = isCompleted ? 'border-[var(--brand-green)]/20' : 'border-[#5865F2]/20';
+            const wrapperBg = isCompleted ? 'bg-[var(--brand-green)]/[0.06]' : 'bg-[#5865F2]/[0.06]';
+            const wrapperHover = isCompleted ? 'hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/[0.09]' : 'hover:border-[#5865F2] hover:bg-[#5865F2]/[0.09]';
+            const wrapperBorder = isCompleted ? 'border-[var(--brand-green)]/25' : 'border-[#5865F2]/25';
+
+            const item = document.createElement('a');
+            item.id = 'tutorial-doc-item';
+            item.href = '/tutorial'; 
+            item.className = `w-full text-left p-4 rounded-2xl ${wrapperBg} border ${wrapperBorder} ${wrapperHover} hover:-translate-y-0.5 transition-all duration-300 group relative block`;
+            item.setAttribute('data-date', dateStr);
+
+            item.innerHTML = `
+                <div class="flex items-center gap-4 pr-5">
+                    <div class="p-3 rounded-xl ${bgClass} ${colorClass} border ${borderClass} group-hover:scale-105 transition-transform">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <h4 class="text-sm font-bold font-orbitron text-white truncate">${title}</h4>
+                        <p class="text-xs text-[var(--muted)] mt-1 font-inter truncate">System • ${isCompleted ? 'Abgeschlossen am ' : 'Später markiert am '} ${dateStr}</p>
+                        <p class="text-[10px] ${colorClass} font-orbitron uppercase tracking-widest mt-2">
+                            ${isCompleted ? 'Erneut ansehen' : 'Aktion erforderlich - Starten'}
+                        </p>
+                    </div>
+                </div>
+            `;
+            
+            // Bei Klick direkt auf "completed" setzen
+            item.addEventListener('click', () => {
+                window.localStorage.setItem(`tutorialStatus_${currentUserKey}`, 'completed');
+                window.localStorage.setItem(`tutorialDate_${currentUserKey}`, getFormattedDate());
+            });
+
+            container.appendChild(item);
+        }
+
+        /* Sortiert das Postfach nach Datum und Uhrzeit */
+        function sortPostfach() {
+            const container = document.getElementById('postfach-container');
+            if (!container) return;
+
+            const items = Array.from(container.children).filter(child => child.hasAttribute('data-date'));
+
+            items.sort((a, b) => {
+                const dateA = a.getAttribute('data-date') || '';
+                const dateB = b.getAttribute('data-date') || '';
+
+                function parseDate(dStr) {
+                    if (!dStr || dStr === 'Standard') return 0;
+                    if (dStr === 'Heute') return new Date().getTime();
+                    
+                    const parts = dStr.split(/[. :]/);
+                    if (parts.length >= 5) {
+                        return new Date(parts[2], parts[1]-1, parts[0], parts[3], parts[4]).getTime();
+                    }
+                    const d = new Date(dStr);
+                    return isNaN(d) ? 0 : d.getTime();
+                }
+
+                return parseDate(dateB) - parseDate(dateA); 
+            });
+
+            items.forEach(item => container.appendChild(item));
+        }
+
         /*
          * Wichtig für echtes Viewport-Centering:
          * Modals immer als direktes Kind von <body> anhängen
@@ -1158,21 +1248,39 @@
 
         if (btnStartTutorial) {
             btnStartTutorial.addEventListener('click', () => {
-                // Setze Flag im LocalStorage, damit es nie wieder automatisch erscheint
                 window.localStorage.setItem(tutorialStorageKey, 'true');
+                window.localStorage.setItem(`tutorialStatus_${currentUserKey}`, 'completed');
+                window.localStorage.setItem(`tutorialDate_${currentUserKey}`, getFormattedDate());
             });
         }
 
         if (btnDismissTutorial) {
             btnDismissTutorial.addEventListener('click', () => {
-                // Setze Flag im LocalStorage
                 window.localStorage.setItem(tutorialStorageKey, 'true');
+                
+                if(!window.localStorage.getItem(`tutorialStatus_${currentUserKey}`)) {
+                    window.localStorage.setItem(`tutorialStatus_${currentUserKey}`, 'pending');
+                    window.localStorage.setItem(`tutorialDate_${currentUserKey}`, getFormattedDate());
+                }
+
+                addTutorialToPostfach(
+                    window.localStorage.getItem(`tutorialStatus_${currentUserKey}`),
+                    window.localStorage.getItem(`tutorialDate_${currentUserKey}`)
+                );
+                sortPostfach();
+
                 closeAnimatedModal(tutorialAlertWrapper, tutorialAlertPanel, () => {
                     isTutorialShowing = false;
                     // Wenn nach Wegklicken Dokumente da sind, Document-Alert triggern
                     initializeInboxNotifications(true);
                 });
             });
+        }
+
+        // Initiale Darstellung des Tutorials im Postfach
+        const tStatus = window.localStorage.getItem(`tutorialStatus_${currentUserKey}`);
+        if (tStatus) {
+            addTutorialToPostfach(tStatus, window.localStorage.getItem(`tutorialDate_${currentUserKey}`));
         }
 
         // ====== POSTFACH LOGIK ======
@@ -1476,6 +1584,15 @@
 
             if (tutorialAlertWrapper && !tutorialAlertWrapper.classList.contains('hidden')) {
                 window.localStorage.setItem(tutorialStorageKey, 'true');
+                if(!window.localStorage.getItem(`tutorialStatus_${currentUserKey}`)) {
+                    window.localStorage.setItem(`tutorialStatus_${currentUserKey}`, 'pending');
+                    window.localStorage.setItem(`tutorialDate_${currentUserKey}`, getFormattedDate());
+                }
+                addTutorialToPostfach(
+                    window.localStorage.getItem(`tutorialStatus_${currentUserKey}`),
+                    window.localStorage.getItem(`tutorialDate_${currentUserKey}`)
+                );
+                sortPostfach();
                 closeAnimatedModal(tutorialAlertWrapper, tutorialAlertPanel, () => {
                     isTutorialShowing = false;
                     initializeInboxNotifications(true);
@@ -1509,8 +1626,9 @@
             }
         });
 
-        // Dokument-Zähler initialisieren (wird zurückgehalten, falls Tutorial sichtbar ist)
+        // Dokument-Zähler initialisieren und final sortieren
         initializeInboxNotifications();
+        sortPostfach();
 
         if (univSigInput) {
             univSigInput.addEventListener('input', (e) => {
