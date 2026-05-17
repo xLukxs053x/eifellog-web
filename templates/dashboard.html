@@ -8,6 +8,7 @@
     - Token-Anforderung ist nur bei approved möglich.
     - NEU: Blaues Tutorial-Alert, welches nur 1x pro User erscheint.
     - NEU: Tutorial-Status (Abgeschlossen / Ausstehend) landet sortiert nach Datum/Uhrzeit im Postfach.
+    - NEU: Disposition-Schnellzugriff für Rolle 1473726639643820344 auf dispo.html.
 #}
 
 {% set primary_role_display = primary_role_name|default('User', true) %}
@@ -62,6 +63,20 @@
 {% endfor %}
 {% if primary_role_display in ['Buchhaltung'] %}
     {% set buchhaltung_nav.allowed = true %}
+{% endif %}
+
+{# Navigation zur Disposition nur für berechtigte Rollen #}
+{% set disposition_nav_roles = [
+    '1473726639643820344'
+] %}
+{% set disposition_nav = namespace(allowed=false) %}
+{% for role_id in disposition_nav_roles %}
+    {% if role_id in current_user_roles or (role_id|int) in current_user_roles %}
+        {% set disposition_nav.allowed = true %}
+    {% endif %}
+{% endfor %}
+{% if primary_role_display in ['Disposition', 'Dispo'] %}
+    {% set disposition_nav.allowed = true %}
 {% endif %}
 
 {% block title %}EifelLog - Dashboard{% endblock %}
@@ -461,6 +476,35 @@
                         </div>
 
                         <span class="text-[9px] font-orbitron uppercase tracking-widest rounded-full px-3 py-1 border text-[var(--brand-yellow)] bg-[var(--brand-yellow)]/10 border-[var(--brand-yellow)]/25 whitespace-nowrap">
+                            Öffnen
+                        </span>
+                    </div>
+                </a>
+                {% endif %}
+
+                {% if disposition_nav.allowed %}
+                <a href="/dispo.html"
+                   class="col-span-2 p-5 rounded-2xl border border-[#7ba7ff]/35 bg-[#7ba7ff]/10 hover:border-[#7ba7ff] hover:bg-[#7ba7ff]/20 transition-all text-left group relative overflow-hidden shadow-[0_0_18px_rgba(123,167,255,0.08)]">
+                    <div class="absolute inset-0 bg-gradient-to-br from-[#7ba7ff]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="relative z-10 flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-2xl bg-[#7ba7ff]/10 border border-[#7ba7ff]/25 text-[#7ba7ff] flex items-center justify-center">
+                                <svg class="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-[0.2em] mb-1">Disposition</span>
+                                <span class="block text-sm font-orbitron font-bold text-white uppercase tracking-wider">
+                                    Zum Disposition Dashboard
+                                </span>
+                                <span class="block text-xs text-[var(--muted)] font-inter mt-1">
+                                    Touren, Aufträge und Disposition verwalten
+                                </span>
+                            </div>
+                        </div>
+
+                        <span class="text-[9px] font-orbitron uppercase tracking-widest rounded-full px-3 py-1 border text-[#7ba7ff] bg-[#7ba7ff]/10 border-[#7ba7ff]/25 whitespace-nowrap">
                             Öffnen
                         </span>
                     </div>
