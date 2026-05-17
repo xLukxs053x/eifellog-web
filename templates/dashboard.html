@@ -116,6 +116,50 @@
         background: rgba(255, 255, 255, 0.2);
     }
 
+
+
+    /* ---------------------------------------------------------
+       Postfach-/Modal-Scroll-Lock
+       - Wenn das Postfach oder ein anderes Modal offen ist,
+         bleibt der Hintergrund fest stehen.
+       - Der Inhalt im Postfach selbst bleibt scrollbar.
+       - Funktioniert stabiler auf Mobile/iOS als nur body.overflow-hidden.
+    --------------------------------------------------------- */
+    html.modal-scroll-locked,
+    body.modal-scroll-locked {
+        overflow: hidden !important;
+        height: 100% !important;
+        overscroll-behavior: none;
+    }
+
+    body.modal-scroll-locked {
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+    }
+
+    #general-alerts-wrapper,
+    #tutorial-alert-wrapper,
+    #new-doc-alert-wrapper,
+    #universal-doc-modal,
+    #driver-registration-modal,
+    #token-request-modal {
+        overscroll-behavior: contain;
+    }
+
+    #general-alerts-panel {
+        min-height: 0;
+    }
+
+    #postfach-container {
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
+    }
+
     /* ---------------------------------------------------------
        Responsive Dashboard-Fit
        - Desktop/Laptop: leicht herausgezoomt über CSS-Scale.
@@ -992,7 +1036,7 @@
             </div>
         </div>
 
-        <div id="postfach-container" class="p-6 space-y-3 flex-grow overflow-y-auto custom-scrollbar">
+        <div id="postfach-container" class="p-6 space-y-3 flex-grow min-h-0 overflow-y-auto custom-scrollbar">
             {% if needs_signature_flag %}
             <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-green)]/70 hover:bg-white/[0.07] hover:-translate-y-0.5 transition-all duration-300 group relative"
                     data-title="EifelLog Richtlinien"
@@ -1587,8 +1631,16 @@
             element.setAttribute('aria-hidden', 'true');
         }
 
+        let lockedScrollY = 0;
+
         function lockBodyScroll() {
-            document.body.classList.add('overflow-hidden');
+            if (document.documentElement.classList.contains('modal-scroll-locked')) return;
+
+            lockedScrollY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+
+            document.documentElement.classList.add('modal-scroll-locked');
+            document.body.classList.add('modal-scroll-locked', 'overflow-hidden');
+            document.body.style.top = `-${lockedScrollY}px`;
         }
 
         function unlockBodyScroll() {
@@ -1600,7 +1652,10 @@
             const tutorialHidden = !tutorialAlertWrapper || tutorialAlertWrapper.classList.contains('hidden');
 
             if (driverHidden && tokenHidden && alertsHidden && newDocAlertHidden && docHidden && tutorialHidden) {
-                document.body.classList.remove('overflow-hidden');
+                document.documentElement.classList.remove('modal-scroll-locked');
+                document.body.classList.remove('modal-scroll-locked', 'overflow-hidden');
+                document.body.style.top = '';
+                window.scrollTo(0, lockedScrollY);
             }
         }
 
