@@ -2,10 +2,11 @@
 
 {#
     Dashboard-Fix:
-    - Kein automatisches System-Alert-Popup mehr.
+    - Kein automatisches System-Alert-Popup mehr (außer bei echten neuen Docs).
     - Token-Dokumente werden nur angezeigt, wenn fahrer_registration_status == "approved" ist.
     - "claimed" bedeutet nur: Sachbearbeiter hat übernommen, nicht freigegeben.
     - Token-Anforderung ist nur bei approved möglich.
+    - NEU: Blaues Tutorial-Alert, welches nur 1x pro User erscheint.
 #}
 
 {% set primary_role_display = primary_role_name|default('User', true) %}
@@ -557,6 +558,38 @@
     </div>
 </div>
 
+<!-- NEU: Blaues Tutorial-Alert-Modal -->
+<div id="tutorial-alert-wrapper" aria-hidden="true" class="fixed inset-0 z-[140] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
+    <div id="tutorial-alert-panel" class="relative z-10 w-full max-w-lg mx-auto overflow-hidden rounded-3xl border border-[#5865F2]/30 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(88,101,242,0.15)] transform transition-all duration-300">
+        <div class="p-6 md:p-7">
+            <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded-2xl bg-[#5865F2]/10 border border-[#5865F2]/30 flex items-center justify-center text-[#5865F2] shrink-0 shadow-[0_0_25px_rgba(88,101,242,0.1)]">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+
+                <div class="min-w-0">
+                    <span class="font-orbitron text-[10px] font-bold text-[#5865F2] tracking-[0.22em] uppercase">System Information</span>
+                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Moin {{ current_user.username }}!</h2>
+                    <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed">
+                        Starte jetzt dein Positions-Tutorial für die Rolle <strong>{{ primary_role_display }}</strong>, um deine Aufgaben im System kennenzulernen und allgemeine Schritte auf der Webseite zu verstehen.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <a href="/tutorial" id="btn-start-tutorial" class="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-[#5865F2]/15 border border-[#5865F2]/50 text-[#5865F2] hover:bg-[#5865F2]/30 hover:text-white hover:-translate-y-0.5 transition-all duration-300 font-orbitron text-[10px] font-bold uppercase tracking-[0.15em] shadow-[0_0_15px_rgba(88,101,242,0.1)] text-center">
+                    Tutorial starten
+                </a>
+                <button id="btn-dismiss-tutorial" type="button" class="w-full inline-flex items-center justify-center px-5 py-3 rounded-xl bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 hover:border-white/20 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.18em]">
+                    Später / Verstanden
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="new-doc-alert-wrapper" aria-hidden="true" class="fixed inset-0 z-[130] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
     <div id="new-doc-alert-panel" class="relative z-10 w-full max-w-lg mx-auto overflow-hidden rounded-3xl border border-[var(--brand-yellow)]/25 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(0,0,0,0.8)] transform transition-all duration-300">
         <div class="p-6 md:p-7">
@@ -979,6 +1012,13 @@
         const currentUserKey = {{ (current_user.id|default(current_user.username, true)) | string | tojson }};
         const fahrerRegistrationStatus = {{ fahrer_reg_status | tojson }};
 
+        // Tutorial UI Elements
+        const tutorialAlertWrapper = document.getElementById('tutorial-alert-wrapper');
+        const tutorialAlertPanel = document.getElementById('tutorial-alert-panel');
+        const btnStartTutorial = document.getElementById('btn-start-tutorial');
+        const btnDismissTutorial = document.getElementById('btn-dismiss-tutorial');
+        const tutorialStorageKey = `eifellog.tutorial.seen.${currentUserKey || 'user'}`;
+
         const alertBell = document.getElementById('alert-bell');
         const alertBadge = document.getElementById('alert-badge');
         const alertsWrapper = document.getElementById('general-alerts-wrapper');
@@ -1025,6 +1065,7 @@
          * Modals immer als direktes Kind von <body> anhängen
          */
         [
+            tutorialAlertWrapper,
             newDocAlertWrapper,
             alertsWrapper,
             univModal,
@@ -1066,8 +1107,9 @@
             const alertsHidden = !alertsWrapper || alertsWrapper.classList.contains('hidden');
             const newDocAlertHidden = !newDocAlertWrapper || newDocAlertWrapper.classList.contains('hidden');
             const docHidden = !univModal || univModal.classList.contains('hidden');
+            const tutorialHidden = !tutorialAlertWrapper || tutorialAlertWrapper.classList.contains('hidden');
 
-            if (driverHidden && tokenHidden && alertsHidden && newDocAlertHidden && docHidden) {
+            if (driverHidden && tokenHidden && alertsHidden && newDocAlertHidden && docHidden && tutorialHidden) {
                 document.body.classList.remove('overflow-hidden');
             }
         }
@@ -1080,7 +1122,6 @@
 
             setTimeout(() => {
                 wrapper.classList.remove('opacity-0');
-                // HINWEIS: scale-95 und translate-y-4 wurden entfernt, damit das Modal stabil zentriert gerendert wird
                 panel.classList.remove('opacity-0');
 
                 if (focusTarget) {
@@ -1104,6 +1145,37 @@
             }, 300);
         }
 
+        // ====== TUTORIAL LOGIK ======
+        let isTutorialShowing = false;
+        
+        setTimeout(() => {
+            const hasSeenTutorial = window.localStorage.getItem(tutorialStorageKey);
+            if (!hasSeenTutorial) {
+                isTutorialShowing = true;
+                openAnimatedModal(tutorialAlertWrapper, tutorialAlertPanel);
+            }
+        }, 800); // Leicht verzögert, wirkt natürlicher
+
+        if (btnStartTutorial) {
+            btnStartTutorial.addEventListener('click', () => {
+                // Setze Flag im LocalStorage, damit es nie wieder automatisch erscheint
+                window.localStorage.setItem(tutorialStorageKey, 'true');
+            });
+        }
+
+        if (btnDismissTutorial) {
+            btnDismissTutorial.addEventListener('click', () => {
+                // Setze Flag im LocalStorage
+                window.localStorage.setItem(tutorialStorageKey, 'true');
+                closeAnimatedModal(tutorialAlertWrapper, tutorialAlertPanel, () => {
+                    isTutorialShowing = false;
+                    // Wenn nach Wegklicken Dokumente da sind, Document-Alert triggern
+                    initializeInboxNotifications(true);
+                });
+            });
+        }
+
+        // ====== POSTFACH LOGIK ======
         const readDocumentsStorageKey = `eifellog.dashboard.readDocuments.${currentUserKey || 'user'}`;
         const inboxFingerprintStorageKey = `eifellog.dashboard.lastInboxFingerprint.${currentUserKey || 'user'}`;
         let readDocumentIds = new Set();
@@ -1240,7 +1312,9 @@
             closeAnimatedModal(alertsWrapper, alertsPanel);
         }
 
-        function initializeInboxNotifications() {
+        function initializeInboxNotifications(force = false) {
+            if (isTutorialShowing && !force) return; // Wenn Tutorial-Alert da ist, warte mit den Dokumenten
+
             readDocumentIds = new Set(readJsonArrayFromStorage(readDocumentsStorageKey));
             const unreadCount = updateInboxNotificationState();
             const fingerprint = getInboxFingerprint();
@@ -1400,6 +1474,15 @@
         document.addEventListener('keydown', (event) => {
             if (event.key !== 'Escape') return;
 
+            if (tutorialAlertWrapper && !tutorialAlertWrapper.classList.contains('hidden')) {
+                window.localStorage.setItem(tutorialStorageKey, 'true');
+                closeAnimatedModal(tutorialAlertWrapper, tutorialAlertPanel, () => {
+                    isTutorialShowing = false;
+                    initializeInboxNotifications(true);
+                });
+                return;
+            }
+
             if (newDocAlertWrapper && !newDocAlertWrapper.classList.contains('hidden')) {
                 rememberCurrentInboxFingerprint();
                 closeNewDocumentAlert();
@@ -1426,7 +1509,7 @@
             }
         });
 
-        // Dokument-Zähler initialisieren
+        // Dokument-Zähler initialisieren (wird zurückgehalten, falls Tutorial sichtbar ist)
         initializeInboxNotifications();
 
         if (univSigInput) {
