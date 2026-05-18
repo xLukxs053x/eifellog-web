@@ -5,6 +5,8 @@
 {% block content %}
 
 {% set github_repo = "xLukxs053x/EifelLog-Tracking" %}
+{% set telemetry_dll_file = "EifelLogTelemetry.dll" %}
+{% set telemetry_dll_url = url_for('static', filename=telemetry_dll_file) if url_for is defined else '/static/EifelLogTelemetry.dll' %}
 
 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 mt-6">
     <div>
@@ -15,7 +17,7 @@
             Downloads
         </h1>
         <p class="text-sm text-[var(--muted)] font-inter mt-2 max-w-2xl">
-            Lade dir hier das aktuelle EifelLog Setup herunter und öffne wichtige Fahrer-Dokumente direkt im Hub.
+            Lade dir hier das aktuelle EifelLog Setup, das Telemetry-Plugin und wichtige Fahrer-Dokumente direkt im Hub herunter.
         </p>
     </div>
 
@@ -86,6 +88,161 @@
                         </svg>
                         Setup wird gesucht...
                     </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card p-6 relative overflow-hidden border-t border-[#5865F2]/30">
+            <div class="absolute -right-12 -top-12 opacity-5 text-white">
+                <svg class="w-56 h-56" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M7 2h10a2 2 0 012 2v16a2 2 0 01-2 2H7a2 2 0 01-2-2V4a2 2 0 012-2zm1 4v2h8V6H8zm0 4v2h8v-2H8zm0 4v2h5v-2H8z"/>
+                </svg>
+            </div>
+
+            <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-6 relative z-10">
+                <div class="flex items-start gap-4">
+                    <div class="w-14 h-14 rounded-2xl bg-[#5865F2]/10 border border-[#5865F2]/30 flex items-center justify-center text-[#5865F2] shrink-0 shadow-[0_0_25px_rgba(88,101,242,0.12)]">
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 3v2m6-2v2M9 19v2m6-2v2M3 9h2m-2 6h2m14-6h2m-2 6h2M7 7h10v10H7V7z"></path>
+                        </svg>
+                    </div>
+
+                    <div class="min-w-0">
+                        <span class="font-orbitron text-[10px] font-bold text-[#5865F2] tracking-[0.22em] uppercase">
+                            ETS2 Telemetry Plugin
+                        </span>
+                        <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">
+                            EifelLogTelemetry.dll
+                        </h2>
+                        <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed">
+                            Diese Datei wird aus dem lokalen <span class="text-white font-semibold">static</span>-Ordner bereitgestellt und muss in den Plugin-Ordner von Euro Truck Simulator 2 kopiert werden.
+                        </p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
+                            <div class="bg-black/30 border border-white/5 rounded-2xl p-3">
+                                <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">Quelle</p>
+                                <p class="text-sm font-orbitron font-bold text-white">Static</p>
+                            </div>
+
+                            <div class="bg-black/30 border border-white/5 rounded-2xl p-3">
+                                <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">Größe</p>
+                                <p id="telemetry-dll-size" class="text-sm font-orbitron font-bold text-white">Prüfe...</p>
+                            </div>
+
+                            <div class="bg-black/30 border border-white/5 rounded-2xl p-3">
+                                <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-1">Status</p>
+                                <p id="telemetry-dll-status" class="text-sm font-orbitron font-bold text-[var(--brand-yellow)]">Prüfe...</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-5 bg-black/35 border border-white/10 rounded-2xl p-4">
+                            <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest mb-2">
+                                Zielordner Beispiel
+                            </p>
+                            <code class="block text-xs sm:text-sm text-gray-200 font-mono break-all leading-relaxed">
+                                C:\Program Files (x86)\Steam\steamapps\common\Euro Truck Simulator 2\bin\win_x64\plugins
+                            </code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3 w-full lg:w-auto lg:min-w-[260px]">
+                    <a id="telemetry-dll-download-btn"
+                       href="{{ telemetry_dll_url }}"
+                       download="EifelLogTelemetry.dll"
+                       class="inline-flex items-center justify-center px-6 py-4 rounded-2xl bg-[#5865F2]/10 border border-[#5865F2]/50 text-[#9AA2FF] hover:bg-[#5865F2]/20 hover:-translate-y-0.5 transition-all text-xs font-orbitron uppercase tracking-widest shadow-[0_0_25px_rgba(88,101,242,0.10)] opacity-60 cursor-not-allowed"
+                       aria-disabled="true">
+                        <svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        DLL wird geprüft...
+                    </a>
+
+                    <p class="text-[11px] text-[var(--muted)] font-inter leading-relaxed text-center lg:text-left">
+                        Server-Pfad: <span class="text-white font-mono">static/EifelLogTelemetry.dll</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide">
+                        Installation Tutorial
+                    </h2>
+                    <p class="text-xs text-[var(--muted)] font-inter mt-1">
+                        So installierst du das Telemetry-Plugin für Euro Truck Simulator 2.
+                    </p>
+                </div>
+
+                <span class="inline-flex w-fit px-3 py-1 rounded-full bg-[#5865F2]/10 border border-[#5865F2]/20 text-[#9AA2FF] text-[10px] font-orbitron uppercase tracking-widest">
+                    ETS2 Plugin
+                </span>
+            </div>
+
+            <div class="space-y-4">
+                <div class="flex gap-4 p-4 rounded-2xl bg-white/[0.04] border border-white/10">
+                    <div class="w-9 h-9 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center text-[var(--brand-green)] font-orbitron font-bold text-xs shrink-0">
+                        1
+                    </div>
+                    <div>
+                        <h3 class="font-orbitron text-sm font-bold text-white uppercase tracking-wider">
+                            DLL herunterladen
+                        </h3>
+                        <p class="text-sm text-[var(--muted)] font-inter mt-1 leading-relaxed">
+                            Klicke oben auf <span class="text-white font-semibold">DLL herunterladen</span> und speichere die Datei <span class="text-white font-mono">EifelLogTelemetry.dll</span>.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 p-4 rounded-2xl bg-white/[0.04] border border-white/10">
+                    <div class="w-9 h-9 rounded-xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 flex items-center justify-center text-[var(--brand-yellow)] font-orbitron font-bold text-xs shrink-0">
+                        2
+                    </div>
+                    <div>
+                        <h3 class="font-orbitron text-sm font-bold text-white uppercase tracking-wider">
+                            ETS2 Plugin-Ordner öffnen
+                        </h3>
+                        <p class="text-sm text-[var(--muted)] font-inter mt-1 leading-relaxed">
+                            Öffne im Explorer den folgenden Ordner:
+                        </p>
+                        <code class="block mt-3 bg-black/40 border border-white/10 rounded-xl p-3 text-xs sm:text-sm text-gray-200 font-mono break-all">
+                            C:\Program Files (x86)\Steam\steamapps\common\Euro Truck Simulator 2\bin\win_x64\plugins
+                        </code>
+                        <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">
+                            Falls der Ordner <span class="text-white font-mono">plugins</span> nicht existiert, erstelle ihn manuell.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 p-4 rounded-2xl bg-white/[0.04] border border-white/10">
+                    <div class="w-9 h-9 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/25 flex items-center justify-center text-[#9AA2FF] font-orbitron font-bold text-xs shrink-0">
+                        3
+                    </div>
+                    <div>
+                        <h3 class="font-orbitron text-sm font-bold text-white uppercase tracking-wider">
+                            Datei einfügen
+                        </h3>
+                        <p class="text-sm text-[var(--muted)] font-inter mt-1 leading-relaxed">
+                            Kopiere <span class="text-white font-mono">EifelLogTelemetry.dll</span> in den Ordner <span class="text-white font-mono">plugins</span>.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 p-4 rounded-2xl bg-white/[0.04] border border-white/10">
+                    <div class="w-9 h-9 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center text-[var(--brand-green)] font-orbitron font-bold text-xs shrink-0">
+                        4
+                    </div>
+                    <div>
+                        <h3 class="font-orbitron text-sm font-bold text-white uppercase tracking-wider">
+                            Spiel neu starten
+                        </h3>
+                        <p class="text-sm text-[var(--muted)] font-inter mt-1 leading-relaxed">
+                            Starte Euro Truck Simulator 2 neu. Danach kann EifelLog die Telemetry-Daten über das Plugin auslesen.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -221,6 +378,15 @@
                     </p>
                 </div>
 
+                <div class="border-l-2 border-[#5865F2] pl-3">
+                    <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
+                        Telemetry Plugin
+                    </p>
+                    <p class="text-sm font-inter text-gray-300 leading-relaxed">
+                        Kopiere die DLL in den ETS2-Plugin-Ordner, damit EifelLog Telemetry-Daten auslesen kann.
+                    </p>
+                </div>
+
                 <div class="border-l-2 border-[var(--brand-yellow)] pl-3">
                     <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-wider mb-1">
                         Nach der Fahrt
@@ -235,7 +401,7 @@
                         Support
                     </p>
                     <p class="text-sm font-inter text-gray-300 leading-relaxed">
-                        Bei Problemen mit Setup, Login oder Tourdaten melde dich beim Support-Team.
+                        Bei Problemen mit Setup, Login, Plugin oder Tourdaten melde dich beim Support-Team.
                     </p>
                 </div>
             </div>
@@ -248,7 +414,7 @@
 
             <div class="space-y-3">
                 <div class="flex justify-between items-center text-sm">
-                    <span class="text-gray-400 font-inter">Quelle:</span>
+                    <span class="text-gray-400 font-inter">Setup Quelle:</span>
                     <span class="text-white font-orbitron font-bold text-xs uppercase">GitHub</span>
                 </div>
 
@@ -261,6 +427,31 @@
                     <span class="text-gray-400 font-inter">Dateien:</span>
                     <span id="release-status-files" class="text-white font-orbitron font-bold text-xs uppercase">Lädt...</span>
                 </div>
+
+                <div class="flex justify-between items-center text-sm border-t border-white/10 pt-3">
+                    <span class="text-gray-400 font-inter">DLL Quelle:</span>
+                    <span class="text-[#9AA2FF] font-orbitron font-bold text-xs uppercase">Static</span>
+                </div>
+
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-400 font-inter">DLL Status:</span>
+                    <span id="release-status-dll" class="text-[var(--brand-yellow)] font-orbitron font-bold text-xs uppercase">Prüfe...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card p-6">
+            <h2 class="font-orbitron font-bold text-sm text-[var(--muted)] uppercase tracking-widest mb-4">
+                Static Datei
+            </h2>
+
+            <div class="bg-black/35 border border-white/10 rounded-2xl p-4">
+                <p class="text-xs text-[var(--muted)] font-inter leading-relaxed">
+                    Damit der Download funktioniert, muss die Datei in deinem Projekt hier liegen:
+                </p>
+                <code class="block mt-3 bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-gray-200 font-mono break-all">
+                    static/EifelLogTelemetry.dll
+                </code>
             </div>
         </div>
 
@@ -340,10 +531,18 @@
         const repo = '{{ github_repo }}';
         const releaseApiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
 
+        const telemetryDllFileName = '{{ telemetry_dll_file }}';
+        const telemetryDllUrl = '{{ telemetry_dll_url }}';
+
         const setupVersion = document.getElementById('setup-version');
         const setupSize = document.getElementById('setup-size');
         const setupStatus = document.getElementById('setup-status');
         const setupDownloadBtn = document.getElementById('setup-download-btn');
+
+        const telemetryDllSize = document.getElementById('telemetry-dll-size');
+        const telemetryDllStatus = document.getElementById('telemetry-dll-status');
+        const telemetryDllDownloadBtn = document.getElementById('telemetry-dll-download-btn');
+        const releaseStatusDll = document.getElementById('release-status-dll');
 
         const releaseStatusVersion = document.getElementById('release-status-version');
         const releaseStatusFiles = document.getElementById('release-status-files');
@@ -444,6 +643,99 @@
             `;
         }
 
+        function setTelemetryDllLoading() {
+            telemetryDllDownloadBtn.href = telemetryDllUrl;
+            telemetryDllDownloadBtn.setAttribute('download', telemetryDllFileName);
+            telemetryDllDownloadBtn.setAttribute('aria-disabled', 'true');
+            telemetryDllDownloadBtn.classList.add('opacity-60', 'cursor-not-allowed');
+
+            telemetryDllSize.textContent = 'Prüfe...';
+            telemetryDllStatus.textContent = 'Prüfe...';
+            telemetryDllStatus.classList.remove('text-[var(--brand-green)]');
+            telemetryDllStatus.classList.add('text-[var(--brand-yellow)]');
+
+            releaseStatusDll.textContent = 'Prüfe...';
+            releaseStatusDll.classList.remove('text-[var(--brand-green)]');
+            releaseStatusDll.classList.add('text-[var(--brand-yellow)]');
+
+            telemetryDllDownloadBtn.innerHTML = `
+                <svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                DLL wird geprüft...
+            `;
+        }
+
+        function setTelemetryDllReady(sizeText) {
+            telemetryDllDownloadBtn.href = telemetryDllUrl;
+            telemetryDllDownloadBtn.setAttribute('download', telemetryDllFileName);
+            telemetryDllDownloadBtn.removeAttribute('aria-disabled');
+            telemetryDllDownloadBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+
+            telemetryDllSize.textContent = sizeText || '-';
+            telemetryDllStatus.textContent = 'Bereit';
+            telemetryDllStatus.classList.remove('text-[var(--brand-yellow)]');
+            telemetryDllStatus.classList.add('text-[var(--brand-green)]');
+
+            releaseStatusDll.textContent = 'Bereit';
+            releaseStatusDll.classList.remove('text-[var(--brand-yellow)]');
+            releaseStatusDll.classList.add('text-[var(--brand-green)]');
+
+            telemetryDllDownloadBtn.innerHTML = `
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
+                </svg>
+                DLL herunterladen
+            `;
+        }
+
+        function setTelemetryDllUnavailable() {
+            telemetryDllDownloadBtn.href = telemetryDllUrl;
+            telemetryDllDownloadBtn.setAttribute('download', telemetryDllFileName);
+            telemetryDllDownloadBtn.setAttribute('aria-disabled', 'true');
+            telemetryDllDownloadBtn.classList.add('opacity-60', 'cursor-not-allowed');
+
+            telemetryDllSize.textContent = '-';
+            telemetryDllStatus.textContent = 'Datei fehlt';
+            telemetryDllStatus.classList.remove('text-[var(--brand-green)]');
+            telemetryDllStatus.classList.add('text-[var(--brand-yellow)]');
+
+            releaseStatusDll.textContent = 'Fehlt';
+            releaseStatusDll.classList.remove('text-[var(--brand-green)]');
+            releaseStatusDll.classList.add('text-[var(--brand-yellow)]');
+
+            telemetryDllDownloadBtn.innerHTML = `
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z"></path>
+                </svg>
+                DLL nicht verfügbar
+            `;
+        }
+
+        function checkTelemetryDll() {
+            setTelemetryDllLoading();
+
+            fetch(telemetryDllUrl, {
+                method: 'HEAD',
+                cache: 'no-store'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('DLL nicht gefunden');
+                }
+
+                const contentLength = response.headers.get('content-length');
+                const sizeText = contentLength ? formatBytes(Number(contentLength)) : '-';
+
+                setTelemetryDllReady(sizeText);
+            })
+            .catch(error => {
+                console.warn('Telemetry DLL konnte nicht geladen werden:', error);
+                setTelemetryDllUnavailable();
+            });
+        }
+
         function setUnavailableState() {
             setupVersion.textContent = '-';
             setupSize.textContent = '-';
@@ -463,6 +755,7 @@
         }
 
         setSetupButtonLoading();
+        checkTelemetryDll();
 
         fetch(releaseApiUrl, {
             headers: {
@@ -502,10 +795,9 @@
                 setSetupButtonUnavailable();
             }
 
-            // Flexiblere Namenssuche für Dokumente 
             assets.forEach(asset => {
                 const assetNameLower = (asset.name || '').toLowerCase();
-                
+
                 if (assetNameLower.includes('frachtterminal')) {
                     knownAssets['Frachtterminal.doc'] = asset;
                     docFrachtterminalVersion.textContent = `Version: ${latestVersion}`;
@@ -608,6 +900,12 @@
 
         setupDownloadBtn.addEventListener('click', event => {
             if (setupDownloadBtn.getAttribute('aria-disabled') === 'true') {
+                event.preventDefault();
+            }
+        });
+
+        telemetryDllDownloadBtn.addEventListener('click', event => {
+            if (telemetryDllDownloadBtn.getAttribute('aria-disabled') === 'true') {
                 event.preventDefault();
             }
         });
