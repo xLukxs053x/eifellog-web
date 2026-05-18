@@ -1,0 +1,872 @@
+{% extends "base.html" %}
+
+{#
+    EifelLog - Dispo Formular / Abschlussbelege
+    Zugriff:
+    - Diese Template-Ansicht rendert den Inhalt nur für User mit der Rolle "Disposition" sowie Projekt- und Geschäftsleitung.
+    - Trage die echte Discord-Rollen-ID der Disposition bei disposition_role_ids ein.
+    - Backend sollte die Route zusätzlich serverseitig schützen.
+
+    Erwartete optionale Backend-Daten:
+    - dispo_form_submissions: Liste eingereichter Dokumente / Abschlussbelege
+    - dispo_manual_entries: Liste manueller Schaden-/Einnahmen-Erfassungen
+    - dispo_form_pending_count, dispo_form_total_documents, dispo_form_income_sum, dispo_form_damage_sum
+#}
+
+{% set primary_role_display = primary_role_name|default('User', true) %}
+{% set current_user_roles = current_user.roles|default([], true) %}
+
+{# Rollen / Rollen-IDs für Disposition #}
+{# TODO: Echte Disposition-Rollen-ID eintragen, z. B. '1234567890123456789' #}
+{# 1473721587122438321 = ROLE_PROJEKTLEITUNG #}
+{# 1473721587122438322 = ROLE_GESCHAEFTSLEITUNG #}
+{% set disposition_role_ids = [
+    'Disposition',
+    '1473726639643820344',
+    '1473721587122438321',
+    '1473721587122438322'
+] %}
+
+{% set disposition_access = namespace(allowed=false) %}
+{% for role_id in disposition_role_ids %}
+    {% if role_id in current_user_roles or (role_id|int) in current_user_roles %}
+        {% set disposition_access.allowed = true %}
+    {% endif %}
+{% endfor %}
+{% if primary_role_display == 'Disposition' %}
+    {% set disposition_access.allowed = true %}
+{% endif %}
+
+{# Defensive Defaults #}
+{% set safe_submissions = dispo_form_submissions|default([], true) %}
+{% set safe_manual_entries = dispo_manual_entries|default([], true) %}
+{% set safe_pending_count = dispo_form_pending_count|default(safe_submissions|selectattr('status', 'equalto', 'pending')|list|length, true) %}
+{% set safe_total_documents = dispo_form_total_documents|default(safe_submissions|length, true) %}
+{% set safe_income_sum = dispo_form_income_sum|default('0,00 €', true) %}
+{% set safe_damage_sum = dispo_form_damage_sum|default('0,00 €', true) %}
+
+{% block title %}EifelLog - Dispo Formular{% endblock %}
+
+{% block content %}
+<style>
+    .dispo-form-scrollbar::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+        background: rgba(255, 255, 255, 0.035);
+    }
+
+    .dispo-form-scrollbar::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 999px;
+        margin: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .dispo-form-scrollbar::-webkit-scrollbar-thumb {
+        background: linear-gradient(
+            180deg,
+            rgba(88, 101, 242, 0.75),
+            rgba(137, 190, 50, 0.62)
+        );
+        border-radius: 999px;
+        border: 3px solid rgba(13, 15, 12, 0.92);
+        box-shadow: 0 0 14px rgba(88, 101, 242, 0.25);
+    }
+
+    .dispo-form-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(
+            180deg,
+            rgba(88, 101, 242, 0.95),
+            rgba(137, 190, 50, 0.82)
+        );
+    }
+
+    .dispo-form-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 440px;
+        position: relative;
+        z-index: 10;
+        padding-bottom: 14px;
+        scrollbar-width: thin !important;
+        scrollbar-color: rgba(88, 101, 242, 0.65) rgba(255, 255, 255, 0.08) !important;
+        scroll-behavior: smooth;
+    }
+
+    .dispo-form-table-wrap::-webkit-scrollbar {
+        display: block !important;
+        height: 14px !important;
+        width: 14px !important;
+        background: rgba(255, 255, 255, 0.035) !important;
+    }
+
+    .dispo-form-table-wrap::-webkit-scrollbar-track {
+        display: block !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        border-radius: 999px !important;
+        margin: 0 18px !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
+
+    .dispo-form-table-wrap::-webkit-scrollbar-thumb {
+        display: block !important;
+        background: linear-gradient(
+            90deg,
+            rgba(88, 101, 242, 0.75),
+            rgba(137, 190, 50, 0.62)
+        ) !important;
+        border-radius: 999px !important;
+        border: 3px solid rgba(13, 15, 12, 0.92) !important;
+        box-shadow: 0 0 14px rgba(88, 101, 242, 0.25) !important;
+    }
+
+    .dispo-form-table-wrap::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(
+            90deg,
+            rgba(88, 101, 242, 0.95),
+            rgba(137, 190, 50, 0.82)
+        ) !important;
+    }
+
+    .dispo-form-status-dot {
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 999px;
+        display: inline-block;
+        box-shadow: 0 0 12px currentColor;
+    }
+
+    .dispo-form-input {
+        width: 100%;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.35);
+        padding: 0.85rem 1rem;
+        color: white;
+        font-family: Inter, sans-serif;
+        outline: none;
+        transition: all 0.2s ease;
+    }
+
+    .dispo-form-input:focus {
+        border-color: rgba(137, 190, 50, 0.7);
+        box-shadow: 0 0 0 1px rgba(137, 190, 50, 0.25), 0 0 18px rgba(137, 190, 50, 0.06);
+    }
+
+    .dispo-form-input::placeholder {
+        color: rgba(255, 255, 255, 0.32);
+    }
+
+    .dispo-form-input[readonly] {
+        color: rgba(255, 255, 255, 0.72);
+        background: rgba(255, 255, 255, 0.045);
+        cursor: not-allowed;
+    }
+
+    .dispo-form-label {
+        display: block;
+        margin-bottom: 0.45rem;
+        color: var(--muted);
+        font-family: Orbitron, sans-serif;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    .dispo-form-select option {
+        background: #0d0f0c;
+        color: white;
+    }
+
+    .dispo-form-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        padding: 0.35rem 0.65rem;
+        font-family: Orbitron, sans-serif;
+        font-size: 0.55rem;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .dispo-form-tab {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        padding: 0.85rem 1rem;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+        font-family: Orbitron, sans-serif;
+        font-size: 0.65rem;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        transition: all 0.2s ease;
+    }
+
+    .dispo-form-tab:hover,
+    .dispo-form-tab.is-active {
+        color: white;
+        border-color: rgba(137, 190, 50, 0.38);
+        background: rgba(137, 190, 50, 0.1);
+        box-shadow: 0 0 20px rgba(137, 190, 50, 0.08);
+    }
+
+    .dispo-form-upload-zone {
+        border: 1px dashed rgba(137, 190, 50, 0.35);
+        background: rgba(137, 190, 50, 0.045);
+        border-radius: 1.5rem;
+        padding: 1.25rem;
+        transition: all 0.2s ease;
+    }
+
+    .dispo-form-upload-zone:hover {
+        border-color: rgba(137, 190, 50, 0.75);
+        background: rgba(137, 190, 50, 0.075);
+    }
+
+    .dispo-form-hidden {
+        display: none !important;
+    }
+</style>
+
+{% if not disposition_access.allowed %}
+<div class="min-h-[70vh] flex items-center justify-center relative z-10 px-4">
+    <div class="glass-card max-w-xl w-full p-8 text-center border border-[var(--danger)]/25 shadow-[0_0_60px_rgba(255,0,0,0.08)]">
+        <div class="w-16 h-16 rounded-3xl mx-auto mb-5 bg-[var(--danger)]/10 border border-[var(--danger)]/30 text-[var(--danger)] flex items-center justify-center">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v3.75m0 3.75h.008v.008H12V16.5zm9-4.5a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </div>
+        <span class="font-orbitron text-[10px] font-bold text-[var(--danger)] tracking-[0.22em] uppercase">Zugriff verweigert</span>
+        <h1 class="font-orbitron text-2xl font-bold text-white mt-2">Dispo-Formular nur für berechtigte User</h1>
+        <p class="text-sm text-[var(--muted)] font-inter mt-4 leading-relaxed">
+            Diese Seite ist ausschließlich für User mit der Rolle <strong class="text-white">Disposition</strong> sowie berechtigte Leitungsebenen sichtbar.
+        </p>
+        <a href="{{ url_for('dashboard') }}"
+           class="mt-6 inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+            Zurück zum Dashboard
+        </a>
+    </div>
+</div>
+{% else %}
+
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 mb-8 mt-6 relative z-10">
+    <div class="flex items-center gap-4">
+        <div class="w-16 h-16 rounded-full border-2 border-[#5865F2] overflow-hidden shadow-[0_0_18px_rgba(88,101,242,0.32)] bg-black/40">
+            {% if current_user.avatar %}
+                <img src="https://cdn.discordapp.com/avatars/{{ current_user.id }}/{{ current_user.avatar }}.png" alt="Avatar" class="w-full h-full object-cover">
+            {% else %}
+                <div class="w-full h-full bg-black/50 flex items-center justify-center text-white font-orbitron font-bold">DF</div>
+            {% endif %}
+        </div>
+
+        <div>
+            <span class="font-orbitron text-[10px] font-bold text-[#5865F2] tracking-[0.22em] uppercase">EifelLog Abschlussbereich</span>
+            <h1 class="text-2xl md:text-3xl font-orbitron font-bold text-white flex flex-wrap items-center gap-3 mt-1">
+                Dispo Formular
+                <span class="px-2.5 py-1 rounded bg-[#5865F2]/10 border border-[#5865F2]/30 text-[#7b8cff] text-[9px] uppercase tracking-widest font-bold">
+                    {{ current_user.username }}
+                </span>
+            </h1>
+            <p class="text-xs text-[var(--muted)] font-inter mt-2">
+                Schäden, Einnahmen und Abschlussbelege erfassen. Der Disponent sieht jederzeit, von wem der Beleg eingereicht wurde.
+            </p>
+        </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+        <a href="{{ url_for('dashboard') }}"
+           class="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 hover:border-white/20 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"></path>
+            </svg>
+            Dashboard
+        </a>
+        <button id="btn-refresh-dispo-form"
+                type="button"
+                class="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[#5865F2]/10 border border-[#5865F2]/35 text-[#7b8cff] hover:bg-[#5865F2]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v6h6M20 20v-6h-6M20 8A8 8 0 006.343 5.657M4 16a8 8 0 0013.657 2.343"></path>
+            </svg>
+            Aktualisieren
+        </button>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8 relative z-10">
+    <div class="glass-card p-6 relative overflow-hidden">
+        <div class="absolute -right-8 -top-8 opacity-5">
+            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+            </svg>
+        </div>
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <span class="dispo-form-status-dot text-[#5865F2] bg-[#5865F2]"></span>
+            Eingereichte Belege
+        </h3>
+        <p class="text-3xl font-bold text-white mt-2">{{ safe_total_documents }}</p>
+        <p class="text-xs text-[var(--muted)] font-inter mt-2">Frachtpapiere und Abschlussbelege</p>
+    </div>
+
+    <div class="glass-card p-6 relative overflow-hidden">
+        <div class="absolute -right-8 -top-8 opacity-5">
+            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L1 21h22L12 2zm1 16h-2v-2h2v2zm0-4h-2v-4h2v4z"></path>
+            </svg>
+        </div>
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <span class="dispo-form-status-dot text-[var(--brand-yellow)] bg-[var(--brand-yellow)]"></span>
+            Offen zur Prüfung
+        </h3>
+        <p class="text-3xl font-bold text-white mt-2">{{ safe_pending_count }}</p>
+        <p class="text-xs text-[var(--muted)] font-inter mt-2">Warten auf Disposition</p>
+    </div>
+
+    <div class="glass-card p-6 relative overflow-hidden">
+        <div class="absolute -right-8 -top-8 opacity-5">
+            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M11 2a1 1 0 011 1v1h3a1 1 0 010 2h-3v2h2a5 5 0 010 10h-2v3a1 1 0 11-2 0v-3H7a1 1 0 110-2h3v-2H8a5 5 0 010-10h2V3a1 1 0 011-1z"></path>
+            </svg>
+        </div>
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <span class="dispo-form-status-dot text-[var(--brand-green)] bg-[var(--brand-green)]"></span>
+            Einnahmen
+        </h3>
+        <p class="text-3xl font-bold text-white mt-2">{{ safe_income_sum }}</p>
+        <p class="text-xs text-[var(--muted)] font-inter mt-2">Netto / nach Backend-Auswertung</p>
+    </div>
+
+    <div class="glass-card p-6 relative overflow-hidden">
+        <div class="absolute -right-8 -top-8 opacity-5">
+            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19.428 15.428a8 8 0 10-10.856 0L12 22l3.428-6.572zM12 11a3 3 0 110-6 3 3 0 010 6z"></path>
+            </svg>
+        </div>
+        <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+            <span class="dispo-form-status-dot text-[var(--danger)] bg-[var(--danger)]"></span>
+            Schäden
+        </h3>
+        <p class="text-3xl font-bold text-white mt-2">{{ safe_damage_sum }}</p>
+        <p class="text-xs text-[var(--muted)] font-inter mt-2">Gemeldete Schadenbeträge</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 2xl:grid-cols-3 gap-6 relative z-10 mb-10">
+    <div class="2xl:col-span-2 flex flex-col gap-6">
+        <div class="glass-card p-6">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+                <div>
+                    <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Einreichung</span>
+                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Manuelle Erfassung & Belege</h2>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button type="button" class="dispo-form-tab is-active" data-form-tab="manual">
+                        Manuell erfassen
+                    </button>
+                    <button type="button" class="dispo-form-tab" data-form-tab="documents">
+                        Frachtpapiere einreichen
+                    </button>
+                </div>
+            </div>
+
+            <form id="manual-entry-form" action="/dispo/form/manual" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4" data-form-panel="manual">
+                {% if csrf_token is defined %}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% endif %}
+                <input type="hidden" name="submitted_by_id" value="{{ current_user.id }}">
+                <input type="hidden" name="submitted_by_name" value="{{ current_user.username }}">
+
+                <div>
+                    <label class="dispo-form-label" for="manual_type">Art der Erfassung</label>
+                    <select id="manual_type" name="entry_type" class="dispo-form-input dispo-form-select" required>
+                        <option value="income">Einnahme</option>
+                        <option value="damage">Schaden</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="dispo-form-label" for="manual_reference">Auftrag / Tour / Referenz</label>
+                    <input id="manual_reference" name="reference" type="text" class="dispo-form-input" placeholder="z. B. Tour #1024 / Auftrag Köln-München" required>
+                </div>
+
+                <div>
+                    <label class="dispo-form-label" for="manual_title">Titel</label>
+                    <input id="manual_title" name="title" type="text" class="dispo-form-input" placeholder="z. B. Zusatzeinnahme Maut / Schaden Stoßstange" required>
+                </div>
+
+                <div>
+                    <label class="dispo-form-label" for="manual_amount_net">Betrag Netto</label>
+                    <input id="manual_amount_net" name="amount_net" type="number" min="0" step="0.01" inputmode="decimal" class="dispo-form-input js-tax-net" placeholder="0,00" required>
+                </div>
+
+                <div>
+                    <label class="dispo-form-label" for="manual_tax_rate">Steuern</label>
+                    <select id="manual_tax_rate" name="tax_rate" class="dispo-form-input dispo-form-select js-tax-rate">
+                        <option value="19" selected>19% Standard</option>
+                        <option value="7">7%</option>
+                        <option value="0">0% / steuerfrei</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="dispo-form-label" for="manual_tax_mode">Steuerbehandlung</label>
+                    <select id="manual_tax_mode" name="tax_mode" class="dispo-form-input dispo-form-select">
+                        <option value="eifellog_internal" selected>EifelLog intern versteuern</option>
+                        <option value="external_receipt">Externer Beleg / bereits ausgewiesen</option>
+                        <option value="no_tax">Keine Steuer</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="dispo-form-label" for="manual_tax_amount">Steuerbetrag</label>
+                    <input id="manual_tax_amount" name="tax_amount_preview" type="text" class="dispo-form-input js-tax-amount" value="0,00 €" readonly>
+                </div>
+
+                <div>
+                    <label class="dispo-form-label" for="manual_amount_gross">Betrag Brutto</label>
+                    <input id="manual_amount_gross" name="amount_gross_preview" type="text" class="dispo-form-input js-tax-gross" value="0,00 €" readonly>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="dispo-form-label" for="manual_description">Beschreibung</label>
+                    <textarea id="manual_description" name="description" rows="4" class="dispo-form-input resize-none" placeholder="Kurz erklären, warum die Einnahme oder der Schaden erfasst wird..."></textarea>
+                </div>
+
+                <div class="md:col-span-2 flex flex-col sm:flex-row gap-3 justify-end mt-2">
+                    <button type="reset" class="inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+                        Zurücksetzen
+                    </button>
+                    <button type="submit" class="btn-primary justify-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Erfassung speichern
+                    </button>
+                </div>
+            </form>
+
+            <form id="document-upload-form" action="/dispo/form/documents/upload" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4 dispo-form-hidden" data-form-panel="documents">
+                {% if csrf_token is defined %}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% endif %}
+                <input type="hidden" name="submitted_by_id" value="{{ current_user.id }}">
+                <input type="hidden" name="submitted_by_name" value="{{ current_user.username }}">
+
+                <div>
+                    <label class="dispo-form-label" for="document_type">Dokumentart</label>
+                    <select id="document_type" name="document_type" class="dispo-form-input dispo-form-select" required>
+                        <option value="freight_papers">Frachtpapiere</option>
+                        <option value="abschlussbeleg">Abschlussbeleg</option>
+                        <option value="delivery_note">Lieferschein / Nachweis</option>
+                        <option value="invoice">Rechnung</option>
+                        <option value="damage_receipt">Schadenbeleg</option>
+                        <option value="other">Sonstiges</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="dispo-form-label" for="document_reference">Auftrag / Tour / Referenz</label>
+                    <input id="document_reference" name="reference" type="text" class="dispo-form-input" placeholder="z. B. Tour #1024 / Frachtauftrag" required>
+                </div>
+
+                <div>
+                    <label class="dispo-form-label" for="document_amount_net">Betrag Netto optional</label>
+                    <input id="document_amount_net" name="amount_net" type="number" min="0" step="0.01" inputmode="decimal" class="dispo-form-input js-tax-net" placeholder="0,00">
+                </div>
+
+                <div>
+                    <label class="dispo-form-label" for="document_tax_rate">Steuern</label>
+                    <select id="document_tax_rate" name="tax_rate" class="dispo-form-input dispo-form-select js-tax-rate">
+                        <option value="19" selected>19% Standard</option>
+                        <option value="7">7%</option>
+                        <option value="0">0% / steuerfrei</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="dispo-form-label" for="document_tax_mode">Steuerbehandlung</label>
+                    <select id="document_tax_mode" name="tax_mode" class="dispo-form-input dispo-form-select">
+                        <option value="eifellog_internal" selected>EifelLog intern versteuern</option>
+                        <option value="external_receipt">Externer Beleg / bereits ausgewiesen</option>
+                        <option value="no_tax">Keine Steuer</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="dispo-form-label" for="document_status">Einreichungsstatus</label>
+                    <select id="document_status" name="status" class="dispo-form-input dispo-form-select">
+                        <option value="pending" selected>Zur Prüfung</option>
+                        <option value="completed">Abschluss vollständig</option>
+                    </select>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="dispo-form-label" for="document_files">Frachtpapiere / Abschlussbelege</label>
+                    <label for="document_files" class="dispo-form-upload-zone flex flex-col md:flex-row md:items-center gap-4 cursor-pointer">
+                        <span class="w-12 h-12 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 text-[var(--brand-green)] flex items-center justify-center shrink-0">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M12 12v9m0-9l-3 3m3-3l3 3"></path>
+                            </svg>
+                        </span>
+                        <span class="min-w-0">
+                            <span class="block font-orbitron text-xs font-bold text-white uppercase tracking-widest">Dateien auswählen</span>
+                            <span id="document-file-preview" class="block text-xs text-[var(--muted)] font-inter mt-1">PDF, PNG, JPG oder WebP hochladen. Mehrere Dateien möglich.</span>
+                        </span>
+                    </label>
+                    <input id="document_files" name="documents" type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple required>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="dispo-form-label" for="document_note">Notiz für Disposition</label>
+                    <textarea id="document_note" name="note" rows="4" class="dispo-form-input resize-none" placeholder="Hinweis zum Abschlussbeleg, zur Fracht oder zur Abrechnung..."></textarea>
+                </div>
+
+                <div class="md:col-span-2 flex flex-col sm:flex-row gap-3 justify-end mt-2">
+                    <button type="reset" class="inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+                        Zurücksetzen
+                    </button>
+                    <button type="submit" class="btn-primary justify-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 12v9m0-9l-3 3m3-3l3 3M12 3v9"></path>
+                        </svg>
+                        Beleg einreichen
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="glass-card p-6 flex flex-col min-h-[420px]">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+                <div>
+                    <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase">Disponent Ansicht</span>
+                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Eingereichte Dokumente</h2>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input id="dispo-form-search" type="search" class="dispo-form-input min-w-[220px]" placeholder="Beleg suchen...">
+                    <select id="dispo-form-filter" class="dispo-form-input dispo-form-select sm:w-[190px]">
+                        <option value="all">Alle Einträge</option>
+                        <option value="pending">Zur Prüfung</option>
+                        <option value="approved">Freigegeben</option>
+                        <option value="rejected">Abgelehnt</option>
+                        <option value="completed">Abgeschlossen</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="dispo-form-table-wrap pr-1">
+                <table class="w-full text-left border-collapse min-w-[1050px] relative">
+                    <thead class="sticky top-0 bg-[#0d0f0c]/95 backdrop-blur-sm z-10">
+                        <tr class="border-b border-white/10 text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
+                            <th class="pb-3 px-2 pt-2">Eingang</th>
+                            <th class="pb-3 px-2 pt-2">Von</th>
+                            <th class="pb-3 px-2 pt-2">Referenz</th>
+                            <th class="pb-3 px-2 pt-2">Art</th>
+                            <th class="pb-3 px-2 pt-2">Betrag</th>
+                            <th class="pb-3 px-2 pt-2">Steuer</th>
+                            <th class="pb-3 px-2 pt-2">Status</th>
+                            <th class="pb-3 px-2 pt-2 text-right">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dispo-form-table" class="text-sm font-inter text-gray-300">
+                        {% if safe_submissions %}
+                            {% for item in safe_submissions %}
+                                {% set item_status = item.status|default('pending', true) %}
+                                {% set item_search = (
+                                    item.reference|default('', true) ~ ' ' ~
+                                    item.submitted_by|default(item.author|default('', true), true) ~ ' ' ~
+                                    item.document_type|default(item.type|default('', true), true) ~ ' ' ~
+                                    item.title|default('', true)
+                                )|lower %}
+                                <tr class="dispo-form-row border-b border-white/5 hover:bg-white/5 transition-colors"
+                                    data-search="{{ item_search }}"
+                                    data-status="{{ item_status }}">
+                                    <td class="py-4 px-2 text-xs text-[var(--muted)] whitespace-nowrap">
+                                        {{ item.created_at|default('-', true) }}
+                                    </td>
+                                    <td class="py-4 px-2">
+                                        <div class="font-bold text-white">{{ item.submitted_by|default(item.author|default('Unbekannt', true), true) }}</div>
+                                        <div class="text-xs text-[var(--muted)] mt-1">ID: {{ item.submitted_by_id|default('-', true) }}</div>
+                                    </td>
+                                    <td class="py-4 px-2">
+                                        <div class="font-bold text-white">{{ item.reference|default('-', true) }}</div>
+                                        <div class="text-xs text-[var(--muted)] mt-1">{{ item.title|default(item.note|default('', true), true) }}</div>
+                                    </td>
+                                    <td class="py-4 px-2">
+                                        <span class="dispo-form-chip text-[#7b8cff] bg-[#5865F2]/10 border border-[#5865F2]/25">
+                                            {{ item.document_type|default(item.type|default('Beleg', true), true) }}
+                                        </span>
+                                    </td>
+                                    <td class="py-4 px-2 whitespace-nowrap">
+                                        {{ item.amount_net|default('-', true) }}
+                                    </td>
+                                    <td class="py-4 px-2 whitespace-nowrap">
+                                        {{ item.tax_rate|default('19', true) }}% · {{ item.tax_mode|default('EifelLog intern', true) }}
+                                    </td>
+                                    <td class="py-4 px-2">
+                                        {% if item_status == 'approved' %}
+                                            <span class="dispo-form-chip text-[var(--brand-green)] bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25">Freigegeben</span>
+                                        {% elif item_status == 'rejected' %}
+                                            <span class="dispo-form-chip text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/25">Abgelehnt</span>
+                                        {% elif item_status == 'completed' %}
+                                            <span class="dispo-form-chip text-[#7b8cff] bg-[#5865F2]/10 border border-[#5865F2]/25">Abgeschlossen</span>
+                                        {% else %}
+                                            <span class="dispo-form-chip text-[var(--brand-yellow)] bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25">Zur Prüfung</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-4 px-2 text-right">
+                                        {% if item.file_url is defined and item.file_url %}
+                                            <a href="{{ item.file_url }}" target="_blank" rel="noopener"
+                                               class="inline-flex items-center justify-center px-4 py-2 rounded-full bg-[#5865F2]/10 border border-[#5865F2]/35 text-[#7b8cff] hover:bg-[#5865F2]/20 hover:text-white transition-all font-orbitron text-[9px] font-bold uppercase tracking-[0.14em]">
+                                                Öffnen
+                                            </a>
+                                        {% else %}
+                                            <span class="inline-flex items-center justify-center px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white/35 font-orbitron text-[9px] font-bold uppercase tracking-[0.14em]">
+                                                Kein Upload
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr class="border-b border-white/5">
+                                <td colspan="8" class="py-8 px-2 text-center text-white/50">
+                                    Noch keine Dokumente oder Abschlussbelege eingereicht.
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex flex-col gap-6">
+        <div class="glass-card p-6">
+            <div class="flex items-center justify-between gap-3 mb-5">
+                <div>
+                    <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Hinweis</span>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mt-1">Was der Disponent sieht</h2>
+                </div>
+                <span class="dispo-form-chip text-[var(--brand-green)] bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25">Live</span>
+            </div>
+
+            <div class="space-y-3 text-sm text-[var(--muted)] font-inter leading-relaxed">
+                <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
+                    <p class="text-white font-orbitron text-xs uppercase tracking-widest mb-2">Einreicher</p>
+                    <p>Jeder Beleg wird mit <strong class="text-white">User-ID</strong> und <strong class="text-white">Username</strong> gespeichert, damit die Disposition direkt sieht, von wem das Dokument kommt.</p>
+                </div>
+                <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
+                    <p class="text-white font-orbitron text-xs uppercase tracking-widest mb-2">Steuerstandard</p>
+                    <p>Standardmäßig sind <strong class="text-white">19%</strong> gesetzt. Als Steuerbehandlung ist <strong class="text-white">EifelLog intern versteuern</strong> vorausgewählt.</p>
+                </div>
+                <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
+                    <p class="text-white font-orbitron text-xs uppercase tracking-widest mb-2">Abschluss</p>
+                    <p>Frachtpapiere, Lieferscheine, Rechnungen und Abschlussbelege können gebündelt eingereicht und später vom Backend geprüft/freigegeben werden.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card p-6">
+            <div class="flex items-center justify-between gap-3 mb-5">
+                <div>
+                    <span class="font-orbitron text-[10px] font-bold text-[#5865F2] tracking-[0.22em] uppercase">Manuelle Erfassungen</span>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mt-1">Letzte Einträge</h2>
+                </div>
+            </div>
+
+            <div class="space-y-3 max-h-[380px] overflow-y-auto dispo-form-scrollbar pr-1">
+                {% if safe_manual_entries %}
+                    {% for entry in safe_manual_entries %}
+                        {% set entry_type = entry.entry_type|default(entry.type|default('income', true), true) %}
+                        <div class="rounded-2xl bg-black/30 border border-white/10 p-4 hover:border-[#5865F2]/35 hover:bg-white/[0.04] transition-all">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <h3 class="text-sm font-orbitron font-bold text-white truncate">{{ entry.title|default('Erfassung', true) }}</h3>
+                                    <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">{{ entry.description|default(entry.reference|default('-', true), true) }}</p>
+                                    <p class="text-[10px] text-white/40 font-orbitron uppercase tracking-widest mt-3">
+                                        {{ entry.submitted_by|default(entry.author|default('Unbekannt', true), true) }} · {{ entry.created_at|default('-', true) }}
+                                    </p>
+                                </div>
+                                {% if entry_type == 'damage' %}
+                                    <span class="dispo-form-chip text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/25">Schaden</span>
+                                {% else %}
+                                    <span class="dispo-form-chip text-[var(--brand-green)] bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25">Einnahme</span>
+                                {% endif %}
+                            </div>
+                            <div class="mt-3 text-xs text-[var(--muted)] font-inter">
+                                Netto: <span class="text-white">{{ entry.amount_net|default('-', true) }}</span> · Steuer: <span class="text-white">{{ entry.tax_rate|default('19', true) }}%</span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="rounded-2xl bg-black/30 border border-white/10 p-6 text-center text-white/50 text-sm">
+                        Noch keine manuellen Erfassungen vorhanden.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="glass-card p-6 bg-gradient-to-br from-black/40 to-black/80">
+            <div class="flex items-center justify-between gap-3 mb-5">
+                <div>
+                    <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase">Backend Routen</span>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mt-1">Anbindung</h2>
+                </div>
+            </div>
+
+            <div class="space-y-3 font-inter text-xs text-[var(--muted)] leading-relaxed">
+                <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-4">
+                    <p class="font-orbitron text-[10px] text-white uppercase tracking-widest mb-2">POST /dispo/form/manual</p>
+                    <p>Speichert Schaden/Einnahme inklusive Referenz, Steuer, User-ID und Username.</p>
+                </div>
+                <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-4">
+                    <p class="font-orbitron text-[10px] text-white uppercase tracking-widest mb-2">POST /dispo/form/documents/upload</p>
+                    <p>Nimmt Frachtpapiere, Abschlussbelege und weitere Dokumente als Upload entgegen.</p>
+                </div>
+                <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-4">
+                    <p class="font-orbitron text-[10px] text-white uppercase tracking-widest mb-2">GET /dispo/form</p>
+                    <p>Rendert diese Seite. Die Route muss zusätzlich serverseitig mit der Disposition-Rolle geschützt werden.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const refreshButton = document.getElementById('btn-refresh-dispo-form');
+        const tabButtons = Array.from(document.querySelectorAll('[data-form-tab]'));
+        const panels = Array.from(document.querySelectorAll('[data-form-panel]'));
+        const searchInput = document.getElementById('dispo-form-search');
+        const statusFilter = document.getElementById('dispo-form-filter');
+        const rows = Array.from(document.querySelectorAll('.dispo-form-row'));
+        const documentInput = document.getElementById('document_files');
+        const documentPreview = document.getElementById('document-file-preview');
+
+        function setActiveTab(tabName) {
+            tabButtons.forEach((button) => {
+                button.classList.toggle('is-active', button.dataset.formTab === tabName);
+            });
+
+            panels.forEach((panel) => {
+                panel.classList.toggle('dispo-form-hidden', panel.dataset.formPanel !== tabName);
+            });
+        }
+
+        function parseAmount(value) {
+            if (!value) return 0;
+            const normalized = String(value).replace(',', '.').replace(/[^0-9.]/g, '');
+            const parsed = Number.parseFloat(normalized);
+            return Number.isFinite(parsed) ? parsed : 0;
+        }
+
+        function formatEuro(value) {
+            return new Intl.NumberFormat('de-DE', {
+                style: 'currency',
+                currency: 'EUR'
+            }).format(value || 0);
+        }
+
+        function updateTaxPreview(form) {
+            if (!form) return;
+
+            const netInput = form.querySelector('.js-tax-net');
+            const rateInput = form.querySelector('.js-tax-rate');
+            const taxAmountInput = form.querySelector('.js-tax-amount');
+            const grossInput = form.querySelector('.js-tax-gross');
+
+            if (!netInput || !rateInput) return;
+
+            const net = parseAmount(netInput.value);
+            const rate = parseAmount(rateInput.value);
+            const tax = net * (rate / 100);
+            const gross = net + tax;
+
+            if (taxAmountInput) {
+                taxAmountInput.value = formatEuro(tax);
+            }
+
+            if (grossInput) {
+                grossInput.value = formatEuro(gross);
+            }
+        }
+
+        function filterRows() {
+            const query = (searchInput?.value || '').trim().toLowerCase();
+            const status = statusFilter?.value || 'all';
+
+            rows.forEach((row) => {
+                const matchesQuery = !query || (row.dataset.search || '').includes(query);
+                const matchesStatus = status === 'all' || row.dataset.status === status;
+                row.classList.toggle('hidden', !(matchesQuery && matchesStatus));
+            });
+        }
+
+        if (refreshButton) {
+            refreshButton.addEventListener('click', function () {
+                window.location.reload();
+            });
+        }
+
+        tabButtons.forEach((button) => {
+            button.addEventListener('click', function () {
+                setActiveTab(button.dataset.formTab);
+            });
+        });
+
+        document.querySelectorAll('form').forEach((form) => {
+            const netInput = form.querySelector('.js-tax-net');
+            const rateInput = form.querySelector('.js-tax-rate');
+
+            if (netInput) {
+                netInput.addEventListener('input', () => updateTaxPreview(form));
+            }
+
+            if (rateInput) {
+                rateInput.addEventListener('change', () => updateTaxPreview(form));
+            }
+
+            updateTaxPreview(form);
+        });
+
+        if (searchInput) {
+            searchInput.addEventListener('input', filterRows);
+        }
+
+        if (statusFilter) {
+            statusFilter.addEventListener('change', filterRows);
+        }
+
+        if (documentInput && documentPreview) {
+            documentInput.addEventListener('change', function () {
+                const files = Array.from(documentInput.files || []);
+
+                if (!files.length) {
+                    documentPreview.textContent = 'PDF, PNG, JPG oder WebP hochladen. Mehrere Dateien möglich.';
+                    return;
+                }
+
+                if (files.length === 1) {
+                    documentPreview.textContent = files[0].name;
+                    return;
+                }
+
+                documentPreview.textContent = `${files.length} Dateien ausgewählt`;
+            });
+        }
+    });
+</script>
+
+{% endif %}
+{% endblock %}
