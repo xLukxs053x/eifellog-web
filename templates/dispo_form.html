@@ -3,11 +3,12 @@
 {#
     EifelLog - Dispo Formular / Abschlussbelege
     Zugriff:
-    - Diese Template-Ansicht rendert den Inhalt nur für User mit der Rolle "Disposition" sowie Projekt- und Geschäftsleitung.
-    - Trage die echte Discord-Rollen-ID der Disposition bei disposition_role_ids ein.
-    - Backend sollte die Route zusätzlich serverseitig schützen.
+    - Formular und Upload sind für alle eingeloggten User gedacht.
+    - Die Disponenten-Ansicht mit eingereichten Dokumenten wird nur gerendert,
+      wenn das Backend can_view_dispo_submitted_documents / show_dispo_submitted_documents setzt
+      oder der User eindeutig eine Disposition-/Disponent-Rolle besitzt.
 
-    Erwartete optionale Backend-Daten:
+    Erwartete optionale Daten:
     - dispo_form_submissions: Liste eingereichter Dokumente / Abschlussbelege
     - dispo_manual_entries: Liste manueller Schaden-/Einnahmen-Erfassungen
     - dispo_form_pending_count, dispo_form_total_documents, dispo_form_income_sum, dispo_form_damage_sum
@@ -16,34 +17,52 @@
 {% set primary_role_display = primary_role_name|default('User', true) %}
 {% set current_user_roles = current_user.roles|default([], true) %}
 
-{# Rollen / Rollen-IDs für Disposition #}
-{# TODO: Echte Disposition-Rollen-ID eintragen, z. B. '1234567890123456789' #}
-{# 1473721587122438321 = ROLE_PROJEKTLEITUNG #}
-{# 1473721587122438322 = ROLE_GESCHAEFTSLEITUNG #}
+{# Nur für die Disponenten-Sektion „Eingereichte Dokumente“. Das Formular selbst bleibt offen. #}
 {% set disposition_role_ids = [
-    'Disposition',
+    role_disposition_id|default('', true),
     '1473726639643820344',
-    '1473721587122438321',
-    '1473721587122438322'
+    'Disposition',
+    'Disponent',
+    'disposition',
+    'disponent',
+    'dispo'
 ] %}
 
-{% set disposition_access = namespace(allowed=false) %}
-{% for role_id in disposition_role_ids %}
-    {% if role_id in current_user_roles or (role_id|int) in current_user_roles %}
-        {% set disposition_access.allowed = true %}
-    {% endif %}
-{% endfor %}
-{% if primary_role_display == 'Disposition' %}
-    {% set disposition_access.allowed = true %}
+{% set dispo_documents_access = namespace(allowed=false) %}
+
+{% if can_view_dispo_submitted_documents|default(false, true)
+      or show_dispo_submitted_documents|default(false, true)
+      or show_submitted_documents|default(false, true)
+      or is_disposition_viewer|default(false, true) %}
+    {% set dispo_documents_access.allowed = true %}
 {% endif %}
 
-{# Defensive Defaults #}
-{% set safe_submissions = dispo_form_submissions|default([], true) %}
-{% set safe_manual_entries = dispo_manual_entries|default([], true) %}
-{% set safe_pending_count = dispo_form_pending_count|default(safe_submissions|selectattr('status', 'equalto', 'pending')|list|length, true) %}
-{% set safe_total_documents = dispo_form_total_documents|default(safe_submissions|length, true) %}
-{% set safe_income_sum = dispo_form_income_sum|default('0,00 €', true) %}
-{% set safe_damage_sum = dispo_form_damage_sum|default('0,00 €', true) %}
+{% for role_id in disposition_role_ids %}
+    {% if role_id and (role_id in current_user_roles or (role_id|int) in current_user_roles) %}
+        {% set dispo_documents_access.allowed = true %}
+    {% endif %}
+{% endfor %}
+
+{% if primary_role_display in ['Disposition', 'Disponent'] %}
+    {% set dispo_documents_access.allowed = true %}
+{% endif %}
+
+{# Defensive Defaults: sensible Daten nur für Disponenten rendern. #}
+{% if dispo_documents_access.allowed %}
+    {% set safe_submissions = dispo_form_submissions|default([], true) %}
+    {% set safe_manual_entries = dispo_manual_entries|default([], true) %}
+    {% set safe_pending_count = dispo_form_pending_count|default(safe_submissions|selectattr('status', 'equalto', 'pending')|list|length, true) %}
+    {% set safe_total_documents = dispo_form_total_documents|default(safe_submissions|length, true) %}
+    {% set safe_income_sum = dispo_form_income_sum|default('0,00 €', true) %}
+    {% set safe_damage_sum = dispo_form_damage_sum|default('0,00 €', true) %}
+{% else %}
+    {% set safe_submissions = [] %}
+    {% set safe_manual_entries = [] %}
+    {% set safe_pending_count = 0 %}
+    {% set safe_total_documents = 0 %}
+    {% set safe_income_sum = '0,00 €' %}
+    {% set safe_damage_sum = '0,00 €' %}
+{% endif %}
 
 {% block title %}EifelLog - Dispo Formular{% endblock %}
 
@@ -238,26 +257,7 @@
     }
 </style>
 
-{% if not disposition_access.allowed %}
-<div class="min-h-[70vh] flex items-center justify-center relative z-10 px-4">
-    <div class="glass-card max-w-xl w-full p-8 text-center border border-[var(--danger)]/25 shadow-[0_0_60px_rgba(255,0,0,0.08)]">
-        <div class="w-16 h-16 rounded-3xl mx-auto mb-5 bg-[var(--danger)]/10 border border-[var(--danger)]/30 text-[var(--danger)] flex items-center justify-center">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v3.75m0 3.75h.008v.008H12V16.5zm9-4.5a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-        </div>
-        <span class="font-orbitron text-[10px] font-bold text-[var(--danger)] tracking-[0.22em] uppercase">Zugriff verweigert</span>
-        <h1 class="font-orbitron text-2xl font-bold text-white mt-2">Dispo-Formular nur für berechtigte User</h1>
-        <p class="text-sm text-[var(--muted)] font-inter mt-4 leading-relaxed">
-            Diese Seite ist ausschließlich für User mit der Rolle <strong class="text-white">Disposition</strong> sowie berechtigte Leitungsebenen sichtbar.
-        </p>
-        <a href="{{ url_for('dashboard') }}"
-           class="mt-6 inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
-            Zurück zum Dashboard
-        </a>
-    </div>
-</div>
-{% else %}
+
 
 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 mb-8 mt-6 relative z-10">
     <div class="flex items-center gap-4">
@@ -278,7 +278,7 @@
                 </span>
             </h1>
             <p class="text-xs text-[var(--muted)] font-inter mt-2">
-                Schäden, Einnahmen und Abschlussbelege erfassen. Der Disponent sieht jederzeit, von wem der Beleg eingereicht wurde.
+                Schäden, Einnahmen und Abschlussbelege erfassen und sauber an die Disposition übergeben.
             </p>
         </div>
     </div>
@@ -302,6 +302,7 @@
     </div>
 </div>
 
+{% if dispo_documents_access.allowed %}
 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8 relative z-10">
     <div class="glass-card p-6 relative overflow-hidden">
         <div class="absolute -right-8 -top-8 opacity-5">
@@ -359,6 +360,8 @@
         <p class="text-xs text-[var(--muted)] font-inter mt-2">Gemeldete Schadenbeträge</p>
     </div>
 </div>
+
+{% endif %}
 
 <div class="grid grid-cols-1 2xl:grid-cols-3 gap-6 relative z-10 mb-10">
     <div class="2xl:col-span-2 flex flex-col gap-6">
@@ -545,6 +548,7 @@
             </form>
         </div>
 
+        {% if dispo_documents_access.allowed %}
         <div class="glass-card p-6 flex flex-col min-h-[420px]">
             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
                 <div>
@@ -648,6 +652,7 @@
                     </tbody>
                 </table>
             </div>
+        {% endif %}
         </div>
     </div>
 
@@ -656,7 +661,7 @@
             <div class="flex items-center justify-between gap-3 mb-5">
                 <div>
                     <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Hinweis</span>
-                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mt-1">Was der Disponent sieht</h2>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mt-1">Hinweise zur Einreichung</h2>
                 </div>
                 <span class="dispo-form-chip text-[var(--brand-green)] bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25">Live</span>
             </div>
@@ -664,7 +669,7 @@
             <div class="space-y-3 text-sm text-[var(--muted)] font-inter leading-relaxed">
                 <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
                     <p class="text-white font-orbitron text-xs uppercase tracking-widest mb-2">Einreicher</p>
-                    <p>Jeder Beleg wird mit <strong class="text-white">User-ID</strong> und <strong class="text-white">Username</strong> gespeichert, damit die Disposition direkt sieht, von wem das Dokument kommt.</p>
+                    <p>Jeder Beleg wird mit <strong class="text-white">User-ID</strong> und <strong class="text-white">Username</strong> übergeben, damit die Zuordnung eindeutig bleibt.</p>
                 </div>
                 <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
                     <p class="text-white font-orbitron text-xs uppercase tracking-widest mb-2">Steuerstandard</p>
@@ -672,11 +677,12 @@
                 </div>
                 <div class="rounded-2xl bg-black/30 border border-white/10 p-4">
                     <p class="text-white font-orbitron text-xs uppercase tracking-widest mb-2">Abschluss</p>
-                    <p>Frachtpapiere, Lieferscheine, Rechnungen und Abschlussbelege können gebündelt eingereicht und später vom Backend geprüft/freigegeben werden.</p>
+                    <p>Frachtpapiere, Lieferscheine, Rechnungen und Abschlussbelege können gebündelt eingereicht werden.</p>
                 </div>
             </div>
         </div>
 
+        {% if dispo_documents_access.allowed %}
         <div class="glass-card p-6">
             <div class="flex items-center justify-between gap-3 mb-5">
                 <div>
@@ -717,29 +723,8 @@
             </div>
         </div>
 
-        <div class="glass-card p-6 bg-gradient-to-br from-black/40 to-black/80">
-            <div class="flex items-center justify-between gap-3 mb-5">
-                <div>
-                    <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase">Backend Routen</span>
-                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mt-1">Anbindung</h2>
-                </div>
-            </div>
+        {% endif %}
 
-            <div class="space-y-3 font-inter text-xs text-[var(--muted)] leading-relaxed">
-                <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-4">
-                    <p class="font-orbitron text-[10px] text-white uppercase tracking-widest mb-2">POST /dispo/form/manual</p>
-                    <p>Speichert Schaden/Einnahme inklusive Referenz, Steuer, User-ID und Username.</p>
-                </div>
-                <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-4">
-                    <p class="font-orbitron text-[10px] text-white uppercase tracking-widest mb-2">POST /dispo/form/documents/upload</p>
-                    <p>Nimmt Frachtpapiere, Abschlussbelege und weitere Dokumente als Upload entgegen.</p>
-                </div>
-                <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-4">
-                    <p class="font-orbitron text-[10px] text-white uppercase tracking-widest mb-2">GET /dispo/form</p>
-                    <p>Rendert diese Seite. Die Route muss zusätzlich serverseitig mit der Disposition-Rolle geschützt werden.</p>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -868,5 +853,4 @@
     });
 </script>
 
-{% endif %}
 {% endblock %}
