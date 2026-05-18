@@ -3,7 +3,7 @@
 {#
     EifelLog - Disposition Dashboard
     Zugriff:
-    - Diese Template-Ansicht rendert den Inhalt nur für User mit der Rolle "Disposition".
+    - Diese Template-Ansicht rendert den Inhalt nur für User mit der Rolle "Disposition" sowie Projekt- und Geschäftsleitung.
     - Trage bei Bedarf die echte Discord-Rollen-ID in disposition_role_ids ein.
     - Backend sollte die Route zusätzlich serverseitig schützen.
 #}
@@ -13,7 +13,9 @@
 
 {# Rolle / Rollen-ID für Disposition #}
 {% set disposition_role_ids = [
-    'Disposition'
+    'Disposition',
+    '1473721587122438321', {# ROLE_PROJEKTLEITUNG #}
+    '1473721587122438322'  {# ROLE_GESCHAEFTSLEITUNG #}
 ] %}
 {% set disposition_access = namespace(allowed=false) %}
 {% for role_id in disposition_role_ids %}
