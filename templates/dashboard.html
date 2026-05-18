@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {#
-    Dashboard-Fix:
+    Dashboard-Fix + Base-Layout-Anpassung:
     - Kein automatisches System-Alert-Popup mehr (außer bei echten neuen Docs).
     - Token-Dokumente werden nur angezeigt, wenn fahrer_registration_status == "approved" ist.
     - "claimed" bedeutet nur: Sachbearbeiter hat übernommen, nicht freigegeben.
@@ -162,10 +162,11 @@
     }
 
     /* ---------------------------------------------------------
-       Responsive Dashboard-Fit
-       - Desktop/Laptop: leicht herausgezoomt über CSS-Scale.
-       - Tablet/Mobile: kein Scale, dafür kompaktere Abstände.
-       - Verhindert horizontales Überlaufen bei fremden Auflösungen.
+       Dashboard-Fit passend zur base.html
+       - Nutzt die Breite und den globalen rem-Zoom aus base.html.
+       - Kein eigenes transform: scale mehr, damit nichts abgeschnitten,
+         verschoben oder doppelt herausgezoomt wird.
+       - Karten, Tabellen und Modals bleiben kompakt und responsive.
     --------------------------------------------------------- */
     html,
     body {
@@ -174,14 +175,13 @@
     }
 
     .dashboard-responsive-shell {
-        --dashboard-scale: 1;
-        --dashboard-radius: clamp(1rem, 1.2vw, 1.5rem);
-        --dashboard-card-padding: clamp(1rem, 1.15vw, 1.5rem);
-        --dashboard-gap: clamp(0.875rem, 1.1vw, 1.5rem);
-        width: min(100%, 1880px);
+        --dashboard-radius: clamp(1rem, 1vw, 1.35rem);
+        --dashboard-card-padding: clamp(0.95rem, 1vw, 1.25rem);
+        --dashboard-gap: clamp(0.85rem, 1vw, 1.25rem);
+        width: 100%;
+        max-width: 100%;
         margin-inline: auto;
-        transform-origin: top center;
-        will-change: transform;
+        min-width: 0;
     }
 
     .dashboard-responsive-shell,
@@ -189,52 +189,77 @@
         box-sizing: border-box;
     }
 
-    .dashboard-responsive-shell .glass-card {
-        padding: var(--dashboard-card-padding) !important;
-        border-radius: var(--dashboard-radius);
+    .dashboard-responsive-shell > .flex:first-child {
+        margin-top: 0 !important;
     }
 
-    .dashboard-responsive-shell .gap-6 {
+    .dashboard-responsive-shell .glass-card {
+        padding: var(--dashboard-card-padding) !important;
+        border-radius: var(--dashboard-radius) !important;
+        min-width: 0;
+    }
+
+    .dashboard-responsive-shell .gap-6,
+    .dashboard-responsive-shell .grid.gap-6,
+    .dashboard-responsive-shell .flex.gap-6 {
         gap: var(--dashboard-gap) !important;
     }
 
+    .dashboard-responsive-shell .gap-4 {
+        gap: clamp(0.75rem, 0.85vw, 1rem) !important;
+    }
+
+    .dashboard-responsive-shell .gap-3 {
+        gap: clamp(0.6rem, 0.75vw, 0.85rem) !important;
+    }
+
+    .dashboard-responsive-shell .mb-10 {
+        margin-bottom: clamp(1.6rem, 2vw, 2.5rem) !important;
+    }
+
     .dashboard-responsive-shell .mb-8 {
-        margin-bottom: clamp(1.25rem, 1.5vw, 2rem) !important;
+        margin-bottom: clamp(1.1rem, 1.35vw, 1.7rem) !important;
     }
 
     .dashboard-responsive-shell .mt-6 {
-        margin-top: clamp(1rem, 1.2vw, 1.5rem) !important;
+        margin-top: 0 !important;
     }
 
     .dashboard-responsive-shell h1 {
-        font-size: clamp(1.35rem, 1.75vw, 1.875rem) !important;
+        font-size: clamp(1.35rem, 1.55vw, 1.75rem) !important;
         line-height: 1.12 !important;
         flex-wrap: wrap;
         min-width: 0;
     }
 
     .dashboard-responsive-shell h2 {
-        font-size: clamp(1rem, 1.05vw, 1.125rem) !important;
+        font-size: clamp(1rem, 1vw, 1.1rem) !important;
         line-height: 1.25 !important;
     }
 
     .dashboard-responsive-shell .text-3xl {
-        font-size: clamp(1.55rem, 1.75vw, 1.875rem) !important;
+        font-size: clamp(1.45rem, 1.6vw, 1.75rem) !important;
         line-height: 1.15 !important;
     }
 
     .dashboard-responsive-shell .text-2xl {
-        font-size: clamp(1.25rem, 1.45vw, 1.5rem) !important;
-        line-height: 1.2 !important;
+        font-size: clamp(1.2rem, 1.35vw, 1.45rem) !important;
+        line-height: 1.18 !important;
+    }
+
+    .dashboard-responsive-shell .text-xl {
+        font-size: clamp(1rem, 1.1vw, 1.18rem) !important;
     }
 
     .dashboard-responsive-shell .grid,
-    .dashboard-responsive-shell .flex {
+    .dashboard-responsive-shell .flex,
+    .dashboard-responsive-shell [class*="grid-cols"],
+    .dashboard-responsive-shell [class*="col-span"] {
         min-width: 0;
     }
 
     .dashboard-responsive-shell table {
-        min-width: 620px;
+        min-width: 600px;
     }
 
     .dashboard-responsive-shell img,
@@ -246,70 +271,52 @@
         text-wrap: balance;
     }
 
-    /* Laptop- und Desktop-Fit: Layout optisch etwas herauszoomen */
-    @media (min-width: 1024px) {
-        .dashboard-responsive-shell {
-            transform: scale(var(--dashboard-scale));
-            width: calc(100% / var(--dashboard-scale));
-            max-width: calc(1880px / var(--dashboard-scale));
-            margin-left: calc((100% - (100% / var(--dashboard-scale))) / 2);
-            margin-right: auto;
+    .dashboard-responsive-shell .min-w-\[230px\] {
+        min-width: min(14.5rem, 100%) !important;
+    }
+
+    .dashboard-responsive-shell .min-w-\[150px\] {
+        min-width: min(9.5rem, 100%) !important;
+    }
+
+    .dashboard-responsive-shell .w-16.h-16 {
+        width: clamp(3.1rem, 3.8vw, 4rem) !important;
+        height: clamp(3.1rem, 3.8vw, 4rem) !important;
+    }
+
+    .dashboard-responsive-shell .w-12.h-12 {
+        width: clamp(2.7rem, 3vw, 3rem) !important;
+        height: clamp(2.7rem, 3vw, 3rem) !important;
+    }
+
+    .dashboard-responsive-shell .p-6 {
+        padding: var(--dashboard-card-padding) !important;
+    }
+
+    .dashboard-responsive-shell .p-5 {
+        padding: clamp(0.9rem, 0.95vw, 1.15rem) !important;
+    }
+
+    .dashboard-responsive-shell .p-4 {
+        padding: clamp(0.75rem, 0.85vw, 1rem) !important;
+    }
+
+    /* Exakt auf die max-width der base.html abgestimmt: 3 Spalten erst ab xl. */
+    @media (min-width: 1280px) {
+        .dashboard-responsive-shell .xl\:grid-cols-3 {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(300px, 0.82fr) !important;
         }
     }
 
-    @media (min-width: 1024px) and (max-width: 1279px) {
+    @media (min-width: 1536px) {
         .dashboard-responsive-shell {
-            --dashboard-scale: 0.92;
-            --dashboard-card-padding: 1rem;
-            --dashboard-gap: 1rem;
-        }
-
-        .dashboard-responsive-shell .xl\:col-span-2 {
-            grid-column: span 2 / span 2;
+            --dashboard-card-padding: 1.1rem;
+            --dashboard-gap: 1.1rem;
         }
     }
 
-    @media (min-width: 1280px) and (max-width: 1439px) {
+    @media (max-width: 1279px) {
         .dashboard-responsive-shell {
-            --dashboard-scale: 0.94;
-            --dashboard-card-padding: 1.05rem;
-            --dashboard-gap: 1.05rem;
-        }
-    }
-
-    @media (min-width: 1440px) and (max-width: 1599px) {
-        .dashboard-responsive-shell {
-            --dashboard-scale: 0.96;
-        }
-    }
-
-    @media (min-width: 1600px) {
-        .dashboard-responsive-shell {
-            --dashboard-scale: 0.98;
-        }
-    }
-
-    @media (max-height: 780px) and (min-width: 1024px) {
-        .dashboard-responsive-shell {
-            --dashboard-scale: 0.88;
-            --dashboard-card-padding: 0.95rem;
-            --dashboard-gap: 0.9rem;
-        }
-    }
-
-    @media (max-height: 680px) and (min-width: 1024px) {
-        .dashboard-responsive-shell {
-            --dashboard-scale: 0.84;
-        }
-    }
-
-    /* Tablet/Mobile: kein globaler Scale, sondern kompakteres Layout */
-    @media (max-width: 1023px) {
-        .dashboard-responsive-shell {
-            transform: none !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            margin-inline: 0 !important;
             --dashboard-card-padding: 1rem;
             --dashboard-gap: 1rem;
         }
@@ -329,10 +336,7 @@
             border-radius: 1rem !important;
         }
 
-        .dashboard-responsive-shell .p-6 {
-            padding: 0.875rem !important;
-        }
-
+        .dashboard-responsive-shell .p-6,
         .dashboard-responsive-shell .p-5 {
             padding: 0.875rem !important;
         }
@@ -347,16 +351,16 @@
         }
 
         .dashboard-responsive-shell .w-12.h-12 {
-            width: 2.75rem !important;
-            height: 2.75rem !important;
+            width: 2.65rem !important;
+            height: 2.65rem !important;
         }
 
         .dashboard-responsive-shell .text-3xl {
-            font-size: 1.45rem !important;
+            font-size: 1.4rem !important;
         }
 
         .dashboard-responsive-shell h1 {
-            font-size: 1.35rem !important;
+            font-size: 1.32rem !important;
         }
 
         .dashboard-responsive-shell .font-orbitron {
@@ -370,7 +374,7 @@
         }
 
         .dashboard-responsive-shell table {
-            min-width: 560px;
+            min-width: 540px;
         }
 
         #alert-bell {
@@ -378,10 +382,10 @@
         }
     }
 
-    @media (max-width: 420px) {
+    @media (max-width: 520px) {
         .dashboard-responsive-shell {
-            --dashboard-card-padding: 0.75rem;
-            --dashboard-gap: 0.75rem;
+            --dashboard-card-padding: 0.78rem;
+            --dashboard-gap: 0.78rem;
         }
 
         .dashboard-responsive-shell .grid-cols-2 {
@@ -1400,55 +1404,17 @@
             document.documentElement.style.setProperty('--dashboard-vh', `${window.innerHeight * 0.01}px`);
         }
 
-        function setDashboardScale() {
-            const shell = document.getElementById('dashboard-responsive-shell');
-            if (!shell) return;
-
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-            let scale = 1;
-
-            if (width >= 1600) {
-                scale = 0.98;
-            } else if (width >= 1440) {
-                scale = 0.96;
-            } else if (width >= 1280) {
-                scale = 0.94;
-            } else if (width >= 1024) {
-                scale = 0.92;
-            }
-
-            if (width >= 1024 && height < 780) {
-                scale = Math.min(scale, 0.88);
-            }
-
-            if (width >= 1024 && height < 680) {
-                scale = Math.min(scale, 0.84);
-            }
-
-            if (width < 1024) {
-                scale = 1;
-            }
-
-            shell.style.setProperty('--dashboard-scale', String(scale));
-        }
-
-        function updateDashboardFit() {
-            setDashboardViewportHeight();
-            setDashboardScale();
-        }
-
         let resizeFrame = null;
         window.addEventListener('resize', () => {
             if (resizeFrame) {
                 window.cancelAnimationFrame(resizeFrame);
             }
-            resizeFrame = window.requestAnimationFrame(updateDashboardFit);
+            resizeFrame = window.requestAnimationFrame(setDashboardViewportHeight);
         }, { passive: true });
 
-        window.addEventListener('orientationchange', updateDashboardFit, { passive: true });
-        document.addEventListener('DOMContentLoaded', updateDashboardFit);
-        updateDashboardFit();
+        window.addEventListener('orientationchange', setDashboardViewportHeight, { passive: true });
+        document.addEventListener('DOMContentLoaded', setDashboardViewportHeight);
+        setDashboardViewportHeight();
     })();
 </script>
 
