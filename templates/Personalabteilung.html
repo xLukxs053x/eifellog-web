@@ -8,10 +8,6 @@
 {% set safe_token_requests = token_requests|default([], true) %}
 {% set safe_tasks = tasks|default([], true) %} <!-- Neu für den Aufgaben Pool -->
 {% set safe_buchhaltung_requests = buchhaltung_requests|default(accounting_requests|default(buchhaltung_anfragen|default([], true), true), true) %} <!-- Anfragen aus der Buchhaltung -->
-{% set safe_service_requests = service_center_requests|default([], true) %}
-{% if not safe_service_requests %}
-    {% set safe_service_requests = fahrerkarte_requests|default(driver_card_requests|default(personalisierte_fahrerkarte_requests|default([], true), true), true) %}
-{% endif %} <!-- NEU: Service Center / Fahrerkarte-Anträge -->
 
 <style>
     :root {
@@ -1170,273 +1166,6 @@
             width: calc(100vw - 32px);
         }
     }
-
-
-    /* =========================================================
-       REDESIGN 2026: Personalabteilung Control Center
-       - stärkerer Command-Center Look
-       - Service-Center als eigener Kernbereich
-       - weichere Karten, bessere Tabs, bessere Mobile-Dichte
-    ========================================================= */
-
-    .personal-page {
-        padding: clamp(18px, 2.2vw, 34px) !important;
-        padding-bottom: 150px !important;
-        background:
-            radial-gradient(circle at 14% 2%, rgba(var(--el-green-rgb), 0.16), transparent 32%),
-            radial-gradient(circle at 92% 8%, rgba(var(--el-yellow-rgb), 0.10), transparent 28%),
-            linear-gradient(180deg, rgba(2, 8, 5, 0.15), rgba(0, 0, 0, 0.0));
-    }
-
-    .personal-shell {
-        width: min(1480px, 100%) !important;
-        gap: 20px !important;
-    }
-
-    .glass-card {
-        border-radius: 32px !important;
-        background:
-            radial-gradient(circle at 12% 0%, rgba(var(--el-green-rgb), 0.12), transparent 34%),
-            linear-gradient(145deg, rgba(13, 24, 15, 0.74) 0%, rgba(2, 6, 3, 0.94) 100%) !important;
-        border-color: rgba(255, 255, 255, 0.075) !important;
-        border-top-color: rgba(var(--el-green-rgb), 0.24) !important;
-        border-left-color: rgba(var(--el-green-rgb), 0.16) !important;
-        box-shadow: 0 30px 88px rgba(0, 0, 0, 0.64) !important;
-    }
-
-    .page-head {
-        min-height: 310px;
-        padding: clamp(24px, 2.7vw, 38px) !important;
-        grid-template-columns: minmax(0, 1fr) 380px !important;
-        align-items: stretch !important;
-    }
-
-    .page-head::after {
-        content: "";
-        position: absolute;
-        right: -120px;
-        bottom: -150px;
-        width: 420px;
-        height: 420px;
-        border-radius: 999px;
-        background: radial-gradient(circle, rgba(var(--el-green-rgb), 0.20), transparent 70%);
-        pointer-events: none;
-    }
-
-    .page-kicker {
-        min-height: 34px;
-        padding: 0 14px;
-        border-radius: 999px;
-        background: rgba(var(--el-green-rgb), 0.10);
-        border: 1px solid rgba(var(--el-green-rgb), 0.24);
-    }
-
-    .page-head h1 {
-        font-size: clamp(34px, 5vw, 72px) !important;
-        line-height: 0.92 !important;
-        letter-spacing: -0.06em !important;
-    }
-
-    .page-head p {
-        max-width: 880px !important;
-        font-size: 14px !important;
-        font-weight: 600;
-    }
-
-    .role-access {
-        min-width: 0 !important;
-        align-content: start;
-        gap: 14px !important;
-    }
-
-    .access-pill {
-        border-radius: 22px !important;
-        padding: 16px !important;
-        background: rgba(0, 0, 0, 0.30) !important;
-    }
-
-    .stats-grid {
-        grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
-        gap: 14px !important;
-    }
-
-    .stat-card {
-        min-height: 130px;
-        display: grid;
-        align-content: space-between;
-        border-radius: 24px !important;
-        padding: 20px !important;
-    }
-
-    .stat-card strong {
-        font-size: clamp(24px, 2vw, 34px) !important;
-        line-height: 1;
-    }
-
-    .tabbar {
-        position: sticky;
-        top: 88px;
-        z-index: 70;
-        display: grid !important;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-        gap: 10px !important;
-        padding: 10px !important;
-        overflow: visible !important;
-    }
-
-    .tab-btn {
-        min-height: 58px !important;
-        border-radius: 18px !important;
-        justify-content: center;
-        box-shadow: none;
-    }
-
-    .tab-btn::before {
-        content: "";
-        width: 7px;
-        height: 7px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.18);
-        transition: 220ms ease;
-    }
-
-    .tab-btn.active::before,
-    .tab-btn:hover::before {
-        background: var(--el-green-soft);
-        box-shadow: 0 0 12px rgba(var(--el-green-rgb), 0.72);
-    }
-
-    .tab-btn.active,
-    .tab-btn:hover {
-        box-shadow: 0 0 34px rgba(var(--el-green-rgb), 0.13);
-    }
-
-    .toolbar,
-    .toolbar.requests,
-    .toolbar.accounting,
-    .toolbar.service-center-toolbar {
-        padding: 16px !important;
-        gap: 12px !important;
-    }
-
-    .toolbar.service-center-toolbar {
-        grid-template-columns: minmax(260px, 1fr) 220px !important;
-    }
-
-    .table-head h2 {
-        color: #fff !important;
-        font-size: 16px !important;
-    }
-
-    .request-table.wide-table,
-    .driver-table.wide-table {
-        min-width: 1320px !important;
-    }
-
-    .service-highlight-card {
-        padding: 22px;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) 360px;
-        gap: 18px;
-        align-items: stretch;
-    }
-
-    .service-highlight-copy small {
-        display: inline-flex;
-        color: var(--el-yellow);
-        font-family: "Orbitron", sans-serif;
-        font-size: 9px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 0.17em;
-        margin-bottom: 10px;
-    }
-
-    .service-highlight-copy h2 {
-        margin: 0;
-        color: #fff;
-        font-family: "Orbitron", sans-serif;
-        font-size: clamp(22px, 2.4vw, 34px);
-        line-height: 1.05;
-        letter-spacing: -0.04em;
-    }
-
-    .service-highlight-copy p {
-        margin: 12px 0 0;
-        color: var(--el-muted);
-        line-height: 1.65;
-        font-size: 13px;
-        font-weight: 600;
-    }
-
-    .service-flow {
-        display: grid;
-        gap: 10px;
-    }
-
-    .service-flow-step {
-        padding: 14px;
-        border-radius: 18px;
-        background: rgba(0, 0, 0, 0.28);
-        border: 1px solid rgba(255, 255, 255, 0.07);
-    }
-
-    .service-flow-step strong {
-        display: block;
-        color: #fff;
-        font-family: "Orbitron", sans-serif;
-        font-size: 11px;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-    }
-
-    .service-flow-step span {
-        display: block;
-        margin-top: 6px;
-        color: var(--el-muted);
-        font-size: 12px;
-        line-height: 1.45;
-    }
-
-    .detail-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-    }
-
-    @media (max-width: 1280px) {
-        .page-head {
-            grid-template-columns: 1fr !important;
-        }
-
-        .role-access {
-            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-        }
-
-        .stats-grid,
-        .tabbar {
-            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-        }
-
-        .service-highlight-card {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    @media (max-width: 720px) {
-        .role-access,
-        .stats-grid,
-        .tabbar,
-        .detail-grid {
-            grid-template-columns: 1fr !important;
-        }
-
-        .tabbar {
-            position: relative;
-            top: auto;
-        }
-    }
-
 </style>
 
 <section class="personal-page">
@@ -1449,14 +1178,14 @@
                 </span>
 
                 <h1>
-                    People Ops<br />
-                    <span>Control Center</span>
+                    Fahrer &amp;<br />
+                    <span>Registrierungen</span>
                 </h1>
 
                 <p>
-                    Zentrale Bearbeitung für Fahrer-Registrierungen, Service-Center-Anträge, Token-Anfragen, interne Aufgaben und Rückfragen aus der Buchhaltung.
-                    Das neue Control-Center ist auf schnelle Prüfung, klare Zuständigkeiten und saubere Dokumentenübergabe ins System-Postfach ausgelegt.
-                    Der zusätzliche Service-Center-Tab bündelt Beantragungen zur personalisierten Fahrerkarte.
+                    Hier werden neue Fahrer-Registrierungen, Token-Anfragen, interne Aufgaben und Buchhaltungs-Anfragen bearbeitet.
+                    Die Personalabteilung kann Anträge prüfen, claimen, intern nachverfolgen und Rückfragen aus der Buchhaltung zentral einsehen.
+                    Nach Genehmigung wird dem User über sein System-Postfach ein Bestätigungsdokument (inklusive Aktenzeichen) bereitgestellt.
                 </p>
             </div>
 
@@ -1490,11 +1219,6 @@
             </div>
 
             <div class="glass-card stat-card">
-                <small>Service Center offen</small>
-                <strong id="statServiceOpen">0</strong>
-            </div>
-
-            <div class="glass-card stat-card">
                 <small>Buchhaltung offen</small>
                 <strong id="statAccountingOpen">0</strong>
             </div>
@@ -1514,7 +1238,6 @@
             <button class="tab-btn active" type="button" data-tab-target="registrations">Fahrer Registrierungen</button>
             <button class="tab-btn" type="button" data-tab-target="tokenRequests">Token Anfragen</button>
             <button class="tab-btn" type="button" data-tab-target="drivers">Fahrer Datenbank</button>
-            <button class="tab-btn" type="button" data-tab-target="serviceCenter">Service Center</button>
             <!-- NEU: Aufgaben Pool Tab -->
             <button class="tab-btn" type="button" data-tab-target="taskPool">Aufgaben Pool</button>
             <button class="tab-btn" type="button" data-tab-target="accountingRequests">Buchhaltungs-Anfragen</button>
@@ -2002,205 +1725,6 @@
                                         <div class="empty-state">
                                             <strong>Keine Fahrer gefunden</strong>
                                             In der Collection <code>users</code> wurden keine Fahrer geladen.
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-        </div>
-
-
-        <!-- NEU: Service Center Tab Panel -->
-        <div id="serviceCenter" class="tab-panel">
-            <section class="glass-card service-highlight-card">
-                <div class="service-highlight-copy">
-                    <small>Service Center</small>
-                    <h2>Personalisierte Fahrerkarte &amp; Mitarbeiter-Service</h2>
-                    <p>
-                        Dieser Bereich bündelt ServiceCenter-Beantragungen, vor allem die personalisierte Fahrerkarte.
-                        Die Personalabteilung sieht Status, Priorität, Karten-ID, Bereitstellung und Hinweise direkt im Vorgang.
-                    </p>
-                </div>
-
-                <div class="service-flow">
-                    <div class="service-flow-step">
-                        <strong>01 · Eingang</strong>
-                        <span>User beantragt im ServiceCenter die Fahrerkarte.</span>
-                    </div>
-                    <div class="service-flow-step">
-                        <strong>02 · Prüfung</strong>
-                        <span>Personalabteilung gleicht Name, Rolle und Berechtigung ab.</span>
-                    </div>
-                    <div class="service-flow-step">
-                        <strong>03 · Ausstellung</strong>
-                        <span>Nach Freigabe wird die Karte ausgestellt und dokumentiert.</span>
-                    </div>
-                </div>
-            </section>
-
-            <section class="glass-card toolbar service-center-toolbar">
-                <input
-                    class="search-box"
-                    id="serviceSearch"
-                    type="search"
-                    placeholder="Service-Antrag suchen: Name, Fahrerkarte, Karten-ID, Discord-ID..."
-                    autocomplete="off"
-                />
-
-                <select class="filter-select" id="serviceStatusFilter">
-                    <option value="all">Alle Service-Anträge</option>
-                    <option value="pending">Offen</option>
-                    <option value="claimed">In Prüfung</option>
-                    <option value="approved">Freigegeben</option>
-                    <option value="issued">Ausgestellt</option>
-                    <option value="rejected">Abgelehnt</option>
-                </select>
-            </section>
-
-            <section class="glass-card table-card">
-                <div class="table-head">
-                    <div>
-                        <h2>ServiceCenter Anträge</h2>
-                        <span>Quelle: <strong>fahrerkarte_requests / ServiceCenter</strong></span>
-                    </div>
-
-                    <a href="/servicecenter" target="_blank" rel="noopener" class="request-btn blue">
-                        ServiceCenter öffnen
-                    </a>
-                </div>
-
-                <div class="request-table-wrap">
-                    <table class="request-table wide-table">
-                        <thead>
-                            <tr>
-                                <th>Antragsteller</th>
-                                <th>Discord-ID</th>
-                                <th>Service</th>
-                                <th>Priorität</th>
-                                <th>Status</th>
-                                <th>Karten-ID</th>
-                                <th>Sachbearbeiter</th>
-                                <th>Eingang</th>
-                                <th>Hinweis</th>
-                                <th style="text-align: right;">Aktion</th>
-                            </tr>
-                        </thead>
-
-                        <tbody id="serviceRequestTableBody">
-                            {% for service in safe_service_requests %}
-                                {% set service_id = service.id or service._id or service.request_id %}
-                                {% set service_status = service.status or "pending" %}
-                                {% set service_name = service.display_name or service.full_name or service.name or service.username or "Unbekannter User" %}
-                                {% set service_username = service.username or service.discord_username or service_name %}
-                                {% set service_role = service.role or service.role_name or service.primary_role_name or "Fahrer" %}
-                                {% set service_discord_id = service.discord_id or service.user_id or "-" %}
-                                {% set service_title = service.title or service.service_title or service.type_label or "Personalisierte Fahrerkarte" %}
-                                {% set service_priority = service.priority or "normal" %}
-                                {% set service_delivery = service.delivery_method or service.delivery or "servicecenter" %}
-                                {% set service_card_id = service.card_id or service.fahrerkarte_card_id or "Wird erzeugt" %}
-                                {% set service_handler = service.claimed_by_name or service.handler_name or service.sachbearbeiter_name or "Noch nicht zugewiesen" %}
-                                {% set service_created = service.created_at or service.requested_at or "-" %}
-                                {% set service_issued = service.issued_at or "-" %}
-                                {% set service_note = service.notes or service.note or service.reject_reason or "" %}
-
-                                <tr
-                                    data-service-row
-                                    data-service-id="{{ service_id }}"
-                                    data-service-status="{{ service_status }}"
-                                    data-service-name="{{ service_name|e }}"
-                                    data-service-username="{{ service_username|e }}"
-                                    data-service-role="{{ service_role|e }}"
-                                    data-service-discord-id="{{ service_discord_id|e }}"
-                                    data-service-title="{{ service_title|e }}"
-                                    data-service-priority="{{ service_priority|e }}"
-                                    data-service-delivery="{{ service_delivery|e }}"
-                                    data-service-card-id="{{ service_card_id|e }}"
-                                    data-service-handler="{{ service_handler|e }}"
-                                    data-service-created="{{ service_created|e }}"
-                                    data-service-issued="{{ service_issued|e }}"
-                                    data-service-note="{{ service_note|e }}"
-                                    data-search="{{ (service_name ~ ' ' ~ service_username ~ ' ' ~ service_role ~ ' ' ~ service_discord_id ~ ' ' ~ service_title ~ ' ' ~ service_card_id ~ ' ' ~ service_handler ~ ' ' ~ service_note)|lower|e }}"
-                                >
-                                    <td>
-                                        <div class="driver-cell">
-                                            <div class="driver-avatar">
-                                                {% if service.avatar_url %}
-                                                    <img src="{{ service.avatar_url }}" alt="{{ service_name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
-                                                    <span style="display:none;">SC</span>
-                                                {% else %}
-                                                    <span>SC</span>
-                                                {% endif %}
-                                            </div>
-
-                                            <div class="driver-meta">
-                                                <strong>{{ service_name }}</strong>
-                                                <span>@{{ service_username }}</span>
-                                                <span>{{ service_role }}</span>
-                                            </div>
-                                        </div>
-                                    </td>
-
-                                    <td><span class="mono">{{ service_discord_id }}</span></td>
-                                    <td><span class="role-badge">{{ service_title }}</span></td>
-
-                                    <td>
-                                        {% if service_priority == "high" or service_priority == "hoch" %}
-                                            <span class="deadline-badge expired">Hoch</span>
-                                        {% elif service_priority == "low" or service_priority == "niedrig" %}
-                                            <span class="status-badge approved">Niedrig</span>
-                                        {% else %}
-                                            <span class="deadline-badge">Normal</span>
-                                        {% endif %}
-                                    </td>
-
-                                    <td>
-                                        {% if service_status == "issued" %}
-                                            <span class="status-badge approved">Ausgestellt</span>
-                                        {% elif service_status == "approved" %}
-                                            <span class="status-badge claimed">Freigegeben</span>
-                                        {% elif service_status == "claimed" %}
-                                            <span class="status-badge claimed">In Prüfung</span>
-                                        {% elif service_status == "rejected" %}
-                                            <span class="status-badge rejected">Abgelehnt</span>
-                                        {% else %}
-                                            <span class="status-badge pending">Offen</span>
-                                        {% endif %}
-                                    </td>
-
-                                    <td><span class="aktenzeichen-mono">{{ service_card_id }}</span></td>
-                                    <td><span class="mono">{{ service_handler }}</span></td>
-                                    <td><span class="mono">{{ service_created }}</span></td>
-                                    <td><div class="accounting-message-preview">{{ service_note or "Keine Hinweise hinterlegt." }}</div></td>
-
-                                    <td>
-                                        <div class="action-wrap">
-                                            <button class="request-btn blue" type="button" data-action="view-service-request" data-service-id="{{ service_id }}">
-                                                Ansehen
-                                            </button>
-
-                                            {% if service_discord_id and service_discord_id != "-" %}
-                                                <button
-                                                    class="request-btn"
-                                                    type="button"
-                                                    data-action="send-document"
-                                                    data-driver-id="{{ service_discord_id }}"
-                                                    data-driver-name="{{ service_name|e }}"
-                                                >
-                                                    Dokument
-                                                </button>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% else %}
-                                <tr>
-                                    <td colspan="10">
-                                        <div class="empty-state">
-                                            <strong>Keine ServiceCenter-Anträge vorhanden</strong>
-                                            Sobald im ServiceCenter eine personalisierte Fahrerkarte beantragt wird, erscheint der Vorgang hier.
                                         </div>
                                     </td>
                                 </tr>
@@ -2739,43 +2263,6 @@
     </div>
 </div>
 
-
-<!-- Service Center Detail Modal -->
-<div class="modal-backdrop" id="serviceModal">
-    <div class="modal-card">
-        <div class="modal-head">
-            <div>
-                <small>Service Center</small>
-                <h3 id="serviceModalTitle">Service-Antrag</h3>
-            </div>
-
-            <button class="modal-close" type="button" data-close-modal="serviceModal">×</button>
-        </div>
-
-        <div class="modal-body">
-            <div class="detail-grid">
-                <div class="detail-pill"><small>Antragsteller</small><strong id="serviceDetailUser">-</strong></div>
-                <div class="detail-pill"><small>Discord-ID</small><strong id="serviceDetailDiscordId">-</strong></div>
-                <div class="detail-pill"><small>Rolle</small><strong id="serviceDetailRole">-</strong></div>
-                <div class="detail-pill"><small>Status</small><strong id="serviceDetailStatus">-</strong></div>
-                <div class="detail-pill"><small>Priorität</small><strong id="serviceDetailPriority">-</strong></div>
-                <div class="detail-pill"><small>Bereitstellung</small><strong id="serviceDetailDelivery">-</strong></div>
-                <div class="detail-pill"><small>Karten-ID</small><strong id="serviceDetailCardId">-</strong></div>
-                <div class="detail-pill"><small>Sachbearbeiter</small><strong id="serviceDetailHandler">-</strong></div>
-                <div class="detail-pill"><small>Eingang</small><strong id="serviceDetailCreated">-</strong></div>
-                <div class="detail-pill"><small>Ausgestellt</small><strong id="serviceDetailIssued">-</strong></div>
-            </div>
-
-            <div class="detail-message" id="serviceDetailNote">-</div>
-
-            <div class="modal-actions">
-                <button class="request-btn blue" type="button" id="serviceModalDocumentButton">Dokument vorbereiten</button>
-                <button class="request-btn" type="button" data-close-modal="serviceModal">Schließen</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         const CREATE_TOKEN_URL = "{{ url_for('personalabteilung_create_tracker_code') }}";
@@ -2799,9 +2286,6 @@
 
         const requestSearch = document.getElementById("requestSearch");
         const requestStatusFilter = document.getElementById("requestStatusFilter");
-
-        const serviceSearch = document.getElementById("serviceSearch");
-        const serviceStatusFilter = document.getElementById("serviceStatusFilter");
 
         const taskSearch = document.getElementById("taskSearch");
         const taskStatusFilter = document.getElementById("taskStatusFilter");
@@ -2842,10 +2326,6 @@
         const accountingDetailSubject = document.getElementById("accountingDetailSubject");
         const accountingDetailMessage = document.getElementById("accountingDetailMessage");
 
-        const serviceModal = document.getElementById("serviceModal");
-        const serviceModalTitle = document.getElementById("serviceModalTitle");
-        const serviceModalDocumentButton = document.getElementById("serviceModalDocumentButton");
-
         function getRows() {
             return Array.from(document.querySelectorAll("[data-driver-row]"));
         }
@@ -2856,10 +2336,6 @@
 
         function getTokenRequestRows() {
             return Array.from(document.querySelectorAll("[data-token-request-row]"));
-        }
-
-        function getServiceRows() {
-            return Array.from(document.querySelectorAll("[data-service-row]"));
         }
 
         function getTaskRows() {
@@ -2882,7 +2358,6 @@
             const rows = getRows();
             const requestRows = getRequestRows();
             const accountingRows = getAccountingRows();
-            const serviceRows = getServiceRows();
 
             const total = rows.length;
             const withToken = rows.filter((row) => row.dataset.token === "with-token").length;
@@ -2893,11 +2368,6 @@
 
             const claimedRequests = requestRows.filter((row) => {
                 return row.dataset.requestStatus === "claimed";
-            }).length;
-
-            const serviceOpen = serviceRows.filter((row) => {
-                const status = String(row.dataset.serviceStatus || "pending").toLowerCase();
-                return status === "pending" || status === "open" || status === "claimed" || status === "approved";
             }).length;
 
             const accountingOpen = accountingRows.filter((row) => {
@@ -2925,7 +2395,6 @@
             setText("statWithToken", withToken);
             setText("statOpenRequests", openRequests);
             setText("statClaimedRequests", claimedRequests);
-            setText("statServiceOpen", serviceOpen);
             setText("statAccountingOpen", accountingOpen);
 
             setText("accountingSideAll", accountingRows.length);
@@ -3007,20 +2476,6 @@
             rows.forEach((row) => {
                 const matchesSearch = !query || String(row.dataset.search || "").includes(query);
                 const matchesStatus = statusValue === "all" || row.dataset.requestStatus === statusValue;
-
-                row.style.display = matchesSearch && matchesStatus ? "" : "none";
-            });
-        }
-
-        function applyServiceFilters() {
-            const rows = getServiceRows();
-            const query = String(serviceSearch?.value || "").trim().toLowerCase();
-            const statusValue = serviceStatusFilter?.value || "all";
-
-            rows.forEach((row) => {
-                const status = String(row.dataset.serviceStatus || "pending").toLowerCase();
-                const matchesSearch = !query || String(row.dataset.search || "").includes(query);
-                const matchesStatus = statusValue === "all" || status === statusValue;
 
                 row.style.display = matchesSearch && matchesStatus ? "" : "none";
             });
@@ -3311,31 +2766,10 @@
         function humanizePriority(priority) {
             const value = String(priority || "medium").toLowerCase();
 
-            if (value === "high" || value === "hoch" || value === "dringend") return "Hoch";
+            if (value === "high" || value === "hoch") return "Hoch";
             if (value === "low" || value === "niedrig") return "Niedrig";
-            if (value === "normal") return "Normal";
 
             return "Mittel";
-        }
-
-        function humanizeServiceStatus(status) {
-            const value = String(status || "pending").toLowerCase();
-
-            if (value === "issued") return "Ausgestellt";
-            if (value === "approved") return "Freigegeben";
-            if (value === "claimed") return "In Prüfung";
-            if (value === "rejected") return "Abgelehnt";
-
-            return "Offen";
-        }
-
-        function humanizeDelivery(delivery) {
-            const value = String(delivery || "servicecenter").toLowerCase();
-
-            if (value === "profile") return "Im Profil hinterlegen";
-            if (value === "manual") return "Manuelle Übergabe";
-
-            return "ServiceCenter / Postfach";
         }
 
         function openAccountingModal(button) {
@@ -3373,67 +2807,12 @@
             document.body.style.overflow = "";
         }
 
-        function openServiceModal(button) {
-            const row = button.closest("[data-service-row]");
-
-            if (!row || !serviceModal) return;
-
-            const name = row.dataset.serviceName || "-";
-            const username = row.dataset.serviceUsername || "";
-            const discordId = row.dataset.serviceDiscordId || "-";
-            const role = row.dataset.serviceRole || "-";
-            const status = row.dataset.serviceStatus || "pending";
-            const priority = row.dataset.servicePriority || "normal";
-            const delivery = row.dataset.serviceDelivery || "servicecenter";
-            const cardId = row.dataset.serviceCardId || "-";
-            const handler = row.dataset.serviceHandler || "-";
-            const created = row.dataset.serviceCreated || "-";
-            const issued = row.dataset.serviceIssued || "-";
-            const title = row.dataset.serviceTitle || "Service-Antrag";
-            const note = row.dataset.serviceNote || "Keine Hinweise hinterlegt.";
-
-            serviceModalTitle.textContent = title;
-            setText("serviceDetailUser", `${name}${username ? " / @" + username : ""}`);
-            setText("serviceDetailDiscordId", discordId);
-            setText("serviceDetailRole", role);
-            setText("serviceDetailStatus", humanizeServiceStatus(status));
-            setText("serviceDetailPriority", humanizePriority(priority));
-            setText("serviceDetailDelivery", humanizeDelivery(delivery));
-            setText("serviceDetailCardId", cardId);
-            setText("serviceDetailHandler", handler);
-            setText("serviceDetailCreated", created);
-            setText("serviceDetailIssued", issued);
-            setText("serviceDetailNote", note);
-
-            if (serviceModalDocumentButton) {
-                serviceModalDocumentButton.onclick = () => {
-                    closeServiceModal();
-                    openDocumentModal(
-                        discordId,
-                        name,
-                        "ServiceCenter Fahrerkarte",
-                        `Status Fahrerkarte: ${humanizeServiceStatus(status)}\nKarten-ID: ${cardId}\nHinweis: ${note}`
-                    );
-                };
-                serviceModalDocumentButton.disabled = !discordId || discordId === "-";
-            }
-
-            serviceModal.classList.add("active");
-            document.body.style.overflow = "hidden";
-        }
-
-        function closeServiceModal() {
-            serviceModal?.classList.remove("active");
-            document.body.style.overflow = "";
-        }
-
         document.querySelectorAll("[data-close-modal]").forEach((button) => {
             button.addEventListener("click", () => {
                 if(button.dataset.closeModal === "rejectModal") closeRejectModal();
                 if(button.dataset.closeModal === "documentModal") closeDocumentModal();
                 if(button.dataset.closeModal === "taskModal") closeTaskModal();
                 if(button.dataset.closeModal === "accountingModal") closeAccountingModal();
-                if(button.dataset.closeModal === "serviceModal") closeServiceModal();
             });
         });
 
@@ -3453,17 +2832,12 @@
             if (event.target === accountingModal) closeAccountingModal();
         });
 
-        serviceModal?.addEventListener("click", (event) => {
-            if (event.target === serviceModal) closeServiceModal();
-        });
-
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape") {
                 if (rejectModal.classList.contains("active")) closeRejectModal();
                 if (documentModal.classList.contains("active")) closeDocumentModal();
                 if (taskModal.classList.contains("active")) closeTaskModal();
                 if (accountingModal?.classList.contains("active")) closeAccountingModal();
-                if (serviceModal?.classList.contains("active")) closeServiceModal();
             }
         });
 
@@ -3479,9 +2853,6 @@
         
         if (requestSearch) requestSearch.addEventListener("input", applyRequestFilters);
         if (requestStatusFilter) requestStatusFilter.addEventListener("change", applyRequestFilters);
-
-        if (serviceSearch) serviceSearch.addEventListener("input", applyServiceFilters);
-        if (serviceStatusFilter) serviceStatusFilter.addEventListener("change", applyServiceFilters);
 
         if (taskSearch) taskSearch.addEventListener("input", applyTaskFilters);
         if (taskStatusFilter) taskStatusFilter.addEventListener("change", applyTaskFilters);
@@ -3672,11 +3043,6 @@
 
             if (action === "view-accounting-request") {
                 openAccountingModal(button);
-                return;
-            }
-
-            if (action === "view-service-request") {
-                openServiceModal(button);
                 return;
             }
 
@@ -3874,7 +3240,6 @@
 
         updateStats();
         applyRequestFilters();
-        applyServiceFilters();
         applyDriverFilters();
         applyTaskFilters();
         applyAccountingFilters();
