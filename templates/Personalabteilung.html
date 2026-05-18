@@ -1340,6 +1340,164 @@
             width: calc(100vw - 2rem);
         }
     }
+
+
+    /* =========================================================
+       BASE-SLIDESHOW + KOMPAKTER BASE-ZOOM
+       Diese Seite nutzt bewusst die Hintergrund-Slideshow aus base.html.
+       Die Bilder werden hier weniger stark hineingezoomt und die Seite
+       bleibt auf der schmaleren base.html-Bühne, damit kein Oversized-
+       Control-Center-Look entsteht.
+    ========================================================= */
+
+    .base-main,
+    .base-content,
+    .base-shell {
+        background: transparent !important;
+    }
+
+    .base-shell {
+        max-width: min(var(--site-max-width, 1280px), 1220px) !important;
+    }
+
+    .hero-bg {
+        background: var(--bg-1, #040a06) !important;
+    }
+
+    .hero-bg .bg-slide {
+        object-fit: cover !important;
+        object-position: center center !important;
+        filter: saturate(1.06) brightness(0.46) !important;
+        animation-name: personalFadeZoom !important;
+        will-change: opacity, transform;
+    }
+
+    .hero-bg .slide-1 {
+        animation-delay: 0s !important;
+    }
+
+    .hero-bg .slide-2 {
+        animation-delay: 8s !important;
+    }
+
+    .hero-bg .slide-3 {
+        animation-delay: 16s !important;
+    }
+
+    .hero-overlay {
+        background:
+            radial-gradient(circle at 50% 30%, rgba(10, 20, 15, 0.08) 0%, rgba(4, 10, 6, 0.58) 58%, rgba(2, 5, 3, 0.86) 100%),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.46)) !important;
+    }
+
+    @keyframes personalFadeZoom {
+        0% {
+            opacity: 0;
+            transform: scale(1.005);
+        }
+
+        10% {
+            opacity: 1;
+        }
+
+        33% {
+            opacity: 1;
+        }
+
+        45% {
+            opacity: 0;
+            transform: scale(1.025);
+        }
+
+        100% {
+            opacity: 0;
+            transform: scale(1.025);
+        }
+    }
+
+    .personal-page {
+        padding-bottom: 4.75rem !important;
+    }
+
+    .personal-shell {
+        gap: 1rem !important;
+    }
+
+    .personal-page .page-head {
+        padding: clamp(1.35rem, 2.2vw, 2.2rem) !important;
+        gap: clamp(1rem, 1.9vw, 1.65rem) !important;
+    }
+
+    .personal-page .page-head h1 {
+        font-size: clamp(2.25rem, 4.55vw, 4.1rem) !important;
+        line-height: 0.94 !important;
+    }
+
+    .personal-page .page-head p {
+        margin-top: 1.05rem !important;
+        font-size: 0.92rem !important;
+        line-height: 1.62 !important;
+    }
+
+    .personal-page .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+        gap: 0.85rem !important;
+    }
+
+    .personal-page .stat-card {
+        min-height: 7.35rem !important;
+        padding: 1.1rem !important;
+        border-radius: 1.25rem !important;
+    }
+
+    .personal-page .stat-card strong {
+        font-size: clamp(1.55rem, 2.25vw, 2.05rem) !important;
+    }
+
+    .personal-page .tabbar {
+        grid-template-columns: repeat(auto-fit, minmax(142px, 1fr)) !important;
+        gap: 0.55rem !important;
+        padding: 0.6rem !important;
+    }
+
+    .personal-page .tab-btn {
+        min-height: 3.15rem !important;
+        padding: 0.2rem 0.8rem !important;
+        font-size: 0.62rem !important;
+        border-radius: 1rem !important;
+    }
+
+    .personal-page .toolbar,
+    .personal-page .toolbar.requests,
+    .personal-page .toolbar.accounting,
+    .personal-page .toolbar.service-center-toolbar {
+        padding: 1rem !important;
+    }
+
+    .personal-page .glass-card {
+        background:
+            radial-gradient(circle at 14% 0%, rgba(var(--el-green-rgb), 0.075), transparent 34%),
+            linear-gradient(135deg, rgba(20, 30, 20, 0.28) 0%, rgba(5, 10, 5, 0.68) 100%) !important;
+    }
+
+    @media (min-width: 1536px) {
+        .base-shell {
+            max-width: 1160px !important;
+        }
+    }
+
+    @media (max-width: 1280px) {
+        .base-shell {
+            max-width: min(var(--site-max-width, 1280px), 100%) !important;
+        }
+    }
+
+    @media (max-width: 720px) {
+        .personal-page .page-head h1 {
+            font-size: clamp(2rem, 12vw, 3rem) !important;
+        }
+    }
+
 </style>
 
 
