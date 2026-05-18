@@ -1229,6 +1229,210 @@ def build_eifellog_servicecenter_pdf(title, subtitle, sections, footer_text="Eif
     return bytes(pdf)
 
 
+
+def pdf_stream_rect(stream, x, y, width, height, fill_rgb=None, stroke_rgb=None, line_width=1):
+    if fill_rgb:
+        r, g, b = fill_rgb
+        stream.extend(f"{r:.3f} {g:.3f} {b:.3f} rg {x:.2f} {y:.2f} {width:.2f} {height:.2f} re f\n".encode("ascii"))
+    if stroke_rgb:
+        r, g, b = stroke_rgb
+        stream.extend(f"{r:.3f} {g:.3f} {b:.3f} RG {float(line_width):.2f} w {x:.2f} {y:.2f} {width:.2f} {height:.2f} re S\n".encode("ascii"))
+
+
+def pdf_stream_line(stream, x1, y1, x2, y2, stroke_rgb=(0, 0, 0), line_width=1):
+    r, g, b = stroke_rgb
+    stream.extend(f"{r:.3f} {g:.3f} {b:.3f} RG {float(line_width):.2f} w {x1:.2f} {y1:.2f} m {x2:.2f} {y2:.2f} l S\n".encode("ascii"))
+
+
+def pdf_stream_text(stream, x, y, text, size=10, bold=False, color=(0, 0, 0), max_chars=None, line_gap=3):
+    text = safe_str(text, "-")
+    if max_chars:
+        lines = []
+        for raw_line in text.splitlines() or [""]:
+            lines.extend(wrap_pdf_line("", raw_line, max_chars=max_chars))
+    else:
+        lines = text.splitlines() or [text]
+
+    cursor_y = y
+    font = "F2" if bold else "F1"
+    r, g, b = color
+    for line in lines:
+        stream.extend(b"BT\n")
+        stream.extend(f"/{font} {int(size)} Tf\n".encode("ascii"))
+        stream.extend(f"{r:.3f} {g:.3f} {b:.3f} rg\n".encode("ascii"))
+        stream.extend(f"1 0 0 1 {float(x):.2f} {float(cursor_y):.2f} Tm\n".encode("ascii"))
+        stream.extend(b"(" + pdf_text_bytes(line) + b") Tj\n")
+        stream.extend(b"ET\n")
+        cursor_y -= int(size) + int(line_gap)
+    return cursor_y
+
+
+def build_pdf_single_page(stream, page_width=595, page_height=842):
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        f"<< /Type /Pages /Kids [6 0 R] /Count 1 >>".encode("ascii"),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>",
+    ]
+    content = bytes(stream)
+    objects.append(f"<< /Length {len(content)} >>\nstream\n".encode("ascii") + content + b"\nendstream")
+    objects.append(
+        f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_width} {page_height}] "
+        f"/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 5 0 R >>".encode("ascii")
+    )
+
+    pdf = bytearray()
+    pdf.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(len(pdf))
+        pdf.extend(f"{index} 0 obj\n".encode("ascii"))
+        pdf.extend(obj)
+        pdf.extend(b"\nendobj\n")
+
+    xref_offset = len(pdf)
+    pdf.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+    pdf.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+    pdf.extend(
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{xref_offset}\n%%EOF\n".encode("ascii")
+    )
+    return bytes(pdf)
+
+
+def fahrerkarte_pdf_value(request_doc, user_doc, *keys, fallback="-"):
+    for key in keys:
+        if request_doc and request_doc.get(key):
+            return request_doc.get(key)
+        if user_doc and user_doc.get(key):
+            return user_doc.get(key)
+    return fallback
+
+
+def build_personalisierte_fahrerkarte_pdf(request_doc, user_doc=None, actor=None):
+    user_doc = user_doc or {}
+    actor = actor or {}
+
+    card_id = safe_str(request_doc.get("card_id")) or generate_fahrerkarte_card_id(request_doc.get("discord_id"), request_doc.get("request_id"))
+    request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+    name = safe_str(
+        request_doc.get("display_name")
+        or request_doc.get("full_name")
+        or request_doc.get("name")
+        or user_doc.get("display_name")
+        or user_doc.get("username")
+        or "EifelLog Fahrer"
+    )
+    username = safe_str(request_doc.get("username") or user_doc.get("username") or user_doc.get("discord_username") or "-")
+    role = safe_str(request_doc.get("role") or request_doc.get("role_name") or get_primary_role_name(user_doc.get("roles", [])))
+    discord_id = safe_str(request_doc.get("discord_id") or user_doc.get("discord_id") or "-")
+    driver_number = safe_str(request_doc.get("driver_number") or user_doc.get("driver_number") or "Nicht angegeben")
+    system_id = safe_str(request_doc.get("system_id") or discord_id or "-")
+    reason_label = fahrerkarte_reason_label(request_doc.get("reason"))
+    priority_label = fahrerkarte_priority_label(request_doc.get("priority"))
+    delivery_label = fahrerkarte_delivery_label(request_doc.get("delivery_method"))
+    issued_at = request_doc.get("issued_at") or now_utc()
+    if not isinstance(issued_at, datetime):
+        issued_at = now_utc()
+    valid_until = issued_at + timedelta(days=365)
+    handler = (
+        actor.get("display_name")
+        or actor.get("username")
+        or (request_doc.get("issued_by") or {}).get("display_name")
+        or (request_doc.get("approved_by") or {}).get("display_name")
+        or "Personalabteilung"
+    )
+    note = safe_str(request_doc.get("issue_note") or request_doc.get("approval_note") or request_doc.get("notes") or "Fahrerkarte wurde im EifelLog ServiceCenter ausgestellt.")
+
+    stream = bytearray()
+    stream.extend(b"q\n")
+
+    # Hintergrund
+    pdf_stream_rect(stream, 0, 0, 595, 842, fill_rgb=(0.015, 0.025, 0.020))
+    pdf_stream_rect(stream, 0, 0, 595, 842, stroke_rgb=(0.110, 0.750, 0.280), line_width=2.5)
+    pdf_stream_rect(stream, 0, 776, 595, 66, fill_rgb=(0.020, 0.055, 0.035))
+    pdf_stream_rect(stream, 0, 770, 595, 6, fill_rgb=(0.160, 0.850, 0.340))
+    pdf_stream_text(stream, 42, 805, "EIFELLOG SERVICECENTER", size=10, bold=True, color=(0.160, 0.850, 0.340))
+    pdf_stream_text(stream, 42, 785, "Personalisierte Fahrerkarte", size=21, bold=True, color=(1, 1, 1))
+    pdf_stream_text(stream, 390, 805, f"Ausgestellt: {issued_at.strftime('%d.%m.%Y')}", size=9, bold=False, color=(0.750, 0.820, 0.760))
+
+    # Kartenkörper
+    card_x, card_y, card_w, card_h = 48, 464, 499, 236
+    pdf_stream_rect(stream, card_x + 7, card_y - 9, card_w, card_h, fill_rgb=(0.000, 0.000, 0.000))
+    pdf_stream_rect(stream, card_x, card_y, card_w, card_h, fill_rgb=(0.030, 0.045, 0.038), stroke_rgb=(0.160, 0.850, 0.340), line_width=1.4)
+    pdf_stream_rect(stream, card_x, card_y + card_h - 42, card_w, 42, fill_rgb=(0.120, 0.650, 0.270))
+    pdf_stream_text(stream, card_x + 18, card_y + card_h - 27, "FAHRERKARTE", size=16, bold=True, color=(0.000, 0.000, 0.000))
+    pdf_stream_text(stream, card_x + 170, card_y + card_h - 24, "EifelLog Virtual Logistics", size=10, bold=True, color=(0.000, 0.000, 0.000))
+    pdf_stream_rect(stream, card_x + card_w - 96, card_y + card_h - 31, 72, 18, fill_rgb=(0.000, 0.000, 0.000), stroke_rgb=(0.000, 0.000, 0.000), line_width=1)
+    pdf_stream_text(stream, card_x + card_w - 86, card_y + card_h - 26, "AKTIV", size=9, bold=True, color=(0.160, 0.850, 0.340))
+
+    # Avatar-Platzhalter
+    avatar_x, avatar_y = card_x + 22, card_y + 78
+    pdf_stream_rect(stream, avatar_x, avatar_y, 92, 98, fill_rgb=(0.075, 0.095, 0.085), stroke_rgb=(0.180, 0.850, 0.360), line_width=1)
+    pdf_stream_rect(stream, avatar_x + 18, avatar_y + 54, 56, 30, fill_rgb=(0.160, 0.850, 0.340))
+    pdf_stream_text(stream, avatar_x + 28, avatar_y + 65, "EL", size=18, bold=True, color=(0.000, 0.000, 0.000))
+    pdf_stream_text(stream, avatar_x + 14, avatar_y + 30, "DRIVER", size=10, bold=True, color=(0.780, 0.860, 0.800))
+    pdf_stream_text(stream, avatar_x + 10, avatar_y + 13, "IDENTITY", size=8, bold=False, color=(0.550, 0.630, 0.570))
+
+    # Hauptdaten
+    data_x = card_x + 134
+    pdf_stream_text(stream, data_x, card_y + 169, name[:42], size=19, bold=True, color=(1, 1, 1))
+    pdf_stream_text(stream, data_x, card_y + 146, role[:54], size=11, bold=True, color=(0.160, 0.850, 0.340))
+    pdf_stream_line(stream, data_x, card_y + 134, card_x + card_w - 26, card_y + 134, stroke_rgb=(0.160, 0.850, 0.340), line_width=0.8)
+
+    pdf_stream_text(stream, data_x, card_y + 112, f"Karten-ID: {card_id}", size=10, bold=True, color=(0.900, 0.960, 0.910), max_chars=52)
+    pdf_stream_text(stream, data_x, card_y + 94, f"Username: {username}", size=9, bold=False, color=(0.770, 0.830, 0.780), max_chars=60)
+    pdf_stream_text(stream, data_x, card_y + 78, f"Discord-ID: {discord_id}", size=9, bold=False, color=(0.770, 0.830, 0.780), max_chars=60)
+    pdf_stream_text(stream, data_x, card_y + 62, f"Fahrernummer: {driver_number}", size=9, bold=False, color=(0.770, 0.830, 0.780), max_chars=60)
+    pdf_stream_text(stream, data_x, card_y + 44, f"Gültig bis: {valid_until.strftime('%d.%m.%Y')}", size=9, bold=True, color=(1, 1, 1), max_chars=60)
+
+    # QR-artiger Prüfblock
+    qr_x, qr_y, cell = card_x + card_w - 103, card_y + 74, 5
+    pdf_stream_rect(stream, qr_x - 8, qr_y - 8, 84, 84, fill_rgb=(0.930, 0.965, 0.930))
+    digest = hashlib.sha256(card_id.encode("utf-8")).digest()
+    for row in range(14):
+        for col in range(14):
+            byte = digest[(row * 14 + col) % len(digest)]
+            should_fill = ((byte >> (col % 8)) & 1) or row in {0, 13} or col in {0, 13}
+            if should_fill:
+                pdf_stream_rect(stream, qr_x + col * cell, qr_y + row * cell, cell - 1, cell - 1, fill_rgb=(0.020, 0.045, 0.030))
+    pdf_stream_text(stream, qr_x - 3, qr_y - 22, "CHECKCODE", size=7, bold=True, color=(0.160, 0.850, 0.340))
+
+    # Ausstellungsleiste
+    pdf_stream_rect(stream, card_x + 20, card_y + 22, card_w - 40, 30, fill_rgb=(0.015, 0.022, 0.018), stroke_rgb=(0.120, 0.520, 0.240), line_width=0.7)
+    pdf_stream_text(stream, card_x + 32, card_y + 34, f"Ausgestellt durch: {handler}", size=8, bold=False, color=(0.750, 0.820, 0.760), max_chars=82)
+    pdf_stream_text(stream, card_x + 32, card_y + 23, "Dieses Dokument ist automatisch generiert und für den ServiceCenter-Download bestimmt.", size=7, bold=False, color=(0.560, 0.620, 0.580), max_chars=92)
+
+    # Detailbereiche
+    box_y = 246
+    pdf_stream_rect(stream, 48, box_y, 499, 182, fill_rgb=(0.965, 0.980, 0.965), stroke_rgb=(0.160, 0.850, 0.340), line_width=1)
+    pdf_stream_text(stream, 66, box_y + 154, "Dokumentdaten", size=13, bold=True, color=(0.020, 0.070, 0.035))
+    pdf_stream_text(stream, 66, box_y + 130, f"Antrags-ID: {request_id}", size=9, bold=False, color=(0.050, 0.070, 0.060), max_chars=78)
+    pdf_stream_text(stream, 66, box_y + 114, f"System-ID: {system_id}", size=9, bold=False, color=(0.050, 0.070, 0.060), max_chars=78)
+    pdf_stream_text(stream, 66, box_y + 98, f"Status: {fahrerkarte_status_label(request_doc.get('status') or 'issued')}", size=9, bold=False, color=(0.050, 0.070, 0.060), max_chars=78)
+    pdf_stream_text(stream, 66, box_y + 82, f"Priorität: {priority_label}", size=9, bold=False, color=(0.050, 0.070, 0.060), max_chars=78)
+    pdf_stream_text(stream, 66, box_y + 66, f"Antragsgrund: {reason_label}", size=9, bold=False, color=(0.050, 0.070, 0.060), max_chars=78)
+    pdf_stream_text(stream, 66, box_y + 50, f"Bereitstellung: {delivery_label}", size=9, bold=False, color=(0.050, 0.070, 0.060), max_chars=78)
+
+    pdf_stream_text(stream, 315, box_y + 154, "Hinweis", size=13, bold=True, color=(0.020, 0.070, 0.035))
+    pdf_stream_text(stream, 315, box_y + 130, note, size=9, bold=False, color=(0.050, 0.070, 0.060), max_chars=36)
+
+    # Signatur
+    pdf_stream_rect(stream, 48, 116, 499, 90, fill_rgb=(0.030, 0.045, 0.038), stroke_rgb=(0.160, 0.850, 0.340), line_width=0.9)
+    pdf_stream_text(stream, 66, 178, "Digitale Ausstellung", size=12, bold=True, color=(0.160, 0.850, 0.340))
+    pdf_stream_text(stream, 66, 156, f"{handler} / {issued_at.strftime('%d.%m.%Y %H:%M')} UTC", size=10, bold=False, color=(1, 1, 1), max_chars=80)
+    verify_hash = hashlib.sha256(f"{card_id}|{discord_id}|{request_id}".encode("utf-8")).hexdigest()[:24].upper()
+    pdf_stream_text(stream, 66, 137, f"Prüfhash: {verify_hash}", size=8, bold=False, color=(0.760, 0.820, 0.780), max_chars=80)
+    pdf_stream_text(stream, 66, 121, "Download: ServiceCenter / Dokumente / Fahrerkarte", size=8, bold=True, color=(0.160, 0.850, 0.340), max_chars=80)
+
+    pdf_stream_text(stream, 42, 62, f"{TOUR_RECEIPT_COMPANY_NAME} - automatisch generierte personalisierte Fahrerkarte", size=8, bold=False, color=(0.740, 0.800, 0.760))
+    pdf_stream_text(stream, 42, 48, "Bei Missbrauch oder falschen Daten bitte die Personalabteilung kontaktieren.", size=8, bold=False, color=(0.540, 0.600, 0.560))
+    stream.extend(b"Q\n")
+    return build_pdf_single_page(stream)
+
+
 def build_fahrerkarte_pdf_sections(request_doc, user_doc=None, actor=None):
     user_doc = user_doc or {}
     actor = actor or {}
@@ -1308,13 +1512,9 @@ def save_fahrerkarte_pdf(request_doc, user_doc=None, actor=None, force=False):
     pdf_doc["issued_at"] = issue_time
     pdf_doc["status"] = "issued"
 
-    subtitle = f"Personalisierte Fahrerkarte / {driver_name} / {card_id}"
-    pdf_bytes = build_eifellog_servicecenter_pdf(
-        "Personalisierte Fahrerkarte",
-        subtitle,
-        build_fahrerkarte_pdf_sections(pdf_doc, user_doc=user_doc, actor=actor),
-        footer_text="EifelLog ServiceCenter - Fahrerkarte"
-    )
+    # Das Fahrerkarte-PDF wird komplett in main.py generiert.
+    # Kein Template und keine externe PDF-Bibliothek nötig.
+    pdf_bytes = build_personalisierte_fahrerkarte_pdf(pdf_doc, user_doc=user_doc, actor=actor)
 
     with open(file_path, "wb") as file:
         file.write(pdf_bytes)
@@ -1331,22 +1531,43 @@ def fahrerkarte_pdf_document_content(request_doc, download_url, description=""):
     request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
     card_id = safe_str(request_doc.get("card_id"), "Wird erzeugt")
     name = request_doc.get("display_name") or request_doc.get("full_name") or request_doc.get("name") or "EifelLog Fahrer"
+    username = request_doc.get("username") or request_doc.get("discord_username") or "-"
+    role = request_doc.get("role") or request_doc.get("role_name") or "Fahrer"
+    issued_at = format_datetime_for_template(request_doc.get("issued_at")) or now_utc().strftime("%d.%m.%Y %H:%M")
     description = safe_str(description, "Deine personalisierte Fahrerkarte wurde als PDF im EifelLog ServiceCenter bereitgestellt.")
     return f"""
-        <p><strong>Personalisierte Fahrerkarte bereitgestellt</strong></p>
+        <p><strong>Personalisierte Fahrerkarte ausgestellt</strong></p>
         <p class="mt-4">{description}</p>
-        <div class="mt-5 rounded-2xl bg-black/50 border border-[var(--brand-green)]/25 p-4">
-            <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest mb-2">ServiceCenter PDF</p>
-            <p><strong>Name:</strong> {name}</p>
-            <p><strong>Karten-ID:</strong> {card_id}</p>
-            <p><strong>Antrags-ID:</strong> {request_id}</p>
-            <p class="mt-4 text-xs text-gray-400">Dieses PDF kannst du später im Tracker hochladen.</p>
+
+        <div class="mt-5 rounded-3xl bg-gradient-to-br from-black via-[#07120b] to-black border border-[var(--brand-green)]/40 p-5 shadow-2xl">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-[0.25em]">EifelLog Fahrerkarte</p>
+                    <h3 class="mt-2 text-xl font-orbitron font-black text-white">{name}</h3>
+                    <p class="mt-1 text-sm text-gray-300">{role}</p>
+                </div>
+                <div class="rounded-xl border border-[var(--brand-green)]/50 px-3 py-2 text-right">
+                    <p class="text-[9px] uppercase tracking-widest text-gray-400">Status</p>
+                    <p class="font-orbitron font-bold text-[var(--brand-green)]">AKTIV</p>
+                </div>
+            </div>
+
+            <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <p><span class="text-gray-400">Karten-ID:</span><br><strong class="text-white break-all">{card_id}</strong></p>
+                <p><span class="text-gray-400">Username:</span><br><strong class="text-white">{username}</strong></p>
+                <p><span class="text-gray-400">Antrags-ID:</span><br><strong class="text-white break-all">{request_id}</strong></p>
+                <p><span class="text-gray-400">Ausgestellt am:</span><br><strong class="text-white">{issued_at}</strong></p>
+            </div>
+
+            <p class="mt-5 text-xs text-gray-400">
+                Das PDF wurde automatisch generiert und ist als Download für Dashboard, ServiceCenter und späteren Tracker-Upload bereit.
+            </p>
+
             <a href="{download_url}" class="inline-flex items-center justify-center mt-5 px-5 py-3 rounded-xl bg-[var(--brand-green)] text-black font-orbitron font-bold uppercase tracking-widest hover:opacity-90" download>
                 PDF herunterladen
             </a>
         </div>
     """
-
 
 def create_fahrerkarte_pdf_dashboard_document(request_doc, actor=None, description=""):
     discord_id = safe_str(request_doc.get("discord_id") or request_doc.get("user_id"))
@@ -1383,6 +1604,204 @@ def create_fahrerkarte_pdf_dashboard_document(request_doc, actor=None, descripti
             "tracker_upload_ready": True,
         },
     )
+
+
+def get_active_fahrerkarte_request_for_issue(discord_id):
+    discord_id = safe_str(discord_id)
+    if not discord_id:
+        return None
+    return fahrerkarte_requests_collection.find_one(
+        {
+            "discord_id": discord_id,
+            "archived": {"$ne": True},
+            "status": {"$in": ["pending", "open", "postponed", "claimed", "approved"]},
+        },
+        sort=[("created_at", DESCENDING)]
+    )
+
+
+def create_direct_fahrerkarte_request_for_user(user_doc, actor=None, issue_note=""):
+    if not user_doc:
+        raise ValueError("Fahrer wurde nicht gefunden.")
+
+    actor = actor or current_staff_identity()
+    now = now_utc()
+    discord_id = safe_str(user_doc.get("discord_id"))
+    display_name = safe_str(user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username"), "EifelLog Fahrer")
+    role_name = get_primary_role_name(user_doc.get("roles", []))
+    request_id = uuid.uuid4().hex
+
+    request_doc = {
+        "request_id": request_id,
+        "discord_id": discord_id,
+        "user_id": discord_id,
+        "username": user_doc.get("username") or user_doc.get("discord_username"),
+        "discord_username": user_doc.get("discord_username") or user_doc.get("username"),
+        "avatar_url": make_external_url(get_discord_avatar_url(user_doc)),
+        "name": display_name,
+        "full_name": display_name,
+        "display_name": display_name,
+        "role": role_name,
+        "role_name": role_name,
+        "system_id": discord_id,
+        "driver_number": user_doc.get("driver_number") or user_doc.get("fahrernummer") or "",
+        "priority": "normal",
+        "reason": "new_issue",
+        "delivery_method": "servicecenter",
+        "notes": safe_str(issue_note, "Direkte Ausstellung über Dokument / Ausstellen."),
+        "status": "claimed",
+        "claimed_by": actor,
+        "claimed_at": now,
+        "approved_by": actor,
+        "approved_at": now,
+        "approval_note": safe_str(issue_note, "Direkte Ausstellung durch Personalabteilung."),
+        "handler_name": actor.get("display_name") or actor.get("username") or "Personalabteilung",
+        "created_at": now,
+        "updated_at": now,
+        "source": "personalabteilung_dokument_ausstellen",
+        "card_id": "",
+    }
+    inserted = fahrerkarte_requests_collection.insert_one(request_doc)
+    return fahrerkarte_requests_collection.find_one({"_id": inserted.inserted_id})
+
+
+def ensure_fahrerkarte_dashboard_document_once(request_doc, actor=None, description=""):
+    discord_id = safe_str(request_doc.get("discord_id") or request_doc.get("user_id"))
+    request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+    if not discord_id or not request_id:
+        return None
+
+    existing = system_documents_collection.find_one({
+        "discord_id": discord_id,
+        "type": "driver_card_pdf",
+        "request_id": request_id,
+        "archived": {"$ne": True},
+        "hidden": {"$ne": True},
+    })
+    if existing:
+        return existing
+
+    return create_fahrerkarte_pdf_dashboard_document(request_doc, actor=actor, description=description)
+
+
+def auto_issue_fahrerkarte_for_user(user_doc, actor=None, issue_note="", request_doc=None, force_pdf=True):
+    if not user_doc:
+        raise ValueError("Fahrer wurde nicht gefunden.")
+
+    actor = actor or current_staff_identity()
+    handler_name = actor.get("display_name") or actor.get("username") or "Personalabteilung"
+    issue_note = safe_str(issue_note, "Fahrerkarte wurde über Dokument / Ausstellen automatisch ausgestellt.")[:1000]
+    discord_id = safe_str(user_doc.get("discord_id"))
+
+    if not request_doc:
+        request_doc = get_active_fahrerkarte_request_for_issue(discord_id)
+
+    if not request_doc:
+        request_doc = create_direct_fahrerkarte_request_for_user(user_doc, actor=actor, issue_note=issue_note)
+
+    current_status = normalize_fahrerkarte_status(request_doc.get("status"))
+    if current_status in {"rejected", "archived"}:
+        raise PermissionError("Abgelehnte oder archivierte Fahrerkarte-Anträge können nicht ausgestellt werden.")
+
+    if current_status == "issued":
+        pdf_path = request_doc.get("pdf_path") or request_doc.get("pdf_relative_path")
+        resolved_path = resolve_fahrerkarte_pdf_path(pdf_path)
+        if not resolved_path or not os.path.exists(resolved_path):
+            file_path, relative_path, filename, _pdf_bytes = save_fahrerkarte_pdf(request_doc, user_doc=user_doc, actor=actor, force=True)
+            fahrerkarte_requests_collection.update_one(
+                {"_id": request_doc["_id"]},
+                {"$set": {"pdf_path": file_path, "pdf_relative_path": relative_path, "pdf_filename": filename, "updated_at": now_utc()}}
+            )
+            request_doc = fahrerkarte_requests_collection.find_one({"_id": request_doc["_id"]})
+        ensure_fahrerkarte_dashboard_document_once(request_doc, actor=actor, description=issue_note)
+        return {
+            "request": request_doc,
+            "download_url": servicecenter_fahrerkarte_download_url(request_doc.get("request_id") or request_doc.get("_id")),
+            "pdf_filename": request_doc.get("pdf_filename") or "EifelLog_Fahrerkarte.pdf",
+            "card_id": request_doc.get("card_id"),
+            "already_issued": True,
+        }
+
+    claimed_by = request_doc.get("claimed_by") or {}
+    claimed_discord_id = safe_str(claimed_by.get("discord_id"))
+    actor_discord_id = safe_str(actor.get("discord_id"))
+    if current_status in {"claimed", "approved"} and claimed_discord_id and actor_discord_id and claimed_discord_id != actor_discord_id:
+        claimed_name = claimed_by.get("display_name") or claimed_by.get("username") or "einem anderen Sachbearbeiter"
+        raise PermissionError(f"Dieser Fahrerkarte-Antrag ist bereits von {claimed_name} geclaimt.")
+
+    now = now_utc()
+    card_id = safe_str(request_doc.get("card_id")) or generate_fahrerkarte_card_id(discord_id, request_doc.get("request_id"))
+
+    pre_update = {
+        "status": "issued",
+        "card_id": card_id,
+        "claimed_by": request_doc.get("claimed_by") or actor,
+        "claimed_at": request_doc.get("claimed_at") or now,
+        "approved_by": request_doc.get("approved_by") or actor,
+        "approved_at": request_doc.get("approved_at") or now,
+        "issued_by": actor,
+        "issued_at": now,
+        "issue_note": issue_note,
+        "handler_name": handler_name,
+        "tracker_upload_ready": True,
+        "updated_at": now,
+    }
+
+    temp_doc = dict(request_doc)
+    temp_doc.update(pre_update)
+    file_path, relative_path, filename, _pdf_bytes = save_fahrerkarte_pdf(temp_doc, user_doc=user_doc, actor=actor, force=force_pdf)
+
+    final_update = dict(pre_update)
+    final_update.update({
+        "pdf_path": file_path,
+        "pdf_relative_path": relative_path,
+        "pdf_filename": filename,
+        "download_url": servicecenter_fahrerkarte_download_url(request_doc.get("request_id") or request_doc.get("_id")),
+    })
+
+    fahrerkarte_requests_collection.update_one({"_id": request_doc["_id"]}, {"$set": final_update})
+    fresh_request = fahrerkarte_requests_collection.find_one({"_id": request_doc["_id"]})
+
+    update_user_fahrerkarte_state(user_doc, fresh_request, "issued", actor, extra_set={
+        "fahrerkarte_issued_at": now,
+        "fahrerkarte_pdf_relative_path": relative_path,
+        "fahrerkarte_pdf_filename": filename,
+        "fahrerkarte_download_url": servicecenter_fahrerkarte_download_url(fresh_request.get("request_id")),
+    })
+
+    ensure_fahrerkarte_dashboard_document_once(fresh_request, actor=actor, description=issue_note)
+    tasks_collection.update_many(
+        {"source": "servicecenter_fahrerkarte", "request_id": fresh_request.get("request_id")},
+        {"$set": {"status": "done", "completed_at": now, "updated_at": now}}
+    )
+
+    return {
+        "request": fresh_request,
+        "download_url": servicecenter_fahrerkarte_download_url(fresh_request.get("request_id")),
+        "pdf_filename": filename,
+        "card_id": card_id,
+        "already_issued": False,
+    }
+
+
+def should_issue_fahrerkarte_from_document_payload(data, title="", message=""):
+    doc_type = safe_str(data.get("type") or data.get("documentType") or data.get("docType")).lower()
+    action = safe_str(data.get("action") or data.get("documentAction")).lower()
+    combined = f"{title} {message} {doc_type} {action}".lower()
+    explicit = bool_from_payload(
+        data.get("issueFahrerkarte")
+        or data.get("issue_fahrerkarte")
+        or data.get("issueDriverCard")
+        or data.get("ausstellen"),
+        fallback=False
+    )
+    if explicit:
+        return True
+    if doc_type in {"fahrerkarte", "driver_card", "driver-card", "driver_card_pdf", "driver-card-pdf"}:
+        return True
+    if action in {"fahrerkarte_ausstellen", "issue_fahrerkarte", "issue-driver-card", "driver_card_issue"}:
+        return True
+    return "fahrerkarte" in combined and ("ausstellen" in combined or "austellen" in combined or "pdf" in combined)
 
 
 def prepare_fahrerkarte_request_for_personalabteilung(request_doc):
@@ -1441,6 +1860,21 @@ def prepare_fahrerkarte_request_for_personalabteilung(request_doc):
     item["reject_reason"] = item.get("reject_reason") or ""
     item["postpone_reason"] = item.get("postpone_reason") or ""
     item["issue_note"] = item.get("issue_note") or ""
+
+    # Frontend-Hilfe für die Spalte/Button "Dokument":
+    # - vor Ausstellung: Button "AUSSTELLEN" kann die Issue-Route aufrufen
+    # - nach Ausstellung: Button kann direkt die PDF herunterladen
+    if item["status"] == "issued" and item["download_url"]:
+        item["document_action"] = "download"
+        item["document_button_label"] = "PDF DOWNLOAD"
+        item["document_download_url"] = item["download_url"]
+        item["document_issue_url"] = ""
+    else:
+        item["document_action"] = "issue_fahrerkarte"
+        item["document_button_label"] = "AUSSTELLEN"
+        item["document_download_url"] = ""
+        item["document_issue_url"] = "/api/personalabteilung/servicecenter/fahrerkarte/issue"
+    item["auto_download_after_issue"] = True
     return item
 
 
@@ -5164,25 +5598,63 @@ def personalabteilung_dokumente():
 def api_personalabteilung_send_document():
     permission_response = require_personalabteilung_api_permission()
     if permission_response: return permission_response
-    
+
     data = request.get_json(silent=True) or {}
-    driver_id = safe_str(data.get("driverId"))
-    title = safe_str(data.get("title"))
-    message = safe_str(data.get("message"))
-    
-    if not driver_id or not title: return jsonify({"success": False, "message": "Fahrer-ID oder Titel fehlt."}), 400
-    
-    user_doc = users_collection.find_one({"discord_id": driver_id})
-    if not user_doc: return jsonify({"success": False, "message": "Fahrer nicht gefunden."}), 404
-    
+    driver_id = safe_str(data.get("driverId") or data.get("driver_id") or data.get("discordId") or data.get("discord_id") or data.get("userId"))
+    title = safe_str(data.get("title") or data.get("subject"), "Dokument der Personalabteilung")
+    message = safe_str(data.get("message") or data.get("content") or data.get("description"))
+    doc_type = safe_str(data.get("type") or data.get("documentType") or data.get("docType"), "direct_document")
+    needs_signature = bool_from_payload(data.get("needsSignature") or data.get("needs_signature"), fallback=False)
+    important = bool_from_payload(data.get("important"), fallback=True)
+
+    if not driver_id:
+        return jsonify({"success": False, "message": "Fahrer-ID fehlt."}), 400
+
+    user_doc = find_user_by_driver_identifier(driver_id)
+    if not user_doc:
+        return jsonify({"success": False, "message": "Fahrer nicht gefunden."}), 404
+
     actor = current_staff_identity()
     handler_name = actor.get("display_name") or "Personalabteilung"
     aktenzeichen = user_doc.get("aktenzeichen") or generate_aktenzeichen()
-    
+
     # Sicherstellen, dass der Fahrer ein Aktenzeichen hat
     if not user_doc.get("aktenzeichen"):
-        users_collection.update_one({"discord_id": driver_id}, {"$set": {"aktenzeichen": aktenzeichen}})
-    
+        users_collection.update_one({"_id": user_doc["_id"]}, {"$set": {"aktenzeichen": aktenzeichen}})
+        user_doc["aktenzeichen"] = aktenzeichen
+
+    # Wenn im Dokument-Button "Ausstellen/Austellen" oder Fahrerkarte gesetzt ist:
+    # PDF generieren, Fahrerkarte ausstellen und direkt als Download zurückgeben.
+    if should_issue_fahrerkarte_from_document_payload(data, title=title, message=message):
+        try:
+            issue_result = auto_issue_fahrerkarte_for_user(
+                user_doc,
+                actor=actor,
+                issue_note=message or "Fahrerkarte wurde über Dokument / Ausstellen ausgegeben.",
+                force_pdf=True
+            )
+        except PermissionError as error:
+            return jsonify({"success": False, "message": str(error)}), 403
+        except Exception as error:
+            return jsonify({"success": False, "message": f"Fahrerkarte konnte nicht ausgestellt werden: {error}"}), 500
+
+        fresh_request = issue_result["request"]
+        return jsonify({
+            "success": True,
+            "message": "Fahrerkarte wurde ausgestellt. Das PDF wurde erstellt, im Dokument hinterlegt und kann automatisch heruntergeladen werden.",
+            "documentType": "driver_card_pdf",
+            "status": "issued",
+            "autoDownload": True,
+            "downloadUrl": issue_result["download_url"],
+            "downloadFilename": issue_result["pdf_filename"],
+            "cardId": issue_result["card_id"],
+            "requestId": fresh_request.get("request_id"),
+            "request": prepare_fahrerkarte_request_for_personalabteilung(fresh_request),
+        })
+
+    if not title or not message:
+        return jsonify({"success": False, "message": "Titel und Inhalt fehlen."}), 400
+
     content = f"""
         <p><strong>{title}</strong></p>
         <p class="mt-4">Dieses Dokument wurde direkt von der Personalabteilung an dich ausgestellt.</p>
@@ -5192,18 +5664,84 @@ def api_personalabteilung_send_document():
             <p>{message}</p>
         </div>
     """
-    
-    create_system_document_for_user(
-        driver_id,
+
+    document = create_system_document_for_user(
+        user_doc.get("discord_id"),
         title,
         handler_name,
         content,
-        doc_type="direct_document",
-        needs_signature=False,
-        extra={"important": True}  # Landet im System Alert als wichtig
+        doc_type=doc_type or "direct_document",
+        needs_signature=needs_signature,
+        extra={
+            "important": important,
+            "created_by": actor,
+            "created_for_username": user_doc.get("username") or user_doc.get("discord_username"),
+            "created_for_display_name": user_doc.get("display_name") or user_doc.get("username"),
+            "source": "personalabteilung_driver_document_send",
+        }
     )
-    
-    return jsonify({"success": True, "message": "Wichtiges Dokument ausgestellt."})
+
+    return jsonify({
+        "success": True,
+        "message": "Wichtiges Dokument ausgestellt.",
+        "documentId": document.get("document_id"),
+        "autoDownload": False,
+    })
+
+
+@app.route("/api/personalabteilung/driver/document/issue-fahrerkarte", methods=["POST"])
+@app.route("/api/personalabteilung/driver/fahrerkarte/ausstellen", methods=["POST"])
+def api_personalabteilung_issue_driver_fahrerkarte():
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response: return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("request_id") or data.get("id"))
+    driver_id = safe_str(data.get("driverId") or data.get("driver_id") or data.get("discordId") or data.get("discord_id") or data.get("userId"))
+    issue_note = safe_str(data.get("note") or data.get("issueNote") or data.get("message") or data.get("description"), "Fahrerkarte wurde über Dokument / Ausstellen ausgestellt.")[:1000]
+
+    actor = current_staff_identity()
+    request_doc = None
+    user_doc = None
+
+    if request_id:
+        request_doc = find_fahrerkarte_request(request_id)
+        if not request_doc:
+            return jsonify({"success": False, "message": "Fahrerkarte-Antrag wurde nicht gefunden."}), 404
+        user_doc = find_user_for_request_doc(request_doc)
+    elif driver_id:
+        user_doc = find_user_by_driver_identifier(driver_id)
+    else:
+        return jsonify({"success": False, "message": "Fahrer-ID oder Request-ID fehlt."}), 400
+
+    if not user_doc:
+        return jsonify({"success": False, "message": "Fahrer nicht gefunden."}), 404
+
+    try:
+        issue_result = auto_issue_fahrerkarte_for_user(
+            user_doc,
+            actor=actor,
+            issue_note=issue_note,
+            request_doc=request_doc,
+            force_pdf=bool_from_payload(data.get("force"), fallback=True)
+        )
+    except PermissionError as error:
+        return jsonify({"success": False, "message": str(error)}), 403
+    except Exception as error:
+        return jsonify({"success": False, "message": f"Fahrerkarte konnte nicht ausgestellt werden: {error}"}), 500
+
+    fresh_request = issue_result["request"]
+    return jsonify({
+        "success": True,
+        "message": "Fahrerkarte wurde ausgestellt. PDF wurde erstellt und als Download bereitgestellt.",
+        "status": "issued",
+        "autoDownload": True,
+        "downloadUrl": issue_result["download_url"],
+        "downloadFilename": issue_result["pdf_filename"],
+        "cardId": issue_result["card_id"],
+        "requestId": fresh_request.get("request_id"),
+        "request": prepare_fahrerkarte_request_for_personalabteilung(fresh_request),
+    })
 
 
 # ==========================================
