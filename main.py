@@ -155,6 +155,7 @@ tour_receipts_collection = db["tour_receipts"]
 dispo_tours_collection = db["dispo_tours"]
 dispo_notes_collection = db["dispo_notes"]
 dispo_messages_collection = db["dispo_messages"]
+fahrerkarte_requests_collection = db["fahrerkarte_requests"]
 
 
 def ensure_indexes():
@@ -219,6 +220,13 @@ def ensure_indexes():
         dispo_messages_collection.create_index([("created_at", DESCENDING)], unique=False)
         dispo_messages_collection.create_index([("priority", ASCENDING)], unique=False)
         dispo_messages_collection.create_index([("archived", ASCENDING)], unique=False)
+
+        fahrerkarte_requests_collection.create_index([("request_id", ASCENDING)], unique=False)
+        fahrerkarte_requests_collection.create_index([("discord_id", ASCENDING)], unique=False)
+        fahrerkarte_requests_collection.create_index([("status", ASCENDING)], unique=False)
+        fahrerkarte_requests_collection.create_index([("created_at", DESCENDING)], unique=False)
+        fahrerkarte_requests_collection.create_index([("claimed_by.discord_id", ASCENDING)], unique=False)
+        fahrerkarte_requests_collection.create_index([("archived", ASCENDING)], unique=False)
     except Exception as error:
         print(f"MongoDB Index-Erstellung fehlgeschlagen: {error}")
 
@@ -866,6 +874,157 @@ def dashboard_registration_context(user_doc, latest_request=None):
         "fahrer_token_value": "",
         "fahrer_token_created_at": format_datetime_for_template(user_doc.get("tracker_code_created_at")) or "Heute"
     }
+
+
+# ==========================================
+# SERVICECENTER / PERSONALISIERTE FAHRERKARTE
+# ==========================================
+
+def get_latest_fahrerkarte_request_for_user(discord_id):
+    discord_id = safe_str(discord_id)
+    if not discord_id:
+        return None
+
+    return fahrerkarte_requests_collection.find_one(
+        {"discord_id": discord_id, "archived": {"$ne": True}},
+        sort=[("created_at", DESCENDING)]
+    )
+
+
+def generate_fahrerkarte_card_id(discord_id, request_id=""):
+    discord_id = safe_str(discord_id, "user")
+    request_id = safe_str(request_id)
+    raw = f"{discord_id}|{request_id}|{now_utc().isoformat()}|{secrets.token_hex(4)}"
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:8].upper()
+    return f"EL-FK-{now_utc().strftime('%Y%m%d')}-{digest}"
+
+
+def normalize_fahrerkarte_status(status):
+    status = safe_str(status, "none").lower()
+    if status == "open":
+        return "pending"
+    if status in {"none", "pending", "claimed", "approved", "issued", "rejected", "archived"}:
+        return status
+    return "none"
+
+
+def prepare_fahrerkarte_context(user_doc, latest_request=None):
+    user_doc = user_doc or {}
+    discord_id = safe_str(user_doc.get("discord_id"))
+    latest_request = latest_request or get_latest_fahrerkarte_request_for_user(discord_id)
+
+    status = normalize_fahrerkarte_status(user_doc.get("personalisierte_fahrerkarte_status") or user_doc.get("fahrerkarte_status"))
+    if latest_request and latest_request.get("status"):
+        status = normalize_fahrerkarte_status(latest_request.get("status"))
+
+    name = (
+        user_doc.get("display_name")
+        or user_doc.get("username")
+        or user_doc.get("discord_username")
+        or ""
+    )
+    role = get_primary_role_name(user_doc.get("roles", []))
+    handler = "Noch nicht zugewiesen"
+    requested_at = "-"
+    issued_at = "-"
+    note = ""
+    card_id = safe_str(user_doc.get("fahrerkarte_card_id"), "Wird nach Ausstellung erzeugt")
+
+    if latest_request:
+        name = latest_request.get("display_name") or latest_request.get("full_name") or latest_request.get("name") or name
+        role = latest_request.get("role") or latest_request.get("role_name") or role
+        requested_at = format_datetime_for_template(latest_request.get("created_at")) or "-"
+        issued_at = format_datetime_for_template(latest_request.get("issued_at")) or "-"
+        note = latest_request.get("note") or latest_request.get("notes") or latest_request.get("reject_reason") or ""
+        card_id = latest_request.get("card_id") or card_id
+
+        claimed_by = latest_request.get("claimed_by") or {}
+        approved_by = latest_request.get("approved_by") or {}
+        issued_by = latest_request.get("issued_by") or {}
+        rejected_by = latest_request.get("rejected_by") or {}
+        handler = (
+            issued_by.get("display_name")
+            or approved_by.get("display_name")
+            or rejected_by.get("display_name")
+            or claimed_by.get("display_name")
+            or latest_request.get("handler_name")
+            or handler
+        )
+
+    if not card_id:
+        card_id = "Wird nach Ausstellung erzeugt"
+
+    return {
+        "personalisierte_fahrerkarte_status": status,
+        "fahrerkarte_name": name,
+        "fahrerkarte_role": role,
+        "fahrerkarte_handler": handler,
+        "fahrerkarte_requested_at": requested_at,
+        "fahrerkarte_issued_at": issued_at,
+        "fahrerkarte_card_id": card_id,
+        "fahrerkarte_note": note,
+    }
+
+
+def get_servicecenter_messages_for_user(discord_id, limit=12):
+    discord_id = safe_str(discord_id)
+    if not discord_id:
+        return []
+
+    documents = system_documents_collection.find(
+        {
+            "discord_id": discord_id,
+            "archived": {"$ne": True},
+            "hidden": {"$ne": True},
+            "$or": [
+                {"type": {"$in": ["driver_card_application", "driver_card_approval", "driver_card_issued", "driver_card_rejection"]}},
+                {"title": {"$regex": "fahrerkarte|servicecenter", "$options": "i"}},
+            ],
+        },
+        {"_id": 0}
+    ).sort("created_at", DESCENDING).limit(limit)
+
+    return [prepare_system_document_for_dashboard(document) for document in documents]
+
+
+def fahrerkarte_application_document_content(name, role, request_id, priority, reason, delivery_method, notes=""):
+    reason_label = {
+        "new_issue": "Erstausstellung",
+        "update": "Datenänderung / Aktualisierung",
+        "replacement": "Ersatzkarte",
+        "role_change": "Rollenwechsel",
+    }.get(safe_str(reason), safe_str(reason, "Nicht angegeben"))
+
+    priority_label = {
+        "normal": "Normal - reguläre Bearbeitung",
+        "high": "Hoch - Einsatz / Tour steht bevor",
+        "low": "Niedrig - keine Eile",
+    }.get(safe_str(priority), safe_str(priority, "Normal"))
+
+    delivery_label = {
+        "servicecenter": "ServiceCenter / Postfach",
+        "profile": "Im Profil hinterlegen",
+        "manual": "Manuelle Übergabe durch Personalabteilung",
+    }.get(safe_str(delivery_method), safe_str(delivery_method, "ServiceCenter"))
+
+    notes = safe_str(notes, "Keine Hinweise angegeben.")
+
+    return f"""
+        <p><strong>Beantragung personalisierte Fahrerkarte</strong></p>
+        <p class="mt-4">
+            Deine Beantragung wurde im EifelLog ServiceCenter eingereicht und wartet auf Prüfung.
+        </p>
+        <div class="mt-5 rounded-2xl bg-black/50 border border-[var(--brand-green)]/25 p-4">
+            <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest mb-2">Antragsdaten</p>
+            <p><strong>Name:</strong> {name}</p>
+            <p><strong>Rolle:</strong> {role}</p>
+            <p><strong>Antrags-ID:</strong> {request_id}</p>
+            <p><strong>Priorität:</strong> {priority_label}</p>
+            <p><strong>Antragsgrund:</strong> {reason_label}</p>
+            <p><strong>Bereitstellung:</strong> {delivery_label}</p>
+        </div>
+        <p class="mt-4"><strong>Hinweise:</strong><br>{notes}</p>
+    """
 
 
 def tracker_confirmation_document_content(name, role, handler_name, tracker_code, reason=None):
@@ -2893,6 +3052,188 @@ def dashboard():
     registration_context = dashboard_registration_context(db_user, latest_registration)
 
     return render_template("dashboard.html", current_user=user, needs_signature=needs_signature, primary_role_name=primary_role_name, news_items=news_items, user_documents=user_documents, **registration_context)
+
+
+@app.route("/servicecenter", methods=["GET"])
+@app.route("/EifellogServiceCenter", methods=["GET"])
+@app.route("/EifellogServiceCenter.html", methods=["GET"])
+def servicecenter():
+    if "user" not in session:
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for("hub"))
+
+    user = session["user"]
+    user_roles = user.get("roles", [])
+
+    if not has_dashboard_permission(user_roles):
+        flash("Zugriff verweigert! Du benötigst eine anerkannte Rolle, um das ServiceCenter zu betreten.", "error")
+        return redirect(url_for("home"))
+
+    discord_id = safe_str(user.get("id"))
+    db_user = users_collection.find_one({"discord_id": discord_id})
+
+    if not db_user:
+        db_user = {
+            "discord_id": discord_id,
+            "username": user.get("username"),
+            "discord_username": user.get("discord_username"),
+            "display_name": user.get("username"),
+            "avatar": user.get("avatar"),
+            "roles": user_roles,
+        }
+
+    primary_role_name = get_primary_role_name(user_roles)
+    latest_fahrerkarte_request = get_latest_fahrerkarte_request_for_user(discord_id)
+    fahrerkarte_context = prepare_fahrerkarte_context(db_user, latest_fahrerkarte_request)
+    servicecenter_messages = get_servicecenter_messages_for_user(discord_id)
+
+    return render_template(
+        "EifellogServiceCenter.html",
+        current_user=user,
+        primary_role_name=primary_role_name,
+        servicecenter_messages=servicecenter_messages,
+        fahrerkarte_submit_url=url_for("servicecenter_fahrerkarte_beantragen"),
+        fahrerkarte_download_url=url_for("servicecenter_fahrerkarte"),
+        **fahrerkarte_context,
+    )
+
+
+@app.route("/servicecenter/fahrerkarte", methods=["GET"])
+def servicecenter_fahrerkarte():
+    return servicecenter()
+
+
+@app.route("/servicecenter/fahrerkarte/beantragen", methods=["POST"])
+def servicecenter_fahrerkarte_beantragen():
+    if "user" not in session:
+        flash("Bitte logge dich zuerst ein.", "error")
+        return redirect(url_for("hub"))
+
+    user = session.get("user") or {}
+    user_roles = user.get("roles", [])
+
+    if not has_dashboard_permission(user_roles):
+        flash("Zugriff verweigert! Du benötigst eine anerkannte Rolle, um eine Fahrerkarte zu beantragen.", "error")
+        return redirect(url_for("home"))
+
+    discord_id = safe_str(user.get("id"))
+    if not discord_id:
+        flash("Session ist ungültig. Bitte logge dich erneut ein.", "error")
+        return redirect(url_for("hub"))
+
+    db_user = users_collection.find_one({"discord_id": discord_id})
+    if not db_user:
+        flash("User wurde in der Datenbank nicht gefunden.", "error")
+        return redirect(url_for("dashboard"))
+
+    data = request.form if request.form else (request.get_json(silent=True) or {})
+
+    full_name = safe_str(data.get("full_name"), db_user.get("display_name") or db_user.get("username") or user.get("username"))[:100]
+    display_name = safe_str(data.get("display_name"), full_name)[:100]
+    role_name = safe_str(data.get("role_name"), get_primary_role_name(db_user.get("roles", [])))[:100]
+    system_id = safe_str(data.get("system_id"), discord_id)[:80]
+    driver_number = safe_str(data.get("driver_number"))[:80]
+    priority = safe_str(data.get("priority"), "normal")[:40]
+    reason = safe_str(data.get("reason"))[:80]
+    delivery_method = safe_str(data.get("delivery_method"), "servicecenter")[:80]
+    notes = safe_str(data.get("notes"))[:600]
+    confirm_correct = safe_str(data.get("confirm_correct")) in {"1", "true", "on", "yes", "ja"}
+
+    if len(full_name) < 2 or len(display_name) < 2 or len(role_name) < 2 or len(system_id) < 2:
+        flash("Bitte fülle alle Pflichtfelder für die Fahrerkarte aus.", "error")
+        return redirect(url_for("servicecenter"))
+
+    if not reason:
+        flash("Bitte wähle einen Antragsgrund aus.", "error")
+        return redirect(url_for("servicecenter"))
+
+    if not confirm_correct:
+        flash("Bitte bestätige, dass deine Angaben korrekt sind.", "error")
+        return redirect(url_for("servicecenter"))
+
+    existing_open = fahrerkarte_requests_collection.find_one({
+        "discord_id": discord_id,
+        "archived": {"$ne": True},
+        "status": {"$in": ["pending", "open", "claimed", "approved"]},
+    })
+    if existing_open:
+        flash("Du hast bereits eine offene Beantragung für eine personalisierte Fahrerkarte.", "info")
+        return redirect(url_for("servicecenter"))
+
+    now = now_utc()
+    request_id = uuid.uuid4().hex
+
+    request_doc = {
+        "request_id": request_id,
+        "discord_id": discord_id,
+        "user_id": discord_id,
+        "username": db_user.get("username") or user.get("username"),
+        "discord_username": db_user.get("discord_username") or user.get("discord_username"),
+        "avatar_url": make_external_url(get_discord_avatar_url(db_user)),
+        "name": full_name,
+        "full_name": full_name,
+        "display_name": display_name,
+        "role": role_name,
+        "role_name": role_name,
+        "system_id": system_id,
+        "driver_number": driver_number,
+        "priority": priority,
+        "reason": reason,
+        "delivery_method": delivery_method,
+        "notes": notes,
+        "status": "pending",
+        "created_at": now,
+        "updated_at": now,
+        "source": "servicecenter_fahrerkarte",
+        "card_id": "",
+    }
+
+    fahrerkarte_requests_collection.insert_one(request_doc)
+
+    users_collection.update_one(
+        {"discord_id": discord_id},
+        {
+            "$set": {
+                "personalisierte_fahrerkarte_status": "pending",
+                "fahrerkarte_status": "pending",
+                "fahrerkarte_requested_at": now,
+                "fahrerkarte_request_id": request_id,
+                "fahrerkarte_name": display_name,
+                "fahrerkarte_role": role_name,
+                "fahrerkarte_handler": "Noch nicht zugewiesen",
+            }
+        }
+    )
+
+    create_system_document_for_user(
+        discord_id,
+        "Fahrerkarte beantragt",
+        "EifelLog ServiceCenter",
+        fahrerkarte_application_document_content(display_name, role_name, request_id, priority, reason, delivery_method, notes),
+        doc_type="driver_card_application",
+        needs_signature=False,
+        extra={
+            "important": True,
+            "request_id": request_id,
+            "fahrerkarte_request_id": request_id,
+            "contains_driver_card": True,
+        },
+    )
+
+    tasks_collection.insert_one({
+        "title": f"Fahrerkarte beantragen: {display_name}",
+        "type": "ServiceCenter",
+        "priority": "high" if priority == "high" else "medium",
+        "description": f"{display_name} ({role_name}) hat eine personalisierte Fahrerkarte beantragt. Grund: {reason}",
+        "status": "open",
+        "created_at": now,
+        "assignee": None,
+        "source": "servicecenter_fahrerkarte",
+        "request_id": request_id,
+    })
+
+    flash("Deine personalisierte Fahrerkarte wurde beantragt und im ServiceCenter hinterlegt.", "success")
+    return redirect(url_for("servicecenter"))
 
 
 @app.route("/api/fahrer_registration", methods=["POST"])

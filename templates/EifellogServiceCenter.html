@@ -1,0 +1,934 @@
+{% extends "base.html" %}
+
+{#
+    EifelLog ServiceCenter - Beantragung personalisierte Fahrerkarte
+    Erwartete optionale Variablen:
+    primary_role_name, personalisierte_fahrerkarte_status, fahrerkarte_name,
+    fahrerkarte_role, fahrerkarte_handler, fahrerkarte_requested_at,
+    fahrerkarte_issued_at, fahrerkarte_card_id, fahrerkarte_note,
+    fahrerkarte_submit_url, fahrerkarte_download_url, servicecenter_messages
+#}
+
+{% set primary_role_display = primary_role_name|default('User', true) %}
+{% set current_username = current_user.username|default('User', true) %}
+{% set current_user_id = current_user.id|default('-', true) %}
+
+{% set fahrerkarte_status_raw = (personalisierte_fahrerkarte_status|default('none', true))|lower %}
+{% if fahrerkarte_status_raw == 'open' %}
+    {% set fahrerkarte_status = 'pending' %}
+{% elif fahrerkarte_status_raw in ['none', 'pending', 'claimed', 'approved', 'issued', 'rejected'] %}
+    {% set fahrerkarte_status = fahrerkarte_status_raw %}
+{% else %}
+    {% set fahrerkarte_status = 'none' %}
+{% endif %}
+
+{% set fahrerkarte_name = fahrerkarte_name|default(current_username, true) %}
+{% set fahrerkarte_role = fahrerkarte_role|default(primary_role_display, true) %}
+{% set fahrerkarte_handler = fahrerkarte_handler|default('Noch nicht zugewiesen', true) %}
+{% set fahrerkarte_requested_at = fahrerkarte_requested_at|default('-', true) %}
+{% set fahrerkarte_issued_at = fahrerkarte_issued_at|default('-', true) %}
+{% set fahrerkarte_card_id = fahrerkarte_card_id|default('Wird nach Ausstellung erzeugt', true) %}
+{% set fahrerkarte_note = fahrerkarte_note|default('', true) %}
+{% set fahrerkarte_submit_url = fahrerkarte_submit_url|default('/servicecenter/fahrerkarte/beantragen', true) %}
+{% set fahrerkarte_download_url = fahrerkarte_download_url|default('/servicecenter/fahrerkarte', true) %}
+{% set safe_servicecenter_messages = servicecenter_messages|default([], true) %}
+
+{% block title %}EifelLog - ServiceCenter{% endblock %}
+
+{% block content %}
+<style>
+    .servicecenter-shell {
+        --service-radius: clamp(1rem, 1vw, 1.35rem);
+        --service-card-padding: clamp(0.95rem, 1vw, 1.25rem);
+        --service-gap: clamp(0.85rem, 1vw, 1.25rem);
+        width: 100%;
+        max-width: 100%;
+        margin-inline: auto;
+        min-width: 0;
+    }
+
+    .servicecenter-shell,
+    .servicecenter-shell * {
+        box-sizing: border-box;
+    }
+
+    .servicecenter-shell .glass-card {
+        padding: var(--service-card-padding) !important;
+        border-radius: var(--service-radius) !important;
+        min-width: 0;
+    }
+
+    .servicecenter-shell h1 {
+        font-size: clamp(1.35rem, 1.55vw, 1.85rem) !important;
+        line-height: 1.12 !important;
+    }
+
+    .servicecenter-shell h2 {
+        font-size: clamp(1rem, 1vw, 1.16rem) !important;
+        line-height: 1.25 !important;
+    }
+
+    .service-input,
+    .service-select,
+    .service-textarea {
+        width: 100%;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        background: rgba(0, 0, 0, 0.30);
+        color: white;
+        outline: none;
+        transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 0.875rem;
+    }
+
+    .service-input,
+    .service-select {
+        min-height: 3rem;
+        padding: 0.75rem 0.95rem;
+    }
+
+    .service-textarea {
+        min-height: 8rem;
+        padding: 0.9rem 0.95rem;
+        resize: vertical;
+    }
+
+    .service-input:focus,
+    .service-select:focus,
+    .service-textarea:focus {
+        border-color: rgba(137, 190, 50, 0.72);
+        background: rgba(0, 0, 0, 0.45);
+        box-shadow: 0 0 0 1px rgba(137, 190, 50, 0.16), 0 0 24px rgba(137, 190, 50, 0.08);
+    }
+
+    .service-input[readonly] {
+        color: rgba(255, 255, 255, 0.72);
+        background: rgba(255, 255, 255, 0.035);
+        cursor: not-allowed;
+    }
+
+    .service-select option {
+        background: #0d0f0c;
+        color: white;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    #fahrerkarte-confirm-modal {
+        overscroll-behavior: contain;
+    }
+
+    html.service-modal-locked,
+    body.service-modal-locked {
+        overflow: hidden !important;
+        height: 100% !important;
+        overscroll-behavior: none;
+    }
+
+    body.service-modal-locked {
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+    }
+
+    @media (min-width: 1280px) {
+        .servicecenter-shell .xl\:grid-cols-3 {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(300px, 0.82fr) !important;
+        }
+    }
+
+    @media (max-width: 767px) {
+        .servicecenter-shell {
+            --service-card-padding: 0.875rem;
+            --service-gap: 0.875rem;
+        }
+
+        .servicecenter-shell .glass-card {
+            border-radius: 1rem !important;
+        }
+
+        .servicecenter-shell .font-orbitron {
+            letter-spacing: 0.08em;
+        }
+
+        .servicecenter-shell [class*="tracking-[0.2em]"],
+        .servicecenter-shell [class*="tracking-[0.18em]"],
+        .servicecenter-shell [class*="tracking-widest"] {
+            letter-spacing: 0.08em !important;
+        }
+    }
+
+    @media (max-width: 640px) {
+        #fahrerkarte-confirm-modal {
+            padding: 0.5rem !important;
+            align-items: center !important;
+        }
+
+        #fahrerkarte-confirm-panel {
+            width: 100% !important;
+            max-width: 100% !important;
+            max-height: calc((var(--dashboard-vh, 1vh) * 100) - 1rem) !important;
+            border-radius: 1.25rem !important;
+        }
+
+        #fahrerkarte-confirm-panel .p-6,
+        #fahrerkarte-confirm-panel .p-7 {
+            padding: 1rem !important;
+        }
+    }
+</style>
+
+<div id="servicecenter-shell" class="servicecenter-shell">
+    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4 mt-6">
+        <div class="flex items-center gap-4 min-w-0">
+            <div class="w-16 h-16 rounded-full border-2 border-[var(--brand-green)] overflow-hidden shadow-[0_0_15px_rgba(137,190,50,0.3)] shrink-0">
+                {% if current_user.avatar %}
+                    <img src="https://cdn.discordapp.com/avatars/{{ current_user.id }}/{{ current_user.avatar }}.png" alt="Avatar" class="w-full h-full object-cover">
+                {% else %}
+                    <div class="w-full h-full bg-black/50 flex items-center justify-center text-white font-orbitron font-bold">?</div>
+                {% endif %}
+            </div>
+
+            <div class="min-w-0">
+                <span class="font-orbitron text-[10px] font-bold text-[var(--muted)] tracking-[0.2em] uppercase">EifelLog ServiceCenter</span>
+                <h1 class="text-2xl md:text-3xl font-orbitron font-bold text-white flex flex-wrap items-center gap-3 mt-1">
+                    Personalisierte Fahrerkarte
+                    <span class="px-2 py-1 rounded bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/30 text-[var(--brand-yellow)] text-[9px] uppercase tracking-widest font-bold">
+                        Beantragung
+                    </span>
+                </h1>
+                <p class="text-sm text-[var(--muted)] font-inter mt-2 max-w-3xl leading-relaxed">
+                    Beantrage hier deine personalisierte Fahrerkarte. Nach Prüfung durch die zuständige Stelle wird die Karte ausgestellt und im ServiceCenter hinterlegt.
+                </p>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+            <a href="/dashboard"
+               class="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:bg-white/10 hover:border-white/20 hover:text-white hover:-translate-y-0.5 transition-all duration-300 font-orbitron text-[10px] font-bold uppercase tracking-[0.18em]">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Zurück
+            </a>
+
+            <a href="{{ url_for('profile', username=current_user.username) }}"
+               class="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/40 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:text-white hover:-translate-y-0.5 transition-all duration-300 font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] shadow-[0_0_18px_rgba(137,190,50,0.12)]">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5.121 17.804A9 9 0 1118.879 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Mein Profil
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 relative z-10">
+        <div class="glass-card p-6 flex flex-col justify-center">
+            <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+                <svg class="w-4 h-4 text-[var(--brand-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Antragstyp
+            </h3>
+            <p class="text-2xl font-bold text-white mt-1">Fahrerkarte</p>
+            <p class="text-xs text-[var(--brand-green)] font-inter mt-2">Personalisiert</p>
+        </div>
+
+        <div class="glass-card p-6 flex flex-col justify-center">
+            <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+                <svg class="w-4 h-4 text-[var(--brand-yellow)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Status
+            </h3>
+            <p class="text-2xl font-bold text-white mt-1">
+                {% if fahrerkarte_status == 'issued' %}
+                    Ausgestellt
+                {% elif fahrerkarte_status == 'approved' %}
+                    Freigegeben
+                {% elif fahrerkarte_status == 'claimed' %}
+                    In Prüfung
+                {% elif fahrerkarte_status == 'pending' %}
+                    Offen
+                {% elif fahrerkarte_status == 'rejected' %}
+                    Abgelehnt
+                {% else %}
+                    Nicht beantragt
+                {% endif %}
+            </p>
+            <p class="text-xs text-[var(--brand-yellow)] font-inter mt-2">ServiceCenter</p>
+        </div>
+
+        <div class="glass-card p-6 flex flex-col justify-center">
+            <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+                <svg class="w-4 h-4 text-[#5865F2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A9 9 0 1118.879 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Antragsteller
+            </h3>
+            <p class="text-2xl font-bold text-white mt-1 truncate">{{ fahrerkarte_name }}</p>
+            <p class="text-xs text-[#7ba7ff] font-inter mt-2">{{ fahrerkarte_role }}</p>
+        </div>
+
+        <div class="glass-card p-6 flex flex-col justify-center relative overflow-hidden">
+            <div class="absolute bottom-0 left-0 h-1 bg-[var(--brand-green)] w-full shadow-[0_0_10px_rgba(137,190,50,0.8)]"></div>
+            <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H3v-4l6.257-6.257A6 6 0 1121 9z"></path>
+                </svg>
+                Karten-ID
+            </h3>
+            <p class="text-lg font-bold text-white mt-1 truncate">{{ fahrerkarte_card_id }}</p>
+            <p class="text-xs text-[var(--muted)] font-inter mt-2">Nach Ausstellung eindeutig</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 relative z-10 mb-10">
+        <div class="xl:col-span-2 flex flex-col gap-6">
+            <div class="glass-card p-6 relative overflow-hidden border
+                {% if fahrerkarte_status == 'issued' %}
+                    border-[var(--brand-green)]/30
+                {% elif fahrerkarte_status in ['pending', 'claimed', 'approved'] %}
+                    border-[var(--brand-yellow)]/30
+                {% elif fahrerkarte_status == 'rejected' %}
+                    border-[var(--danger)]/30
+                {% else %}
+                    border-white/10
+                {% endif %}">
+                <div class="absolute -right-10 -top-10 opacity-5">
+                    <svg class="w-48 h-48" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M20 4H4c-1.103 0-2 .897-2 2v12c0 1.103.897 2 2 2h16c1.103 0 2-.897 2-2V6c0-1.103-.897-2-2-2zM4 8h16v2H4V8zm0 10v-6h16l.002 6H4z"></path>
+                    </svg>
+                </div>
+
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                        <span class="font-orbitron text-[10px] font-bold tracking-[0.22em] uppercase
+                            {% if fahrerkarte_status == 'issued' %}
+                                text-[var(--brand-green)]
+                            {% elif fahrerkarte_status in ['pending', 'claimed', 'approved'] %}
+                                text-[var(--brand-yellow)]
+                            {% elif fahrerkarte_status == 'rejected' %}
+                                text-[var(--danger)]
+                            {% else %}
+                                text-[var(--muted)]
+                            {% endif %}">
+                            Statusübersicht
+                        </span>
+
+                        <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">
+                            {% if fahrerkarte_status == 'issued' %}
+                                Deine personalisierte Fahrerkarte wurde ausgestellt
+                            {% elif fahrerkarte_status == 'approved' %}
+                                Antrag freigegeben - Ausstellung läuft
+                            {% elif fahrerkarte_status == 'claimed' %}
+                                Antrag wurde übernommen
+                            {% elif fahrerkarte_status == 'pending' %}
+                                Antrag liegt offen im ServiceCenter
+                            {% elif fahrerkarte_status == 'rejected' %}
+                                Antrag wurde abgelehnt
+                            {% else %}
+                                Neue Fahrerkarte beantragen
+                            {% endif %}
+                        </h2>
+
+                        <p class="text-sm text-[var(--muted)] font-inter mt-2 leading-relaxed">
+                            {% if fahrerkarte_status == 'issued' %}
+                                Die Fahrerkarte ist aktiv und kann im System verwendet werden. Änderungen an Name, Rolle oder Zuordnung müssen erneut beantragt werden.
+                            {% elif fahrerkarte_status == 'approved' %}
+                                Die zuständige Stelle hat den Antrag freigegeben. Die Karte wird jetzt erstellt und anschließend bereitgestellt.
+                            {% elif fahrerkarte_status == 'claimed' %}
+                                Dein Antrag wurde von {{ fahrerkarte_handler }} übernommen. Die Prüfung läuft, die Karte wurde aber noch nicht ausgestellt.
+                            {% elif fahrerkarte_status == 'pending' %}
+                                Dein Antrag ist eingegangen und wartet auf Prüfung. Nach Annahme wird die personalisierte Fahrerkarte ausgestellt.
+                            {% elif fahrerkarte_status == 'rejected' %}
+                                Dein letzter Antrag wurde nicht freigegeben. Prüfe die Hinweise und reiche bei Bedarf eine korrigierte Beantragung ein.
+                            {% else %}
+                                Fülle die Beantragung vollständig aus. Erst nach Prüfung und Freigabe wird die personalisierte Fahrerkarte erzeugt.
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <div class="bg-black/30 border border-white/10 rounded-2xl p-4 min-w-[230px]">
+                        <div class="space-y-2 text-xs font-inter">
+                            <div class="flex justify-between gap-4">
+                                <span class="text-white/40">Eingang</span>
+                                <span class="text-white font-bold text-right">{{ fahrerkarte_requested_at }}</span>
+                            </div>
+                            <div class="flex justify-between gap-4">
+                                <span class="text-white/40">Sachbearbeiter</span>
+                                <span class="text-white font-bold text-right">{{ fahrerkarte_handler }}</span>
+                            </div>
+                            <div class="flex justify-between gap-4">
+                                <span class="text-white/40">Ausgestellt</span>
+                                <span class="text-white font-bold text-right">{{ fahrerkarte_issued_at }}</span>
+                            </div>
+                            <div class="flex justify-between gap-4">
+                                <span class="text-white/40">System-ID</span>
+                                <span class="text-[var(--brand-yellow)] font-bold text-right">{{ current_user_id }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if fahrerkarte_note %}
+                <div class="mt-4 rounded-2xl bg-black/30 border border-white/10 p-4">
+                    <p class="text-xs text-[var(--muted)] font-inter leading-relaxed">{{ fahrerkarte_note }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if fahrerkarte_status == 'issued' %}
+            <div class="glass-card p-6 relative overflow-hidden border border-[var(--brand-green)]/25">
+                <div class="absolute inset-0 bg-gradient-to-br from-[var(--brand-green)]/8 to-transparent pointer-events-none"></div>
+                <div class="relative z-10 flex flex-col lg:flex-row gap-6">
+                    <div class="flex-1">
+                        <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Aktive Fahrerkarte</span>
+                        <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Karte bereitgestellt</h2>
+                        <p class="text-sm text-[var(--muted)] font-inter mt-2 leading-relaxed">
+                            Deine personalisierte Fahrerkarte ist im System aktiv. Du kannst sie öffnen, prüfen oder bei Datenänderung eine Aktualisierung beantragen.
+                        </p>
+                        <div class="mt-5 flex flex-wrap gap-3">
+                            <a href="{{ fahrerkarte_download_url }}" class="inline-flex items-center justify-center px-5 py-3 rounded-full bg-[var(--brand-green)]/15 border border-[var(--brand-green)]/50 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/30 hover:text-white hover:-translate-y-0.5 transition-all duration-300 font-orbitron text-[10px] font-bold uppercase tracking-[0.15em]">
+                                Fahrerkarte öffnen
+                            </a>
+                            <a href="#fahrerkarte-form" class="inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:bg-white/10 hover:text-white hover:border-white/20 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.18em]">
+                                Änderung beantragen
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="w-full lg:w-[330px] rounded-3xl bg-black/40 border border-[var(--brand-green)]/20 overflow-hidden shadow-[0_0_35px_rgba(137,190,50,0.08)]">
+                        <div class="p-5 border-b border-white/10 bg-gradient-to-r from-[var(--brand-green)]/12 to-[var(--brand-yellow)]/8">
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="font-orbitron text-[10px] text-[var(--brand-green)] font-bold uppercase tracking-[0.22em]">EifelLog</span>
+                                <span class="text-[9px] font-orbitron uppercase tracking-widest rounded-full px-2 py-1 border text-[var(--brand-green)] bg-[var(--brand-green)]/10 border-[var(--brand-green)]/25">Aktiv</span>
+                            </div>
+                            <h3 class="font-orbitron text-lg text-white font-bold mt-3">Fahrerkarte</h3>
+                        </div>
+                        <div class="p-5 space-y-4">
+                            <div>
+                                <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">Name</p>
+                                <p class="text-white font-bold mt-1">{{ fahrerkarte_name }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">Rolle</p>
+                                <p class="text-[var(--brand-yellow)] font-bold mt-1">{{ fahrerkarte_role }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">Karten-ID</p>
+                                <p class="text-white font-mono text-sm mt-1 break-all">{{ fahrerkarte_card_id }}</p>
+                            </div>
+                            <div class="pt-4 border-t border-white/10 flex items-center justify-between gap-3">
+                                <span class="text-xs text-[var(--muted)] font-inter">Ausgestellt</span>
+                                <span class="text-xs text-white font-bold">{{ fahrerkarte_issued_at }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div id="fahrerkarte-form" class="glass-card p-6 relative overflow-hidden">
+                <div class="absolute -right-12 -bottom-12 opacity-5">
+                    <svg class="w-56 h-56" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M19 3H5c-1.103 0-2 .897-2 2v14c0 1.103.897 2 2 2h14c1.103 0 2-.897 2-2V5c0-1.103-.897-2-2-2zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm10 8h-8v-2h8v2zm0-4h-8v-2h8v2zm0-4h-8V7h8v2z"></path>
+                    </svg>
+                </div>
+
+                <div class="relative z-10">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                        <div>
+                            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Beantragung</span>
+                            <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Personalisierte Fahrerkarte anfordern</h2>
+                            <p class="text-sm text-[var(--muted)] font-inter mt-2 leading-relaxed">
+                                Die Angaben werden an das ServiceCenter übermittelt. Pflichtfelder sind markiert.
+                            </p>
+                        </div>
+
+                        <span class="text-[9px] font-orbitron uppercase tracking-widest rounded-full px-3 py-1 border
+                            {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}
+                                text-[var(--brand-yellow)] bg-[var(--brand-yellow)]/10 border-[var(--brand-yellow)]/25
+                            {% elif fahrerkarte_status == 'issued' %}
+                                text-[var(--brand-green)] bg-[var(--brand-green)]/10 border-[var(--brand-green)]/25
+                            {% elif fahrerkarte_status == 'rejected' %}
+                                text-[var(--danger)] bg-[var(--danger)]/10 border-[var(--danger)]/25
+                            {% else %}
+                                text-white/60 bg-white/5 border-white/10
+                            {% endif %}">
+                            {% if fahrerkarte_status == 'issued' %}
+                                Aktualisierung möglich
+                            {% elif fahrerkarte_status in ['pending', 'claimed', 'approved'] %}
+                                Antrag gesperrt
+                            {% elif fahrerkarte_status == 'rejected' %}
+                                Neu einreichen
+                            {% else %}
+                                Neuer Antrag
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}
+                    <div class="rounded-2xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 p-5 mb-6">
+                        <div class="flex items-start gap-3">
+                            <svg class="w-5 h-5 text-[var(--brand-yellow)] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div>
+                                <p class="font-orbitron text-xs text-white font-bold uppercase tracking-widest">Es läuft bereits eine Beantragung</p>
+                                <p class="text-sm text-[var(--muted)] font-inter mt-2 leading-relaxed">
+                                    Solange dein Antrag offen, übernommen oder freigegeben ist, kann kein zweiter Antrag erstellt werden.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <form id="fahrerkarte-application-form"
+                          method="post"
+                          action="{{ fahrerkarte_submit_url }}"
+                          class="space-y-6"
+                          {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}data-locked="true"{% else %}data-locked="false"{% endif %}>
+                        {% if csrf_token is defined %}
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        {% endif %}
+                        <input type="hidden" name="request_type" value="personalized_driver_card">
+                        <input type="hidden" name="status_target" value="pending">
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="fahrerkarte-full-name" class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-2">Name im System *</label>
+                                <input id="fahrerkarte-full-name" name="full_name" type="text" class="service-input" value="{{ fahrerkarte_name }}" autocomplete="name" required {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}readonly{% endif %}>
+                            </div>
+
+                            <div>
+                                <label for="fahrerkarte-display-name" class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-2">Anzeigename auf Fahrerkarte *</label>
+                                <input id="fahrerkarte-display-name" name="display_name" type="text" class="service-input" value="{{ fahrerkarte_name }}" autocomplete="nickname" required {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}readonly{% endif %}>
+                            </div>
+
+                            <div>
+                                <label for="fahrerkarte-role" class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-2">Rolle / Bereich *</label>
+                                <input id="fahrerkarte-role" name="role_name" type="text" class="service-input" value="{{ fahrerkarte_role }}" required {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}readonly{% endif %}>
+                            </div>
+
+                            <div>
+                                <label for="fahrerkarte-system-id" class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-2">Discord-/System-ID *</label>
+                                <input id="fahrerkarte-system-id" name="system_id" type="text" class="service-input" value="{{ current_user_id }}" required {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}readonly{% endif %}>
+                            </div>
+
+                            <div>
+                                <label for="fahrerkarte-driver-number" class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-2">Fahrer-/Personalnummer</label>
+                                <input id="fahrerkarte-driver-number" name="driver_number" type="text" class="service-input" placeholder="Optional, falls vorhanden" {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}readonly{% endif %}>
+                            </div>
+
+                            <div>
+                                <label for="fahrerkarte-priority" class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-2">Priorität *</label>
+                                <select id="fahrerkarte-priority" name="priority" class="service-select" required {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}disabled{% endif %}>
+                                    <option value="normal" selected>Normal - reguläre Bearbeitung</option>
+                                    <option value="high">Hoch - Einsatz / Tour steht bevor</option>
+                                    <option value="low">Niedrig - keine Eile</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="fahrerkarte-reason" class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-2">Antragsgrund *</label>
+                                <select id="fahrerkarte-reason" name="reason" class="service-select" required {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}disabled{% endif %}>
+                                    <option value="">Bitte auswählen</option>
+                                    <option value="new_issue">Erstausstellung</option>
+                                    <option value="update">Datenänderung / Aktualisierung</option>
+                                    <option value="replacement">Ersatzkarte</option>
+                                    <option value="role_change">Rollenwechsel</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="fahrerkarte-delivery" class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-2">Bereitstellung *</label>
+                                <select id="fahrerkarte-delivery" name="delivery_method" class="service-select" required {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}disabled{% endif %}>
+                                    <option value="servicecenter" selected>ServiceCenter / Postfach</option>
+                                    <option value="profile">Im Profil hinterlegen</option>
+                                    <option value="manual">Manuelle Übergabe durch Personalabteilung</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="fahrerkarte-notes" class="block text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest mb-2">Hinweise zur Ausstellung</label>
+                            <textarea id="fahrerkarte-notes" name="notes" class="service-textarea custom-scrollbar" placeholder="Kurzer Hinweis, z. B. gewünschte Schreibweise, Einsatzbereich, dringender Grund oder Änderung gegenüber alter Karte." {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}readonly{% endif %}></textarea>
+                        </div>
+
+                        <div class="rounded-2xl bg-black/30 border border-white/10 p-5">
+                            <label class="flex items-start gap-3 cursor-pointer">
+                                <input id="fahrerkarte-confirm" name="confirm_correct" type="checkbox" value="1" class="mt-1 w-4 h-4 accent-[var(--brand-green)]" required {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}disabled{% endif %}>
+                                <span class="text-sm text-[var(--muted)] font-inter leading-relaxed">
+                                    Ich bestätige, dass die Angaben korrekt sind und die personalisierte Fahrerkarte mit diesen Daten ausgestellt werden darf.
+                                </span>
+                            </label>
+                            <p id="fahrerkarte-error" class="hidden text-xs text-[var(--danger)] font-inter mt-3">
+                                Bitte fülle alle Pflichtfelder aus und bestätige die Richtigkeit der Angaben.
+                            </p>
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <button id="fahrerkarte-submit"
+                                    type="submit"
+                                    class="btn-primary w-full sm:w-auto justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+                                    {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}disabled{% endif %}>
+                                {% if fahrerkarte_status == 'issued' %}
+                                    Aktualisierung beantragen
+                                {% elif fahrerkarte_status == 'rejected' %}
+                                    Erneut beantragen
+                                {% else %}
+                                    Fahrerkarte beantragen
+                                {% endif %}
+                            </button>
+
+                            <button id="fahrerkarte-reset"
+                                    type="button"
+                                    class="w-full sm:w-auto inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 hover:border-white/20 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.18em]"
+                                    {% if fahrerkarte_status in ['pending', 'claimed', 'approved'] %}disabled{% endif %}>
+                                Zurücksetzen
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <aside class="flex flex-col gap-6 h-full">
+            <div class="glass-card p-6">
+                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Live-Vorschau</h2>
+
+                <div class="rounded-3xl bg-black/40 border border-white/10 overflow-hidden shadow-[0_0_35px_rgba(0,0,0,0.35)]">
+                    <div class="p-5 border-b border-white/10 bg-gradient-to-r from-[var(--brand-green)]/12 to-[var(--brand-yellow)]/8">
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="font-orbitron text-[10px] text-[var(--brand-green)] font-bold uppercase tracking-[0.22em]">EifelLog</span>
+                            <span id="preview-status" class="text-[9px] font-orbitron uppercase tracking-widest rounded-full px-2 py-1 border text-[var(--brand-yellow)] bg-[var(--brand-yellow)]/10 border-[var(--brand-yellow)]/25">Entwurf</span>
+                        </div>
+                        <h3 class="font-orbitron text-lg text-white font-bold mt-3">Personalisierte Fahrerkarte</h3>
+                    </div>
+
+                    <div class="p-5 space-y-4">
+                        <div class="flex items-center gap-4">
+                            <div class="w-14 h-14 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 flex items-center justify-center text-[var(--brand-green)] shrink-0">
+                                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5.121 17.804A9 9 0 1118.879 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                            </div>
+                            <div class="min-w-0">
+                                <p id="preview-name" class="text-white font-bold truncate">{{ fahrerkarte_name }}</p>
+                                <p id="preview-role" class="text-xs text-[var(--brand-yellow)] font-inter mt-1 truncate">{{ fahrerkarte_role }}</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-3 text-xs font-inter">
+                            <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-3">
+                                <p class="text-white/40 mb-1">System-ID</p>
+                                <p id="preview-system-id" class="text-white font-bold break-all">{{ current_user_id }}</p>
+                            </div>
+
+                            <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-3">
+                                <p class="text-white/40 mb-1">Antragsgrund</p>
+                                <p id="preview-reason" class="text-white font-bold">Noch nicht ausgewählt</p>
+                            </div>
+
+                            <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-3">
+                                <p class="text-white/40 mb-1">Ausstellung</p>
+                                <p id="preview-date" class="text-white font-bold">Nach Freigabe</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card p-6">
+                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Ablauf</h2>
+                <div class="space-y-4">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 text-[var(--brand-green)] flex items-center justify-center shrink-0">
+                            <span class="font-orbitron font-bold text-sm">01</span>
+                        </div>
+                        <div>
+                            <p class="font-orbitron text-sm text-white font-bold uppercase tracking-wider">Beantragen</p>
+                            <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">Du reichst die Daten für die personalisierte Karte ein.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25 text-[var(--brand-yellow)] flex items-center justify-center shrink-0">
+                            <span class="font-orbitron font-bold text-sm">02</span>
+                        </div>
+                        <div>
+                            <p class="font-orbitron text-sm text-white font-bold uppercase tracking-wider">Prüfung</p>
+                            <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">ServiceCenter oder Personalabteilung prüft Name, Rolle und Berechtigung.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-[#5865F2]/10 border border-[#5865F2]/25 text-[#7ba7ff] flex items-center justify-center shrink-0">
+                            <span class="font-orbitron font-bold text-sm">03</span>
+                        </div>
+                        <div>
+                            <p class="font-orbitron text-sm text-white font-bold uppercase tracking-wider">Ausstellung</p>
+                            <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">Nach Freigabe wird die Fahrerkarte erstellt und im System hinterlegt.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card p-6 flex-1 flex flex-col min-h-[250px]">
+                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4 flex items-center justify-between">
+                    ServiceCenter Postfach
+                    <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse"></span>
+                </h2>
+
+                <div class="flex-grow space-y-3 overflow-y-auto custom-scrollbar pr-2">
+                    {% if safe_servicecenter_messages %}
+                        {% for message in safe_servicecenter_messages %}
+                            <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-4">
+                                <div class="flex items-center justify-between gap-3">
+                                    <p class="font-orbitron text-xs text-white font-bold uppercase tracking-wider truncate">{{ message.title }}</p>
+                                    <span class="text-[9px] font-orbitron uppercase tracking-widest text-[var(--brand-yellow)]">{{ message.date }}</span>
+                                </div>
+                                <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">{{ message.content }}</p>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-4">
+                            <p class="font-orbitron text-xs text-white font-bold uppercase tracking-wider">Keine neuen Meldungen</p>
+                            <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">
+                                Statusmeldungen zur Fahrerkarte erscheinen hier, sobald eine Bearbeitung erfolgt.
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<div id="fahrerkarte-confirm-modal" aria-hidden="true" class="fixed inset-0 z-[140] hidden items-center justify-center bg-black/70 backdrop-blur-xl transition-opacity duration-300 opacity-0 p-4 sm:p-6">
+    <div id="fahrerkarte-confirm-panel" class="relative z-10 w-full max-w-lg mx-auto overflow-hidden rounded-3xl border border-[var(--brand-green)]/30 bg-[#0d0f0c]/95 shadow-[0_0_70px_rgba(137,190,50,0.14)] transform transition-all duration-300">
+        <div class="p-6 md:p-7">
+            <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 flex items-center justify-center text-[var(--brand-green)] shrink-0 shadow-[0_0_25px_rgba(137,190,50,0.1)]">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+
+                <div class="min-w-0">
+                    <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Beantragung vorbereitet</span>
+                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Fahrerkarte wird beantragt</h2>
+                    <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed">
+                        Deine Angaben sind vollständig. Nach dem Absenden wird die Beantragung im ServiceCenter als offen hinterlegt.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button id="fahrerkarte-confirm-submit" type="button" class="btn-primary w-full justify-center">Jetzt absenden</button>
+                <button id="fahrerkarte-cancel-submit" type="button" class="w-full inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 hover:border-white/20 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.18em]">
+                    Abbrechen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const form = document.getElementById('fahrerkarte-application-form');
+    if (!form) return;
+
+    const locked = form.dataset.locked === 'true';
+
+    const fullNameInput = document.getElementById('fahrerkarte-full-name');
+    const displayNameInput = document.getElementById('fahrerkarte-display-name');
+    const roleInput = document.getElementById('fahrerkarte-role');
+    const systemIdInput = document.getElementById('fahrerkarte-system-id');
+    const reasonSelect = document.getElementById('fahrerkarte-reason');
+    const submitButton = document.getElementById('fahrerkarte-submit');
+    const resetButton = document.getElementById('fahrerkarte-reset');
+    const errorBox = document.getElementById('fahrerkarte-error');
+
+    const previewName = document.getElementById('preview-name');
+    const previewRole = document.getElementById('preview-role');
+    const previewSystemId = document.getElementById('preview-system-id');
+    const previewReason = document.getElementById('preview-reason');
+    const previewDate = document.getElementById('preview-date');
+
+    const modal = document.getElementById('fahrerkarte-confirm-modal');
+    const confirmSubmit = document.getElementById('fahrerkarte-confirm-submit');
+    const cancelSubmit = document.getElementById('fahrerkarte-cancel-submit');
+
+    let shouldSubmitDirectly = false;
+    let scrollYBeforeLock = 0;
+
+    const reasonLabels = {
+        new_issue: 'Erstausstellung',
+        update: 'Datenänderung / Aktualisierung',
+        replacement: 'Ersatzkarte',
+        role_change: 'Rollenwechsel'
+    };
+
+    function getFormattedDate() {
+        const now = new Date();
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = now.getFullYear();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        return `${day}.${month}.${year} ${hours}:${minutes}`;
+    }
+
+    function updatePreview() {
+        if (previewName && displayNameInput) {
+            previewName.textContent = displayNameInput.value.trim() || fullNameInput.value.trim() || 'Noch kein Name';
+        }
+        if (previewRole && roleInput) {
+            previewRole.textContent = roleInput.value.trim() || 'Rolle nicht gesetzt';
+        }
+        if (previewSystemId && systemIdInput) {
+            previewSystemId.textContent = systemIdInput.value.trim() || '-';
+        }
+        if (previewReason && reasonSelect) {
+            previewReason.textContent = reasonLabels[reasonSelect.value] || 'Noch nicht ausgewählt';
+        }
+        if (previewDate) {
+            previewDate.textContent = reasonSelect && reasonSelect.value ? `Beantragt am ${getFormattedDate()}` : 'Nach Freigabe';
+        }
+    }
+
+    function isFormValid() {
+        const requiredFields = Array.from(form.querySelectorAll('[required]')).filter((field) => !field.disabled);
+        return requiredFields.every((field) => {
+            if (field.type === 'checkbox') return field.checked;
+            return String(field.value || '').trim().length > 0;
+        });
+    }
+
+    function updateSubmitState() {
+        if (!submitButton || locked) return;
+        const valid = isFormValid();
+        submitButton.disabled = !valid;
+        if (errorBox && valid) errorBox.classList.add('hidden');
+    }
+
+    function lockScroll() {
+        scrollYBeforeLock = window.scrollY || document.documentElement.scrollTop || 0;
+        document.documentElement.classList.add('service-modal-locked');
+        document.body.classList.add('service-modal-locked');
+        document.body.style.top = `-${scrollYBeforeLock}px`;
+    }
+
+    function unlockScroll() {
+        document.documentElement.classList.remove('service-modal-locked');
+        document.body.classList.remove('service-modal-locked');
+        document.body.style.top = '';
+        window.scrollTo(0, scrollYBeforeLock);
+    }
+
+    function openModal() {
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        lockScroll();
+        requestAnimationFrame(() => {
+            modal.classList.remove('opacity-0');
+            modal.setAttribute('aria-hidden', 'false');
+        });
+    }
+
+    function closeModal() {
+        if (!modal) return;
+        modal.classList.add('opacity-0');
+        modal.setAttribute('aria-hidden', 'true');
+        window.setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            unlockScroll();
+        }, 220);
+    }
+
+    if (locked) {
+        updatePreview();
+        return;
+    }
+
+    form.addEventListener('input', () => {
+        updatePreview();
+        updateSubmitState();
+    });
+
+    form.addEventListener('change', () => {
+        updatePreview();
+        updateSubmitState();
+    });
+
+    form.addEventListener('submit', (event) => {
+        if (shouldSubmitDirectly) return;
+
+        if (!isFormValid()) {
+            event.preventDefault();
+            if (errorBox) errorBox.classList.remove('hidden');
+            updateSubmitState();
+            return;
+        }
+
+        event.preventDefault();
+        openModal();
+    });
+
+    if (confirmSubmit) {
+        confirmSubmit.addEventListener('click', () => {
+            shouldSubmitDirectly = true;
+            closeModal();
+            window.setTimeout(() => form.submit(), 80);
+        });
+    }
+
+    if (cancelSubmit) cancelSubmit.addEventListener('click', closeModal);
+
+    if (modal) {
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal) closeModal();
+        });
+    }
+
+    if (resetButton) {
+        resetButton.addEventListener('click', () => {
+            form.reset();
+            if (fullNameInput) fullNameInput.value = '{{ fahrerkarte_name|e }}';
+            if (displayNameInput) displayNameInput.value = '{{ fahrerkarte_name|e }}';
+            if (roleInput) roleInput.value = '{{ fahrerkarte_role|e }}';
+            if (systemIdInput) systemIdInput.value = '{{ current_user_id|e }}';
+            updatePreview();
+            updateSubmitState();
+            if (errorBox) errorBox.classList.add('hidden');
+        });
+    }
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) closeModal();
+    });
+
+    updatePreview();
+    updateSubmitState();
+})();
+</script>
+{% endblock %}
