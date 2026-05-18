@@ -163,15 +163,30 @@
 
     /* ---------------------------------------------------------
        Dashboard-Fit passend zur base.html
-       - Nutzt die Breite und den globalen rem-Zoom aus base.html.
-       - Kein eigenes transform: scale mehr, damit nichts abgeschnitten,
-         verschoben oder doppelt herausgezoomt wird.
+       - Der globale rem-Zoom, die fixe Hintergrund-Slideshow und
+         die fadeZoom-Animation bleiben vollständig in base.html.
+       - Das Dashboard skaliert nichts global per html/body/transform,
+         damit die Slideshow nicht doppelt oder falsch gezoomt wird.
        - Karten, Tabellen und Modals bleiben kompakt und responsive.
     --------------------------------------------------------- */
-    html,
-    body {
-        max-width: 100%;
-        overflow-x: hidden;
+
+    /* Slideshow aus base.html nicht durch Dashboard-Regeln begrenzen. */
+    .hero-bg {
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        transform: none !important;
+    }
+
+    .hero-bg .bg-slide {
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        object-fit: cover;
+        object-position: center;
+        transform-origin: center center;
     }
 
     .dashboard-responsive-shell {
