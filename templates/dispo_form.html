@@ -11,13 +11,14 @@
     Erwartete optionale Daten:
     - dispo_form_submissions: Liste eingereichter Dokumente / Abschlussbelege
     - dispo_manual_entries: Liste manueller Schaden-/Einnahmen-Erfassungen
+    - dispo_assignable_users / dispo_users: User-Auswahlliste für Zuordnung im Dokument-Modal
     - dispo_form_pending_count, dispo_form_total_documents, dispo_form_income_sum, dispo_form_damage_sum
 #}
 
 {% set primary_role_display = primary_role_name|default('User', true) %}
 {% set current_user_roles = current_user.roles|default([], true) %}
 
-{# Nur für die Disponenten-Sektion „Eingereichte Dokumente“. Das Formular selbst bleibt offen. #}
+{# Nur für Disponenten-Sektion, Bearbeitung, Signatur und Weitergabe. Das Einreichungsformular bleibt offen. #}
 {% set disposition_role_ids = [
     role_disposition_id|default('', true),
     '1473726639643820344',
@@ -47,7 +48,6 @@
     {% set dispo_documents_access.allowed = true %}
 {% endif %}
 
-{# Defensive Defaults: sensible Daten nur für Disponenten rendern. #}
 {% if dispo_documents_access.allowed %}
     {% set safe_submissions = dispo_form_submissions|default([], true) %}
     {% set safe_manual_entries = dispo_manual_entries|default([], true) %}
@@ -55,6 +55,7 @@
     {% set safe_total_documents = dispo_form_total_documents|default(safe_submissions|length, true) %}
     {% set safe_income_sum = dispo_form_income_sum|default('0,00 €', true) %}
     {% set safe_damage_sum = dispo_form_damage_sum|default('0,00 €', true) %}
+    {% set safe_assignable_users = dispo_assignable_users|default(dispo_users|default([], true), true) %}
 {% else %}
     {% set safe_submissions = [] %}
     {% set safe_manual_entries = [] %}
@@ -62,6 +63,7 @@
     {% set safe_total_documents = 0 %}
     {% set safe_income_sum = '0,00 €' %}
     {% set safe_damage_sum = '0,00 €' %}
+    {% set safe_assignable_users = [] %}
 {% endif %}
 
 {% block title %}EifelLog - Dispo Formular{% endblock %}
@@ -82,29 +84,21 @@
     }
 
     .dispo-form-scrollbar::-webkit-scrollbar-thumb {
-        background: linear-gradient(
-            180deg,
-            rgba(88, 101, 242, 0.75),
-            rgba(137, 190, 50, 0.62)
-        );
+        background: linear-gradient(180deg, rgba(88, 101, 242, 0.75), rgba(137, 190, 50, 0.62));
         border-radius: 999px;
         border: 3px solid rgba(13, 15, 12, 0.92);
         box-shadow: 0 0 14px rgba(88, 101, 242, 0.25);
     }
 
     .dispo-form-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(
-            180deg,
-            rgba(88, 101, 242, 0.95),
-            rgba(137, 190, 50, 0.82)
-        );
+        background: linear-gradient(180deg, rgba(88, 101, 242, 0.95), rgba(137, 190, 50, 0.82));
     }
 
     .dispo-form-table-wrap {
         width: 100%;
         overflow-x: auto;
         overflow-y: auto;
-        max-height: 440px;
+        max-height: 470px;
         position: relative;
         z-index: 10;
         padding-bottom: 14px;
@@ -130,22 +124,14 @@
 
     .dispo-form-table-wrap::-webkit-scrollbar-thumb {
         display: block !important;
-        background: linear-gradient(
-            90deg,
-            rgba(88, 101, 242, 0.75),
-            rgba(137, 190, 50, 0.62)
-        ) !important;
+        background: linear-gradient(90deg, rgba(88, 101, 242, 0.75), rgba(137, 190, 50, 0.62)) !important;
         border-radius: 999px !important;
         border: 3px solid rgba(13, 15, 12, 0.92) !important;
         box-shadow: 0 0 14px rgba(88, 101, 242, 0.25) !important;
     }
 
     .dispo-form-table-wrap::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(
-            90deg,
-            rgba(88, 101, 242, 0.95),
-            rgba(137, 190, 50, 0.82)
-        ) !important;
+        background: linear-gradient(90deg, rgba(88, 101, 242, 0.95), rgba(137, 190, 50, 0.82)) !important;
     }
 
     .dispo-form-status-dot {
@@ -255,9 +241,148 @@
     .dispo-form-hidden {
         display: none !important;
     }
+
+    .document-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 80;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1.25rem;
+        background:
+            radial-gradient(circle at top left, rgba(137, 190, 50, 0.16), transparent 32rem),
+            radial-gradient(circle at bottom right, rgba(88, 101, 242, 0.16), transparent 30rem),
+            rgba(3, 5, 4, 0.88);
+        backdrop-filter: blur(18px);
+    }
+
+    .document-modal-backdrop.is-open {
+        display: flex;
+    }
+
+    .document-modal-shell {
+        width: min(1180px, 100%);
+        max-height: 92vh;
+        overflow: hidden;
+        border-radius: 2rem;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: linear-gradient(145deg, rgba(10, 13, 10, 0.98), rgba(4, 6, 5, 0.98));
+        box-shadow: 0 30px 120px rgba(0, 0, 0, 0.55), 0 0 50px rgba(137, 190, 50, 0.10);
+    }
+
+    .document-modal-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+        gap: 0;
+        max-height: 92vh;
+        overflow: hidden;
+    }
+
+    .document-paper-wrap {
+        padding: 1.25rem;
+        overflow-y: auto;
+        max-height: 92vh;
+    }
+
+    .document-paper {
+        position: relative;
+        min-height: 760px;
+        border-radius: 1.35rem;
+        overflow: hidden;
+        background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.97), rgba(230, 236, 226, 0.96)),
+            repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.025) 0 1px, transparent 1px 28px);
+        color: #172015;
+        box-shadow: 0 20px 70px rgba(0, 0, 0, 0.35);
+    }
+
+    .document-paper::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+            linear-gradient(90deg, rgba(137, 190, 50, 0.12), transparent 18%),
+            radial-gradient(circle at 85% 12%, rgba(88, 101, 242, 0.13), transparent 18rem);
+    }
+
+    .document-paper-inner {
+        position: relative;
+        padding: 2rem;
+    }
+
+    .document-stamp {
+        transform: rotate(-10deg);
+        border: 3px solid rgba(137, 34, 34, 0.58);
+        color: rgba(137, 34, 34, 0.72);
+        border-radius: 0.75rem;
+        padding: 0.6rem 1rem;
+        font-family: Orbitron, sans-serif;
+        font-weight: 900;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+    }
+
+    .document-meta-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .document-meta-box {
+        border: 1px solid rgba(23, 32, 21, 0.12);
+        border-radius: 1rem;
+        background: rgba(255, 255, 255, 0.58);
+        padding: 0.9rem;
+    }
+
+    .document-side-panel {
+        border-left: 1px solid rgba(255, 255, 255, 0.10);
+        background: rgba(255, 255, 255, 0.035);
+        padding: 1.25rem;
+        overflow-y: auto;
+        max-height: 92vh;
+    }
+
+    .document-action-card {
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        background: rgba(0, 0, 0, 0.24);
+        border-radius: 1.4rem;
+        padding: 1rem;
+    }
+
+    .document-signature-line {
+        min-height: 68px;
+        border: 1px dashed rgba(23, 32, 21, 0.28);
+        border-radius: 1rem;
+        background: rgba(255, 255, 255, 0.42);
+        display: flex;
+        align-items: end;
+        justify-content: center;
+        padding: 0.7rem;
+        font-family: cursive;
+        font-size: 1.55rem;
+        color: rgba(23, 32, 21, 0.78);
+    }
+
+    @media (max-width: 1024px) {
+        .document-modal-grid {
+            grid-template-columns: 1fr;
+            overflow-y: auto;
+        }
+
+        .document-side-panel {
+            border-left: 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.10);
+            max-height: none;
+        }
+
+        .document-paper-wrap {
+            max-height: none;
+        }
+    }
 </style>
-
-
 
 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 mb-8 mt-6 relative z-10">
     <div class="flex items-center gap-4">
@@ -306,9 +431,7 @@
 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8 relative z-10">
     <div class="glass-card p-6 relative overflow-hidden">
         <div class="absolute -right-8 -top-8 opacity-5">
-            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
-            </svg>
+            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path></svg>
         </div>
         <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
             <span class="dispo-form-status-dot text-[#5865F2] bg-[#5865F2]"></span>
@@ -320,9 +443,7 @@
 
     <div class="glass-card p-6 relative overflow-hidden">
         <div class="absolute -right-8 -top-8 opacity-5">
-            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2L1 21h22L12 2zm1 16h-2v-2h2v2zm0-4h-2v-4h2v4z"></path>
-            </svg>
+            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm1 16h-2v-2h2v2zm0-4h-2v-4h2v4z"></path></svg>
         </div>
         <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
             <span class="dispo-form-status-dot text-[var(--brand-yellow)] bg-[var(--brand-yellow)]"></span>
@@ -334,23 +455,19 @@
 
     <div class="glass-card p-6 relative overflow-hidden">
         <div class="absolute -right-8 -top-8 opacity-5">
-            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M11 2a1 1 0 011 1v1h3a1 1 0 010 2h-3v2h2a5 5 0 010 10h-2v3a1 1 0 11-2 0v-3H7a1 1 0 110-2h3v-2H8a5 5 0 010-10h2V3a1 1 0 011-1z"></path>
-            </svg>
+            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M11 2a1 1 0 011 1v1h3a1 1 0 010 2h-3v2h2a5 5 0 010 10h-2v3a1 1 0 11-2 0v-3H7a1 1 0 110-2h3v-2H8a5 5 0 010-10h2V3a1 1 0 011-1z"></path></svg>
         </div>
         <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
             <span class="dispo-form-status-dot text-[var(--brand-green)] bg-[var(--brand-green)]"></span>
             Einnahmen
         </h3>
         <p class="text-3xl font-bold text-white mt-2">{{ safe_income_sum }}</p>
-        <p class="text-xs text-[var(--muted)] font-inter mt-2">Netto / nach Backend-Auswertung</p>
+        <p class="text-xs text-[var(--muted)] font-inter mt-2">Netto / Auswertung</p>
     </div>
 
     <div class="glass-card p-6 relative overflow-hidden">
         <div class="absolute -right-8 -top-8 opacity-5">
-            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19.428 15.428a8 8 0 10-10.856 0L12 22l3.428-6.572zM12 11a3 3 0 110-6 3 3 0 010 6z"></path>
-            </svg>
+            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M19.428 15.428a8 8 0 10-10.856 0L12 22l3.428-6.572zM12 11a3 3 0 110-6 3 3 0 010 6z"></path></svg>
         </div>
         <h3 class="font-orbitron font-bold text-[var(--muted)] text-[10px] uppercase tracking-widest mb-1 flex items-center gap-2">
             <span class="dispo-form-status-dot text-[var(--danger)] bg-[var(--danger)]"></span>
@@ -360,7 +477,6 @@
         <p class="text-xs text-[var(--muted)] font-inter mt-2">Gemeldete Schadenbeträge</p>
     </div>
 </div>
-
 {% endif %}
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10 mb-10 items-start">
@@ -373,12 +489,8 @@
                 </div>
 
                 <div class="flex flex-col sm:flex-row gap-3">
-                    <button type="button" class="dispo-form-tab is-active" data-form-tab="manual">
-                        Manuell erfassen
-                    </button>
-                    <button type="button" class="dispo-form-tab" data-form-tab="documents">
-                        Frachtpapiere einreichen
-                    </button>
+                    <button type="button" class="dispo-form-tab is-active" data-form-tab="manual">Manuell erfassen</button>
+                    <button type="button" class="dispo-form-tab" data-form-tab="documents">Frachtpapiere einreichen</button>
                 </div>
             </div>
 
@@ -386,7 +498,7 @@
                 {% if csrf_token is defined %}
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 {% endif %}
-                <input type="hidden" name="submitted_by_id" value="{{ current_user.id }}">
+                <input type="hidden" name="submitted_by_id" value="{{ current_user.discord_id|default(current_user.id|default('', true), true) }}">
                 <input type="hidden" name="submitted_by_name" value="{{ current_user.username }}">
 
                 <div>
@@ -446,13 +558,9 @@
                 </div>
 
                 <div class="md:col-span-2 flex flex-col sm:flex-row gap-3 justify-end mt-2">
-                    <button type="reset" class="inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
-                        Zurücksetzen
-                    </button>
+                    <button type="reset" class="inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">Zurücksetzen</button>
                     <button type="submit" class="btn-primary justify-center">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                        </svg>
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                         Erfassung speichern
                     </button>
                 </div>
@@ -462,7 +570,7 @@
                 {% if csrf_token is defined %}
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 {% endif %}
-                <input type="hidden" name="submitted_by_id" value="{{ current_user.id }}">
+                <input type="hidden" name="submitted_by_id" value="{{ current_user.discord_id|default(current_user.id|default('', true), true) }}">
                 <input type="hidden" name="submitted_by_name" value="{{ current_user.username }}">
 
                 <div>
@@ -517,9 +625,7 @@
                     <label class="dispo-form-label" for="document_files">Frachtpapiere / Abschlussbelege</label>
                     <label for="document_files" class="dispo-form-upload-zone flex flex-col md:flex-row md:items-center gap-4 cursor-pointer">
                         <span class="w-12 h-12 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25 text-[var(--brand-green)] flex items-center justify-center shrink-0">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M12 12v9m0-9l-3 3m3-3l3 3"></path>
-                            </svg>
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M12 12v9m0-9l-3 3m3-3l3 3"></path></svg>
                         </span>
                         <span class="min-w-0">
                             <span class="block font-orbitron text-xs font-bold text-white uppercase tracking-widest">Dateien auswählen</span>
@@ -535,13 +641,9 @@
                 </div>
 
                 <div class="md:col-span-2 flex flex-col sm:flex-row gap-3 justify-end mt-2">
-                    <button type="reset" class="inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
-                        Zurücksetzen
-                    </button>
+                    <button type="reset" class="inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/5 border border-white/10 text-[var(--muted)] hover:text-white hover:bg-white/10 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">Zurücksetzen</button>
                     <button type="submit" class="btn-primary justify-center">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 12v9m0-9l-3 3m3-3l3 3M12 3v9"></path>
-                        </svg>
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 12v9m0-9l-3 3m3-3l3 3M12 3v9"></path></svg>
                         Beleg einreichen
                     </button>
                 </div>
@@ -549,18 +651,23 @@
         </div>
 
         {% if dispo_documents_access.allowed %}
-        <div class="glass-card p-6 flex flex-col min-h-[420px]">
-            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+        <div class="glass-card p-6 flex flex-col min-h-[460px]">
+            <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-6">
                 <div>
                     <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase">Disponent Ansicht</span>
                     <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Eingereichte Dokumente</h2>
+                    <p class="text-xs text-[var(--muted)] font-inter mt-2">Dokument ansehen, Einreicher zuordnen, bearbeiten, prüfen, signieren und an die Geschäftsleitung geben.</p>
                 </div>
 
                 <div class="flex flex-col sm:flex-row gap-3">
                     <input id="dispo-form-search" type="search" class="dispo-form-input min-w-[220px]" placeholder="Beleg suchen...">
-                    <select id="dispo-form-filter" class="dispo-form-input dispo-form-select sm:w-[190px]">
+                    <select id="dispo-form-filter" class="dispo-form-input dispo-form-select sm:w-[220px]">
                         <option value="all">Alle Einträge</option>
                         <option value="pending">Zur Prüfung</option>
+                        <option value="verified">Geprüft</option>
+                        <option value="signed">Signiert</option>
+                        <option value="management_pending">Bei Geschäftsleitung</option>
+                        <option value="returned_incomplete">Zurück / unvollständig</option>
                         <option value="approved">Freigegeben</option>
                         <option value="rejected">Abgelehnt</option>
                         <option value="completed">Abgeschlossen</option>
@@ -568,8 +675,27 @@
                 </div>
             </div>
 
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
+                <div class="rounded-2xl bg-white/[0.035] border border-white/10 p-4">
+                    <p class="font-orbitron text-[10px] text-[var(--muted)] uppercase tracking-widest">Schritt 1</p>
+                    <p class="text-sm text-white font-bold mt-1">Einreicher wählen</p>
+                </div>
+                <div class="rounded-2xl bg-white/[0.035] border border-white/10 p-4">
+                    <p class="font-orbitron text-[10px] text-[var(--muted)] uppercase tracking-widest">Schritt 2</p>
+                    <p class="text-sm text-white font-bold mt-1">Prüfen & speichern</p>
+                </div>
+                <div class="rounded-2xl bg-white/[0.035] border border-white/10 p-4">
+                    <p class="font-orbitron text-[10px] text-[var(--muted)] uppercase tracking-widest">Schritt 3</p>
+                    <p class="text-sm text-white font-bold mt-1">Digital signieren</p>
+                </div>
+                <div class="rounded-2xl bg-white/[0.035] border border-white/10 p-4">
+                    <p class="font-orbitron text-[10px] text-[var(--muted)] uppercase tracking-widest">Schritt 4</p>
+                    <p class="text-sm text-white font-bold mt-1">An Geschäftsleitung</p>
+                </div>
+            </div>
+
             <div class="dispo-form-table-wrap pr-1">
-                <table class="w-full text-left border-collapse min-w-[1050px] relative">
+                <table class="w-full text-left border-collapse min-w-[1220px] relative">
                     <thead class="sticky top-0 bg-[#0d0f0c]/95 backdrop-blur-sm z-10">
                         <tr class="border-b border-white/10 text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
                             <th class="pb-3 px-2 pt-2">Eingang</th>
@@ -579,6 +705,7 @@
                             <th class="pb-3 px-2 pt-2">Betrag</th>
                             <th class="pb-3 px-2 pt-2">Steuer</th>
                             <th class="pb-3 px-2 pt-2">Status</th>
+                            <th class="pb-3 px-2 pt-2">Signatur</th>
                             <th class="pb-3 px-2 pt-2 text-right">Aktion</th>
                         </tr>
                     </thead>
@@ -586,37 +713,30 @@
                         {% if safe_submissions %}
                             {% for item in safe_submissions %}
                                 {% set item_status = item.status|default('pending', true) %}
-                                {% set item_search = (
-                                    item.reference|default('', true) ~ ' ' ~
-                                    item.submitted_by|default(item.author|default('', true), true) ~ ' ' ~
-                                    item.document_type|default(item.type|default('', true), true) ~ ' ' ~
-                                    item.title|default('', true)
-                                )|lower %}
+                                {% set item_id = item.entry_id|default(item.document_id|default(item.id|default(item._id|default('', true), true), true), true) %}
+                                {% set item_user_id = item.submitted_by_id|default(item.submitted_by_discord_id|default(item.user_id|default('', true), true), true) %}
+                                {% set item_user_name = item.submitted_by|default(item.author|default(item.username|default('Unbekannt', true), true), true) %}
+                                {% set item_title = item.title|default(item.note|default('Abschlussbeleg', true), true) %}
+                                {% set item_note = item.note|default(item.description|default('', true), true) %}
+                                {% set item_type = item.document_type|default(item.entry_type|default(item.type|default('Beleg', true), true), true) %}
+                                {% set item_file_url = item.file_url|default(item.download_url|default('', true), true) %}
+                                {% set item_signature = item.signature|default(item.signed_by|default('', true), true) %}
+                                {% set item_search = (item.reference|default('', true) ~ ' ' ~ item_user_name ~ ' ' ~ item_type ~ ' ' ~ item_title)|lower %}
                                 <tr class="dispo-form-row border-b border-white/5 hover:bg-white/5 transition-colors"
-                                    data-search="{{ item_search }}"
-                                    data-status="{{ item_status }}">
-                                    <td class="py-4 px-2 text-xs text-[var(--muted)] whitespace-nowrap">
-                                        {{ item.created_at|default('-', true) }}
-                                    </td>
+                                    data-search="{{ item_search|e }}"
+                                    data-status="{{ item_status|e }}">
+                                    <td class="py-4 px-2 text-xs text-[var(--muted)] whitespace-nowrap">{{ item.created_at|default('-', true) }}</td>
                                     <td class="py-4 px-2">
-                                        <div class="font-bold text-white">{{ item.submitted_by|default(item.author|default('Unbekannt', true), true) }}</div>
-                                        <div class="text-xs text-[var(--muted)] mt-1">ID: {{ item.submitted_by_id|default('-', true) }}</div>
+                                        <div class="font-bold text-white">{{ item_user_name }}</div>
+                                        <div class="text-xs text-[var(--muted)] mt-1">ID: {{ item_user_id|default('-', true) }}</div>
                                     </td>
                                     <td class="py-4 px-2">
                                         <div class="font-bold text-white">{{ item.reference|default('-', true) }}</div>
-                                        <div class="text-xs text-[var(--muted)] mt-1">{{ item.title|default(item.note|default('', true), true) }}</div>
+                                        <div class="text-xs text-[var(--muted)] mt-1 max-w-[260px] truncate">{{ item_title }}</div>
                                     </td>
-                                    <td class="py-4 px-2">
-                                        <span class="dispo-form-chip text-[#7b8cff] bg-[#5865F2]/10 border border-[#5865F2]/25">
-                                            {{ item.document_type|default(item.type|default('Beleg', true), true) }}
-                                        </span>
-                                    </td>
-                                    <td class="py-4 px-2 whitespace-nowrap">
-                                        {{ item.amount_net|default('-', true) }}
-                                    </td>
-                                    <td class="py-4 px-2 whitespace-nowrap">
-                                        {{ item.tax_rate|default('19', true) }}% · {{ item.tax_mode|default('EifelLog intern', true) }}
-                                    </td>
+                                    <td class="py-4 px-2"><span class="dispo-form-chip text-[#7b8cff] bg-[#5865F2]/10 border border-[#5865F2]/25">{{ item_type }}</span></td>
+                                    <td class="py-4 px-2 whitespace-nowrap">{{ item.amount_net|default('-', true) }}</td>
+                                    <td class="py-4 px-2 whitespace-nowrap">{{ item.tax_rate|default('19', true) }}% · {{ item.tax_mode|default('EifelLog intern', true) }}</td>
                                     <td class="py-4 px-2">
                                         {% if item_status == 'approved' %}
                                             <span class="dispo-form-chip text-[var(--brand-green)] bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25">Freigegeben</span>
@@ -624,29 +744,52 @@
                                             <span class="dispo-form-chip text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/25">Abgelehnt</span>
                                         {% elif item_status == 'completed' %}
                                             <span class="dispo-form-chip text-[#7b8cff] bg-[#5865F2]/10 border border-[#5865F2]/25">Abgeschlossen</span>
+                                        {% elif item_status == 'verified' %}
+                                            <span class="dispo-form-chip text-[var(--brand-green)] bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25">Geprüft</span>
+                                        {% elif item_status == 'signed' %}
+                                            <span class="dispo-form-chip text-[#7b8cff] bg-[#5865F2]/10 border border-[#5865F2]/25">Signiert</span>
+                                        {% elif item_status == 'management_pending' %}
+                                            <span class="dispo-form-chip text-[#7b8cff] bg-[#5865F2]/10 border border-[#5865F2]/25">Geschäftsleitung</span>
+                                        {% elif item_status == 'returned_incomplete' %}
+                                            <span class="dispo-form-chip text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/25">Nicht vollständig</span>
                                         {% else %}
                                             <span class="dispo-form-chip text-[var(--brand-yellow)] bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/25">Zur Prüfung</span>
                                         {% endif %}
                                     </td>
-                                    <td class="py-4 px-2 text-right">
-                                        {% if item.file_url is defined and item.file_url %}
-                                            <a href="{{ item.file_url }}" target="_blank" rel="noopener"
-                                               class="inline-flex items-center justify-center px-4 py-2 rounded-full bg-[#5865F2]/10 border border-[#5865F2]/35 text-[#7b8cff] hover:bg-[#5865F2]/20 hover:text-white transition-all font-orbitron text-[9px] font-bold uppercase tracking-[0.14em]">
-                                                Öffnen
-                                            </a>
+                                    <td class="py-4 px-2">
+                                        {% if item_signature %}
+                                            <span class="dispo-form-chip text-[var(--brand-green)] bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25">Signiert</span>
                                         {% else %}
-                                            <span class="inline-flex items-center justify-center px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white/35 font-orbitron text-[9px] font-bold uppercase tracking-[0.14em]">
-                                                Kein Upload
-                                            </span>
+                                            <span class="dispo-form-chip text-white/45 bg-white/5 border border-white/10">Offen</span>
                                         {% endif %}
+                                    </td>
+                                    <td class="py-4 px-2 text-right">
+                                        <button type="button"
+                                                class="js-open-document inline-flex items-center justify-center px-4 py-2 rounded-full bg-[#5865F2]/10 border border-[#5865F2]/35 text-[#7b8cff] hover:bg-[#5865F2]/20 hover:text-white transition-all font-orbitron text-[9px] font-bold uppercase tracking-[0.14em]"
+                                                data-document-id="{{ item_id|e }}"
+                                                data-created-at="{{ item.created_at|default('-', true)|e }}"
+                                                data-submitted-by="{{ item_user_name|e }}"
+                                                data-user-id="{{ item_user_id|e }}"
+                                                data-reference="{{ item.reference|default('-', true)|e }}"
+                                                data-title="{{ item_title|e }}"
+                                                data-document-type="{{ item_type|e }}"
+                                                data-amount-net="{{ item.amount_net|default('-', true)|e }}"
+                                                data-tax-rate="{{ item.tax_rate|default('19', true)|e }}"
+                                                data-tax-mode="{{ item.tax_mode|default('EifelLog intern', true)|e }}"
+                                                data-status="{{ item_status|e }}"
+                                                data-note="{{ item_note|e }}"
+                                                data-file-url="{{ item_file_url|e }}"
+                                                data-signature="{{ item_signature|e }}"
+                                                data-dispo-note="{{ item.dispo_note|default(item.review_note|default('', true), true)|e }}"
+                                                data-management-note="{{ item.management_note|default('', true)|e }}">
+                                            Dokument
+                                        </button>
                                     </td>
                                 </tr>
                             {% endfor %}
                         {% else %}
                             <tr class="border-b border-white/5">
-                                <td colspan="8" class="py-8 px-2 text-center text-white/50">
-                                    Noch keine Dokumente oder Abschlussbelege eingereicht.
-                                </td>
+                                <td colspan="9" class="py-8 px-2 text-center text-white/50">Noch keine Dokumente oder Abschlussbelege eingereicht.</td>
                             </tr>
                         {% endif %}
                     </tbody>
@@ -686,6 +829,22 @@
         <div class="glass-card p-6">
             <div class="flex items-center justify-between gap-3 mb-5">
                 <div>
+                    <span class="font-orbitron text-[10px] font-bold text-[#5865F2] tracking-[0.22em] uppercase">Prüfablauf</span>
+                    <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mt-1">Disposition Workflow</h2>
+                </div>
+            </div>
+
+            <div class="space-y-3 text-sm text-[var(--muted)] font-inter leading-relaxed">
+                <div class="rounded-2xl bg-black/30 border border-white/10 p-4"><strong class="text-white">1.</strong> Dokument öffnen und Einreicher prüfen.</div>
+                <div class="rounded-2xl bg-black/30 border border-white/10 p-4"><strong class="text-white">2.</strong> Auftrag, Betrag, Steuer und Datei kontrollieren.</div>
+                <div class="rounded-2xl bg-black/30 border border-white/10 p-4"><strong class="text-white">3.</strong> Digital signieren und im System speichern.</div>
+                <div class="rounded-2xl bg-black/30 border border-white/10 p-4"><strong class="text-white">4.</strong> Zur Geschäftsleitung geben.</div>
+            </div>
+        </div>
+
+        <div class="glass-card p-6">
+            <div class="flex items-center justify-between gap-3 mb-5">
+                <div>
                     <span class="font-orbitron text-[10px] font-bold text-[#5865F2] tracking-[0.22em] uppercase">Manuelle Erfassungen</span>
                     <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mt-1">Letzte Einträge</h2>
                 </div>
@@ -700,9 +859,7 @@
                                 <div class="min-w-0">
                                     <h3 class="text-sm font-orbitron font-bold text-white truncate">{{ entry.title|default('Erfassung', true) }}</h3>
                                     <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">{{ entry.description|default(entry.reference|default('-', true), true) }}</p>
-                                    <p class="text-[10px] text-white/40 font-orbitron uppercase tracking-widest mt-3">
-                                        {{ entry.submitted_by|default(entry.author|default('Unbekannt', true), true) }} · {{ entry.created_at|default('-', true) }}
-                                    </p>
+                                    <p class="text-[10px] text-white/40 font-orbitron uppercase tracking-widest mt-3">{{ entry.submitted_by|default(entry.author|default('Unbekannt', true), true) }} · {{ entry.created_at|default('-', true) }}</p>
                                 </div>
                                 {% if entry_type == 'damage' %}
                                     <span class="dispo-form-chip text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/25">Schaden</span>
@@ -710,23 +867,198 @@
                                     <span class="dispo-form-chip text-[var(--brand-green)] bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/25">Einnahme</span>
                                 {% endif %}
                             </div>
-                            <div class="mt-3 text-xs text-[var(--muted)] font-inter">
-                                Netto: <span class="text-white">{{ entry.amount_net|default('-', true) }}</span> · Steuer: <span class="text-white">{{ entry.tax_rate|default('19', true) }}%</span>
-                            </div>
+                            <div class="mt-3 text-xs text-[var(--muted)] font-inter">Netto: <span class="text-white">{{ entry.amount_net|default('-', true) }}</span> · Steuer: <span class="text-white">{{ entry.tax_rate|default('19', true) }}%</span></div>
                         </div>
                     {% endfor %}
                 {% else %}
-                    <div class="rounded-2xl bg-black/30 border border-white/10 p-6 text-center text-white/50 text-sm">
-                        Noch keine manuellen Erfassungen vorhanden.
-                    </div>
+                    <div class="rounded-2xl bg-black/30 border border-white/10 p-6 text-center text-white/50 text-sm">Noch keine manuellen Erfassungen vorhanden.</div>
                 {% endif %}
             </div>
         </div>
-
         {% endif %}
-
     </aside>
 </div>
+
+{% if dispo_documents_access.allowed %}
+<div id="document-modal" class="document-modal-backdrop" aria-hidden="true">
+    <div class="document-modal-shell">
+        <div class="document-modal-grid">
+            <div class="document-paper-wrap dispo-form-scrollbar">
+                <div class="document-paper">
+                    <div class="document-paper-inner">
+                        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-5 border-b border-black/10 pb-6 mb-6">
+                            <div>
+                                <p class="font-orbitron text-[11px] uppercase tracking-[0.22em] text-[#1f6d2d] font-black">EifelLog Prüfakte</p>
+                                <h2 class="font-orbitron text-2xl md:text-3xl font-black mt-2 text-[#172015]">Eingereichtes Dokument</h2>
+                                <p class="text-sm text-[#4c584b] mt-2">Dokumentnummer: <span id="modal-paper-id" class="font-bold text-[#172015]">-</span></p>
+                            </div>
+                            <div class="document-stamp" id="modal-paper-stamp">Zur Prüfung</div>
+                        </div>
+
+                        <div class="document-meta-grid mb-6">
+                            <div class="document-meta-box">
+                                <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold">Einreicher</p>
+                                <p id="modal-paper-user" class="text-lg font-black mt-1">-</p>
+                                <p id="modal-paper-user-id" class="text-xs text-[#62705f] mt-1">ID: -</p>
+                            </div>
+                            <div class="document-meta-box">
+                                <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold">Auftrag / Fahrt</p>
+                                <p id="modal-paper-reference" class="text-lg font-black mt-1">-</p>
+                                <p id="modal-paper-created" class="text-xs text-[#62705f] mt-1">Eingang: -</p>
+                            </div>
+                            <div class="document-meta-box">
+                                <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold">Dokumentart</p>
+                                <p id="modal-paper-type" class="text-lg font-black mt-1">-</p>
+                            </div>
+                            <div class="document-meta-box">
+                                <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold">Betrag / Steuer</p>
+                                <p id="modal-paper-money" class="text-lg font-black mt-1">-</p>
+                                <p id="modal-paper-tax" class="text-xs text-[#62705f] mt-1">-</p>
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-black/10 bg-white/60 p-5 mb-6">
+                            <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold mb-2">Titel / Beschreibung</p>
+                            <h3 id="modal-paper-title" class="text-xl font-black text-[#172015]">-</h3>
+                            <p id="modal-paper-note" class="text-sm text-[#4c584b] mt-3 leading-relaxed">-</p>
+                        </div>
+
+                        <div class="rounded-2xl border border-black/10 bg-[#eef3ea] p-5 mb-6">
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                <div>
+                                    <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold">Dateianlage</p>
+                                    <p id="modal-paper-file-label" class="text-sm text-[#4c584b] mt-2">Keine Datei hinterlegt.</p>
+                                </div>
+                                <a id="modal-paper-file-link" href="#" target="_blank" rel="noopener" class="hidden inline-flex items-center justify-center px-4 py-2 rounded-full bg-[#172015] text-white font-orbitron text-[10px] font-bold uppercase tracking-widest">Original öffnen</a>
+                            </div>
+                            <div id="modal-paper-preview" class="mt-5 rounded-2xl overflow-hidden border border-black/10 bg-white/70 min-h-[180px] flex items-center justify-center text-sm text-[#62705f]">
+                                Dokumentvorschau wird hier angezeigt.
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="document-meta-box">
+                                <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold">Dispo-Vermerk</p>
+                                <p id="modal-paper-dispo-note" class="text-sm text-[#4c584b] mt-2 leading-relaxed">-</p>
+                            </div>
+                            <div class="document-meta-box">
+                                <p class="font-orbitron text-[10px] uppercase tracking-widest text-[#62705f] font-bold">Digitale Signatur</p>
+                                <div id="modal-paper-signature" class="document-signature-line mt-3">Nicht signiert</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="document-side-panel dispo-form-scrollbar">
+                <div class="flex items-start justify-between gap-4 mb-5">
+                    <div>
+                        <p class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Dokumentprüfung</p>
+                        <h3 class="font-orbitron text-xl font-bold text-white mt-1">Disposition Aktionen</h3>
+                    </div>
+                    <button type="button" id="close-document-modal" class="w-10 h-10 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <form action="/dispo/form/documents/edit" method="POST" class="document-action-card mb-4">
+                    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                    <input type="hidden" name="document_id" class="js-modal-document-id">
+                    <p class="font-orbitron text-[10px] text-[#7b8cff] uppercase tracking-widest font-bold mb-4">Bearbeiten</p>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="dispo-form-label" for="modal_edit_reference">Auftrag / Fahrt</label>
+                            <input id="modal_edit_reference" name="reference" class="dispo-form-input" type="text">
+                        </div>
+                        <div>
+                            <label class="dispo-form-label" for="modal_edit_title">Titel</label>
+                            <input id="modal_edit_title" name="title" class="dispo-form-input" type="text">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="dispo-form-label" for="modal_edit_amount">Netto</label>
+                                <input id="modal_edit_amount" name="amount_net" class="dispo-form-input" type="text">
+                            </div>
+                            <div>
+                                <label class="dispo-form-label" for="modal_edit_tax">Steuer</label>
+                                <input id="modal_edit_tax" name="tax_rate" class="dispo-form-input" type="text">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full inline-flex items-center justify-center px-4 py-3 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">Änderungen speichern</button>
+                    </div>
+                </form>
+
+                <form action="/dispo/form/documents/assign-user" method="POST" class="document-action-card mb-4">
+                    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                    <input type="hidden" name="document_id" class="js-modal-document-id">
+                    <p class="font-orbitron text-[10px] text-[var(--brand-green)] uppercase tracking-widest font-bold mb-4">Einreicher zuordnen</p>
+                    <label class="dispo-form-label" for="modal_assign_user">User auswählen</label>
+                    <select id="modal_assign_user" name="assigned_user_id" class="dispo-form-input dispo-form-select" required>
+                        <option value="">User auswählen</option>
+                        {% for user in safe_assignable_users %}
+                            {% set option_id = user.discord_id|default(user.id|default(user.user_id|default('', true), true), true) %}
+                            {% set option_name = user.display_name|default(user.username|default(user.name|default(option_id, true), true), true) %}
+                            <option value="{{ option_id }}">{{ option_name }} · {{ option_id }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="w-full mt-3 inline-flex items-center justify-center px-4 py-3 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/35 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">Im System speichern</button>
+                </form>
+
+                <form action="/dispo/form/documents/review" method="POST" class="document-action-card mb-4">
+                    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                    <input type="hidden" name="document_id" class="js-modal-document-id">
+                    <p class="font-orbitron text-[10px] text-[var(--brand-yellow)] uppercase tracking-widest font-bold mb-4">Prüfung</p>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="dispo-form-label" for="modal_review_status">Prüfergebnis</label>
+                            <select id="modal_review_status" name="review_status" class="dispo-form-input dispo-form-select" required>
+                                <option value="verified">Geprüft und vollständig</option>
+                                <option value="needs_fix">Korrektur erforderlich</option>
+                                <option value="rejected">Ablehnen</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="dispo-form-label" for="modal_review_note">Prüfvermerk</label>
+                            <textarea id="modal_review_note" name="review_note" rows="4" class="dispo-form-input resize-none" placeholder="Was wurde kontrolliert? Gibt es Auffälligkeiten?"></textarea>
+                        </div>
+                        <button type="submit" class="w-full inline-flex items-center justify-center px-4 py-3 rounded-full bg-[var(--brand-yellow)]/10 border border-[var(--brand-yellow)]/35 text-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">Prüfung speichern</button>
+                    </div>
+                </form>
+
+                <form action="/dispo/form/documents/sign" method="POST" class="document-action-card mb-4">
+                    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                    <input type="hidden" name="document_id" class="js-modal-document-id">
+                    <p class="font-orbitron text-[10px] text-[#7b8cff] uppercase tracking-widest font-bold mb-4">Digitale Signatur</p>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="dispo-form-label" for="modal_signer_name">Signatur Name</label>
+                            <input id="modal_signer_name" name="signer_name" type="text" class="dispo-form-input" value="{{ current_user.display_name|default(current_user.username|default('', true), true) }}" required>
+                        </div>
+                        <div>
+                            <label class="dispo-form-label" for="modal_signature_text">Signatur</label>
+                            <input id="modal_signature_text" name="signature_text" type="text" class="dispo-form-input" placeholder="z. B. Max Mustermann / Disposition" required>
+                        </div>
+                        <button type="submit" class="w-full inline-flex items-center justify-center px-4 py-3 rounded-full bg-[#5865F2]/10 border border-[#5865F2]/35 text-[#7b8cff] hover:bg-[#5865F2]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">Direkt signieren</button>
+                    </div>
+                </form>
+
+                <form action="/dispo/form/documents/forward-management" method="POST" class="document-action-card">
+                    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                    <input type="hidden" name="document_id" class="js-modal-document-id">
+                    <p class="font-orbitron text-[10px] text-[var(--brand-green)] uppercase tracking-widest font-bold mb-4">Weitergabe</p>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="dispo-form-label" for="modal_management_note">Notiz an Geschäftsleitung</label>
+                            <textarea id="modal_management_note" name="management_note" rows="4" class="dispo-form-input resize-none" placeholder="Kurz zusammenfassen: User, Fahrt, Betrag, Prüfung..."></textarea>
+                        </div>
+                        <button type="submit" class="w-full btn-primary justify-center">An Geschäftsleitung senden</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -738,15 +1070,12 @@
         const rows = Array.from(document.querySelectorAll('.dispo-form-row'));
         const documentInput = document.getElementById('document_files');
         const documentPreview = document.getElementById('document-file-preview');
+        const documentModal = document.getElementById('document-modal');
+        const closeDocumentModal = document.getElementById('close-document-modal');
 
         function setActiveTab(tabName) {
-            tabButtons.forEach((button) => {
-                button.classList.toggle('is-active', button.dataset.formTab === tabName);
-            });
-
-            panels.forEach((panel) => {
-                panel.classList.toggle('dispo-form-hidden', panel.dataset.formPanel !== tabName);
-            });
+            tabButtons.forEach((button) => button.classList.toggle('is-active', button.dataset.formTab === tabName));
+            panels.forEach((panel) => panel.classList.toggle('dispo-form-hidden', panel.dataset.formPanel !== tabName));
         }
 
         function parseAmount(value) {
@@ -757,40 +1086,27 @@
         }
 
         function formatEuro(value) {
-            return new Intl.NumberFormat('de-DE', {
-                style: 'currency',
-                currency: 'EUR'
-            }).format(value || 0);
+            return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value || 0);
         }
 
         function updateTaxPreview(form) {
             if (!form) return;
-
             const netInput = form.querySelector('.js-tax-net');
             const rateInput = form.querySelector('.js-tax-rate');
             const taxAmountInput = form.querySelector('.js-tax-amount');
             const grossInput = form.querySelector('.js-tax-gross');
-
             if (!netInput || !rateInput) return;
-
             const net = parseAmount(netInput.value);
             const rate = parseAmount(rateInput.value);
             const tax = net * (rate / 100);
             const gross = net + tax;
-
-            if (taxAmountInput) {
-                taxAmountInput.value = formatEuro(tax);
-            }
-
-            if (grossInput) {
-                grossInput.value = formatEuro(gross);
-            }
+            if (taxAmountInput) taxAmountInput.value = formatEuro(tax);
+            if (grossInput) grossInput.value = formatEuro(gross);
         }
 
         function filterRows() {
             const query = (searchInput?.value || '').trim().toLowerCase();
             const status = statusFilter?.value || 'all';
-
             rows.forEach((row) => {
                 const matchesQuery = !query || (row.dataset.search || '').includes(query);
                 const matchesStatus = status === 'all' || row.dataset.status === status;
@@ -798,58 +1114,170 @@
             });
         }
 
-        if (refreshButton) {
-            refreshButton.addEventListener('click', function () {
-                window.location.reload();
-            });
+        function setText(id, value, fallback = '-') {
+            const element = document.getElementById(id);
+            if (element) element.textContent = value || fallback;
         }
 
-        tabButtons.forEach((button) => {
-            button.addEventListener('click', function () {
-                setActiveTab(button.dataset.formTab);
+        function safeUrl(url) {
+            const trimmed = String(url || '').trim();
+            if (!trimmed) return '';
+            if (trimmed.startsWith('/') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+            return '';
+        }
+
+        function statusLabel(status) {
+            const labels = {
+                pending: 'Zur Prüfung',
+                verified: 'Geprüft',
+                signed: 'Signiert',
+                management_pending: 'Geschäftsleitung',
+                returned_incomplete: 'Nicht vollständig',
+                approved: 'Freigegeben',
+                rejected: 'Abgelehnt',
+                completed: 'Abgeschlossen'
+            };
+            return labels[status] || 'Zur Prüfung';
+        }
+
+        function populateDocumentPreview(fileUrl) {
+            const preview = document.getElementById('modal-paper-preview');
+            const label = document.getElementById('modal-paper-file-label');
+            const link = document.getElementById('modal-paper-file-link');
+            const url = safeUrl(fileUrl);
+            if (!preview || !label || !link) return;
+
+            preview.innerHTML = '';
+            link.classList.add('hidden');
+            link.removeAttribute('href');
+
+            if (!url) {
+                label.textContent = 'Keine Datei hinterlegt.';
+                preview.textContent = 'Für dieses Dokument wurde keine Dateianlage gefunden.';
+                return;
+            }
+
+            label.textContent = 'Datei ist hinterlegt und kann geöffnet werden.';
+            link.href = url;
+            link.classList.remove('hidden');
+
+            const lowerUrl = url.toLowerCase();
+            if (lowerUrl.endsWith('.png') || lowerUrl.endsWith('.jpg') || lowerUrl.endsWith('.jpeg') || lowerUrl.endsWith('.webp') || lowerUrl.endsWith('.gif')) {
+                const image = document.createElement('img');
+                image.src = url;
+                image.alt = 'Dokumentvorschau';
+                image.className = 'w-full max-h-[420px] object-contain bg-white';
+                preview.appendChild(image);
+                return;
+            }
+
+            if (lowerUrl.endsWith('.pdf')) {
+                const iframe = document.createElement('iframe');
+                iframe.src = url;
+                iframe.title = 'PDF Vorschau';
+                iframe.className = 'w-full h-[420px] bg-white';
+                preview.appendChild(iframe);
+                return;
+            }
+
+            const text = document.createElement('div');
+            text.className = 'p-8 text-center';
+            text.textContent = 'Vorschau für diesen Dateityp nicht verfügbar. Bitte Original öffnen.';
+            preview.appendChild(text);
+        }
+
+        function openDocumentModal(button) {
+            if (!documentModal || !button) return;
+            const data = button.dataset;
+            setText('modal-paper-id', data.documentId);
+            setText('modal-paper-stamp', statusLabel(data.status));
+            setText('modal-paper-user', data.submittedBy);
+            setText('modal-paper-user-id', `ID: ${data.userId || '-'}`);
+            setText('modal-paper-reference', data.reference);
+            setText('modal-paper-created', `Eingang: ${data.createdAt || '-'}`);
+            setText('modal-paper-type', data.documentType);
+            setText('modal-paper-money', data.amountNet);
+            setText('modal-paper-tax', `${data.taxRate || '19'}% · ${data.taxMode || '-'}`);
+            setText('modal-paper-title', data.title);
+            setText('modal-paper-note', data.note || 'Keine Notiz vorhanden.');
+            setText('modal-paper-dispo-note', data.dispoNote || 'Noch kein Dispo-Vermerk gespeichert.');
+            setText('modal-paper-signature', data.signature || 'Nicht signiert');
+            populateDocumentPreview(data.fileUrl);
+
+            document.querySelectorAll('.js-modal-document-id').forEach((input) => {
+                input.value = data.documentId || '';
             });
-        });
+
+            const assignSelect = document.getElementById('modal_assign_user');
+            if (assignSelect && data.userId) assignSelect.value = data.userId;
+
+            const editReference = document.getElementById('modal_edit_reference');
+            const editTitle = document.getElementById('modal_edit_title');
+            const editAmount = document.getElementById('modal_edit_amount');
+            const editTax = document.getElementById('modal_edit_tax');
+            const reviewNote = document.getElementById('modal_review_note');
+            const managementNote = document.getElementById('modal_management_note');
+            const signatureText = document.getElementById('modal_signature_text');
+
+            if (editReference) editReference.value = data.reference || '';
+            if (editTitle) editTitle.value = data.title || '';
+            if (editAmount) editAmount.value = data.amountNet || '';
+            if (editTax) editTax.value = data.taxRate || '19';
+            if (reviewNote) reviewNote.value = data.dispoNote || '';
+            if (managementNote) managementNote.value = data.managementNote || '';
+            if (signatureText) signatureText.value = data.signature || '';
+
+            documentModal.classList.add('is-open');
+            documentModal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            if (!documentModal) return;
+            documentModal.classList.remove('is-open');
+            documentModal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+        }
+
+        if (refreshButton) refreshButton.addEventListener('click', () => window.location.reload());
+        tabButtons.forEach((button) => button.addEventListener('click', () => setActiveTab(button.dataset.formTab)));
 
         document.querySelectorAll('form').forEach((form) => {
             const netInput = form.querySelector('.js-tax-net');
             const rateInput = form.querySelector('.js-tax-rate');
-
-            if (netInput) {
-                netInput.addEventListener('input', () => updateTaxPreview(form));
-            }
-
-            if (rateInput) {
-                rateInput.addEventListener('change', () => updateTaxPreview(form));
-            }
-
+            if (netInput) netInput.addEventListener('input', () => updateTaxPreview(form));
+            if (rateInput) rateInput.addEventListener('change', () => updateTaxPreview(form));
             updateTaxPreview(form);
         });
 
-        if (searchInput) {
-            searchInput.addEventListener('input', filterRows);
-        }
-
-        if (statusFilter) {
-            statusFilter.addEventListener('change', filterRows);
-        }
+        if (searchInput) searchInput.addEventListener('input', filterRows);
+        if (statusFilter) statusFilter.addEventListener('change', filterRows);
 
         if (documentInput && documentPreview) {
             documentInput.addEventListener('change', function () {
                 const files = Array.from(documentInput.files || []);
-
                 if (!files.length) {
                     documentPreview.textContent = 'PDF, PNG, JPG oder WebP hochladen. Mehrere Dateien möglich.';
                     return;
                 }
-
-                if (files.length === 1) {
-                    documentPreview.textContent = files[0].name;
-                    return;
-                }
-
-                documentPreview.textContent = `${files.length} Dateien ausgewählt`;
+                documentPreview.textContent = files.length === 1 ? files[0].name : `${files.length} Dateien ausgewählt`;
             });
         }
+
+        document.querySelectorAll('.js-open-document').forEach((button) => {
+            button.addEventListener('click', () => openDocumentModal(button));
+        });
+
+        if (closeDocumentModal) closeDocumentModal.addEventListener('click', closeModal);
+        if (documentModal) {
+            documentModal.addEventListener('click', (event) => {
+                if (event.target === documentModal) closeModal();
+            });
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeModal();
+        });
     });
 </script>
 
