@@ -157,6 +157,7 @@ tasks_collection = db["tasks"]
 buchhaltung_requests_collection = db["buchhaltung_requests"]
 buchhaltung_entries_collection = db["buchhaltung_entries"]
 tour_receipts_collection = db["tour_receipts"]
+company_stats_collection = db["company_stats"]
 dispo_tours_collection = db["dispo_tours"]
 dispo_notes_collection = db["dispo_notes"]
 dispo_messages_collection = db["dispo_messages"]
@@ -209,6 +210,9 @@ def ensure_indexes():
         tour_receipts_collection.create_index([("driver.discord_id", ASCENDING)], unique=False)
         tour_receipts_collection.create_index([("submitted_at", DESCENDING)], unique=False)
         tour_receipts_collection.create_index([("billing_relevant", ASCENDING)], unique=False)
+
+        company_stats_collection.create_index([("kind", ASCENDING)], unique=False)
+        company_stats_collection.create_index([("updated_at", DESCENDING)], unique=False)
 
         dispo_tours_collection.create_index([("tour_id", ASCENDING)], unique=False)
         dispo_tours_collection.create_index([("status", ASCENDING)], unique=False)
@@ -521,6 +525,162 @@ def parse_int(value, fallback=0):
     except Exception:
         return fallback
 
+
+# ==========================================
+# PERSISTENTE ALL-TIME-KILOMETER / COMPANY STATS
+# ==========================================
+
+COMPANY_STATS_DOCUMENT_ID = "company_all_time"
+
+
+def positive_number(value, fallback=0.0):
+    number = parse_number(value, fallback)
+    if number < 0:
+        return 0.0
+    return number
+
+
+def first_number_from_dict(source, *keys, fallback=0.0):
+    source = source or {}
+    for key in keys:
+        if key in source and source.get(key) is not None:
+            value = parse_number(source.get(key), fallback)
+            if value > 0:
+                return value
+    return fallback
+
+
+def get_user_all_time_km(user_doc):
+    user_doc = user_doc or {}
+    return positive_number(
+        user_doc.get("tracker_all_time_km")
+        or user_doc.get("profile_all_time_km")
+        or user_doc.get("all_time_km")
+        or user_doc.get("profile_km"),
+        0.0
+    )
+
+
+def get_user_all_time_income(user_doc):
+    user_doc = user_doc or {}
+    return positive_number(
+        user_doc.get("tracker_all_time_income")
+        or user_doc.get("profile_all_time_income")
+        or user_doc.get("all_time_income")
+        or user_doc.get("profile_income")
+        or user_doc.get("profile_revenue"),
+        0.0
+    )
+
+
+def get_receipt_distance_km(receipt_doc):
+    receipt_doc = receipt_doc or {}
+    tour = receipt_doc.get("tour") or {}
+
+    return positive_number(
+        tour.get("driven_distance_km")
+        or receipt_doc.get("completedDistanceKm")
+        or receipt_doc.get("completed_distance_km")
+        or receipt_doc.get("drivenDistanceKm")
+        or receipt_doc.get("distanceKm")
+        or receipt_doc.get("distance_km"),
+        0.0
+    )
+
+
+def get_receipt_income(receipt_doc):
+    receipt_doc = receipt_doc or {}
+    billing = receipt_doc.get("billing") or {}
+
+    return positive_number(
+        billing.get("total_amount")
+        or receipt_doc.get("income")
+        or receipt_doc.get("revenue")
+        or receipt_doc.get("money"),
+        0.0
+    )
+
+
+def receipt_counts_as_completed(receipt_doc):
+    receipt_doc = receipt_doc or {}
+    status = safe_str(receipt_doc.get("status")).lower()
+
+    return (
+        receipt_doc.get("completed") is True
+        or receipt_doc.get("submitted") is True
+        or receipt_doc.get("billing_relevant") is True
+        or status in {"submitted", "completed", "complete", "delivered", "done", "fertig"}
+    )
+
+
+def build_company_stats_doc_from_receipts():
+    all_time_km = 0.0
+    all_time_income = 0.0
+    jobs_all_time = 0
+    deliveries_all_time = 0
+    latest_receipt_at = None
+
+    query = {"archived": {"$ne": True}}
+    for receipt_doc in tour_receipts_collection.find(query):
+        if not receipt_counts_as_completed(receipt_doc):
+            continue
+
+        distance = get_receipt_distance_km(receipt_doc)
+        income = get_receipt_income(receipt_doc)
+
+        all_time_km += distance
+        all_time_income += income
+        jobs_all_time += 1
+        deliveries_all_time += 1
+
+        submitted_at = receipt_doc.get("submitted_at") or receipt_doc.get("created_at")
+        if isinstance(submitted_at, datetime) and (latest_receipt_at is None or submitted_at > latest_receipt_at):
+            latest_receipt_at = submitted_at
+
+    now = now_utc()
+    all_time_km = round(all_time_km, 1)
+    all_time_income = round(all_time_income, 2)
+
+    return {
+        "_id": COMPANY_STATS_DOCUMENT_ID,
+        "kind": "global",
+        "all_time_km": all_time_km,
+        "allTimeKilometers": all_time_km,
+        "all_time_income": all_time_income,
+        "companyIncome": all_time_income,
+        "jobs_all_time": jobs_all_time,
+        "deliveries_all_time": deliveries_all_time,
+        "latest_receipt_at": latest_receipt_at,
+        "updated_at": now,
+        "source": "tour_receipts",
+        "all_time_initialized": True
+    }
+
+
+def refresh_company_all_time_stats_from_receipts():
+    stats_doc = build_company_stats_doc_from_receipts()
+    company_stats_collection.replace_one(
+        {"_id": COMPANY_STATS_DOCUMENT_ID},
+        stats_doc,
+        upsert=True
+    )
+    return stats_doc
+
+
+def get_company_all_time_stats():
+    stats_doc = company_stats_collection.find_one({"_id": COMPANY_STATS_DOCUMENT_ID})
+
+    if not stats_doc or not stats_doc.get("all_time_initialized"):
+        stats_doc = refresh_company_all_time_stats_from_receipts()
+
+    return stats_doc or {
+        "all_time_km": 0.0,
+        "all_time_income": 0.0,
+        "jobs_all_time": 0,
+        "deliveries_all_time": 0
+    }
+
+
 # AKTENZEICHEN GENERIEREN
 def generate_aktenzeichen():
     part1 = "".join(secrets.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(2))
@@ -563,14 +723,55 @@ def prepare_profile_data(user_doc):
 
 
 def get_profile_stats(user_doc):
+    user_doc = user_doc or {}
+
+    # Wichtig: "km" ist der persistente All-Time-Wert aus MongoDB.
+    # Live-/Last-Trip-Werte werden hier bewusst nicht genutzt, damit die Statistik
+    # nicht bei einem neuen Auftrag von vorne beginnt.
+    km_value = (
+        user_doc.get("profile_all_time_km")
+        if user_doc.get("profile_all_time_km") not in [None, ""]
+        else user_doc.get("tracker_all_time_km")
+    )
+    if km_value in [None, ""]:
+        km_value = user_doc.get("all_time_km")
+    if km_value in [None, ""]:
+        km_value = user_doc.get("profile_km", "0")
+
+    income_value = (
+        user_doc.get("profile_all_time_income")
+        if user_doc.get("profile_all_time_income") not in [None, ""]
+        else user_doc.get("tracker_all_time_income")
+    )
+    if income_value in [None, ""]:
+        income_value = user_doc.get("profile_income", user_doc.get("profile_revenue", "0"))
+
+    deliveries_value = (
+        user_doc.get("profile_all_time_deliveries")
+        if user_doc.get("profile_all_time_deliveries") not in [None, ""]
+        else user_doc.get("tracker_all_time_deliveries")
+    )
+    if deliveries_value in [None, ""]:
+        deliveries_value = user_doc.get("profile_deliveries", "0")
+
+    jobs_value = (
+        user_doc.get("profile_all_time_jobs")
+        if user_doc.get("profile_all_time_jobs") not in [None, ""]
+        else user_doc.get("tracker_all_time_jobs")
+    )
+    if jobs_value in [None, ""]:
+        jobs_value = user_doc.get("profile_jobs", deliveries_value)
+
     return {
-        "km": user_doc.get("profile_km", "0"),
-        "deliveries": user_doc.get("profile_deliveries", "0"),
-        "jobs": user_doc.get("profile_jobs", user_doc.get("profile_deliveries", "0")),
+        "km": km_value,
+        "all_time_km": km_value,
+        "allTimeKilometers": km_value,
+        "deliveries": deliveries_value,
+        "jobs": jobs_value,
         "convoys": user_doc.get("profile_convoys", "0"),
         "rating": user_doc.get("profile_rating", "0.0"),
-        "income": user_doc.get("profile_income", user_doc.get("profile_revenue", "0")),
-        "revenue": user_doc.get("profile_revenue", user_doc.get("profile_income", "0"))
+        "income": income_value,
+        "revenue": user_doc.get("profile_revenue", income_value)
     }
 
 
@@ -2258,6 +2459,7 @@ def normalize_telemetry_payload(raw):
         "rpm": n("rpm", "engineRpm", "engineRPM", fallback=0),
         "fuelPercent": n("fuelPercent", "fuel", fallback=0),
         "damagePercent": n("damagePercent", "damage", fallback=0),
+        "completedDistanceKm": n("completedDistanceKm", "drivenDistanceKm", "distanceKm", "routeDistanceKm", fallback=0),
         "tripDistanceKm": n("tripDistanceKm", "driverKm", fallback=0),
         "remainingDistanceKm": n("remainingDistanceKm", "routeRemainingDistance", fallback=0),
         "plannedDistanceKm": n("plannedDistanceKm", fallback=0),
@@ -2391,41 +2593,36 @@ def build_logbook_payload(limit=30):
     return clean_entries
 
 def build_company_stats_payload():
+    # Company-All-Time kommt aus einem eigenen MongoDB-Eintrag
+    # und nicht aus tracker_live / tracker_last_trip_distance_km.
     users = list(users_collection.find({}))
-    company_income = 0.0
-    company_km = 0.0
-    jobs_all_time = 0
-    deliveries = 0
+    persistent_stats = get_company_all_time_stats()
+
+    company_km = positive_number(persistent_stats.get("all_time_km") or persistent_stats.get("allTimeKilometers"), 0.0)
+    company_income = positive_number(persistent_stats.get("all_time_income") or persistent_stats.get("companyIncome"), 0.0)
+    jobs_all_time = parse_int(persistent_stats.get("jobs_all_time"), 0)
+    deliveries = parse_int(persistent_stats.get("deliveries_all_time"), 0)
+
+    # Fallback für alte Datenbanken ohne tour_receipts/company_stats.
+    # Auch hier werden nur gespeicherte All-Time-Felder gelesen, keine Live-Trip-Werte.
+    if company_km <= 0 and company_income <= 0 and jobs_all_time <= 0 and deliveries <= 0:
+        for user_doc in users:
+            stats = get_profile_stats(user_doc)
+            company_km += positive_number(stats.get("km"), 0.0)
+            company_income += positive_number(stats.get("income") or stats.get("revenue"), 0.0)
+            deliveries += parse_int(stats.get("deliveries"), 0)
+            jobs_all_time += parse_int(stats.get("jobs"), parse_int(stats.get("deliveries"), 0))
 
     monthly_kilometers = [0, 0, 0, 0, 0, 0]
     income_series = [0, 0, 0, 0, 0, 0]
 
     for user_doc in users:
-        stats = get_profile_stats(user_doc)
-        user_km = parse_number(stats.get("km"), 0)
-        user_income = parse_number(stats.get("income") or stats.get("revenue"), 0)
-        user_deliveries = parse_int(stats.get("deliveries"), 0)
-        user_jobs = parse_int(stats.get("jobs"), user_deliveries)
-
-        live = user_doc.get("tracker_live") or {}
-        live_km = parse_number(live.get("tripDistanceKm"), 0)
-        live_income = round(live_km * 3.2)
-
-        company_km += user_km + live_km
-        company_income += user_income + live_income
-        jobs_all_time += user_jobs
-        deliveries += user_deliveries
-
         job_entries = get_user_job_entries(user_doc)
-        if job_entries:
-            for job in job_entries:
-                distance = parse_number(job.get("distanceKm") or job.get("distance") or job.get("tripDistanceKm"), 0)
-                income = parse_number(job.get("income") or job.get("revenue") or job.get("money"), 0)
-                monthly_kilometers[-1] += distance
-                income_series[-1] += income
-        else:
-            monthly_kilometers[-1] += user_km + live_km
-            income_series[-1] += user_income + live_income
+        for job in job_entries:
+            distance = positive_number(job.get("distanceKm") or job.get("distance") or job.get("tripDistanceKm"), 0)
+            income = positive_number(job.get("income") or job.get("revenue") or job.get("money"), 0)
+            monthly_kilometers[-1] += distance
+            income_series[-1] += income
 
     active_driver_count = len(get_active_drivers())
 
@@ -2435,6 +2632,8 @@ def build_company_stats_payload():
         "revenue": round(company_income),
         "allTimeKilometers": round(company_km, 1),
         "allTimeKm": round(company_km, 1),
+        "companyAllTimeKilometers": round(company_km, 1),
+        "companyAllTimeKm": round(company_km, 1),
         "kilometers": round(company_km, 1),
         "jobsAllTime": jobs_all_time,
         "jobs": jobs_all_time,
@@ -2442,8 +2641,10 @@ def build_company_stats_payload():
         "deliveries": deliveries,
         "totalDeliveries": deliveries,
         "activeDrivers": active_driver_count,
-        "monthlyKilometers": monthly_kilometers,
-        "incomeSeries": income_series
+        "monthlyKilometers": [round(value, 1) for value in monthly_kilometers],
+        "incomeSeries": [round(value, 2) for value in income_series],
+        "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
+        "updatedAt": datetime_to_iso(persistent_stats.get("updated_at"))
     }
 
 def tracker_state_payload(user_doc):
@@ -3072,13 +3273,27 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
     planned_distance = parse_number(
         payload.get("plannedDistanceKm")
         or payload.get("planned_distance_km")
+        or payload.get("routeDistanceKm")
+        or payload.get("route_distance_km")
+        or payload.get("completedDistanceKm")
+        or payload.get("completed_distance_km")
+        or payload.get("distanceKm")
         or telemetry.get("plannedDistanceKm"),
         0
     )
     driven_distance = parse_number(
-        payload.get("drivenDistanceKm")
+        payload.get("completedDistanceKm")
+        or payload.get("completed_distance_km")
+        or payload.get("drivenDistanceKm")
+        or payload.get("driven_distance_km")
         or payload.get("distanceKm")
         or payload.get("distance")
+        or payload.get("routeDistanceKm")
+        or payload.get("route_distance_km")
+        or payload.get("tripDistanceKm")
+        or telemetry.get("completedDistanceKm")
+        or telemetry.get("drivenDistanceKm")
+        or telemetry.get("distanceKm")
         or telemetry.get("tripDistanceKm"),
         0
     )
@@ -3108,8 +3323,9 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         if key not in {
             "clientToken", "jobId", "job_id", "id", "driverName", "sourceCity", "source_city",
             "destinationCity", "destination_city", "cargo", "game", "truck", "plannedDistanceKm",
-            "planned_distance_km", "drivenDistanceKm", "distanceKm", "distance", "remainingDistanceKm",
-            "ratePerKm", "rate_per_km", "income", "baseAmount", "base_amount", "bonus", "penalty",
+            "planned_distance_km", "completedDistanceKm", "completed_distance_km", "drivenDistanceKm",
+            "driven_distance_km", "routeDistanceKm", "route_distance_km", "distanceKm", "distance",
+            "remainingDistanceKm", "ratePerKm", "rate_per_km", "income", "baseAmount", "base_amount", "bonus", "penalty",
             "deduction", "currency", "telemetry", "snapshot"
         }:
             extra[key] = value
@@ -3122,6 +3338,10 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         "submitted": True,
         "completed": True,
         "billing_relevant": True,
+        "distanceKm": driven_distance,
+        "completedDistanceKm": driven_distance,
+        "completed_distance_km": driven_distance,
+        "income": total_amount,
         "submitted_at": submitted_at,
         "created_at": submitted_at,
         "driver": {
@@ -3162,14 +3382,16 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
     billing = receipt_doc.get("billing") or {}
     tour = receipt_doc.get("tour") or {}
 
-    distance = parse_number(tour.get("driven_distance_km"), 0)
-    income = parse_number(billing.get("total_amount"), 0)
+    distance = get_receipt_distance_km(receipt_doc)
+    income = get_receipt_income(receipt_doc)
+
+    new_km = round(get_user_all_time_km(user_doc) + distance, 1)
+    new_income = round(get_user_all_time_income(user_doc) + income, 2)
 
     stats = get_profile_stats(user_doc)
-    new_km = parse_number(stats.get("km"), 0) + distance
-    new_income = parse_number(stats.get("income") or stats.get("revenue"), 0) + income
     new_deliveries = parse_int(stats.get("deliveries"), 0) + 1
     new_jobs = parse_int(stats.get("jobs"), new_deliveries - 1) + 1
+    now = now_utc()
 
     logbook_entry = {
         "status": "Fertig",
@@ -3181,6 +3403,7 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
         "destinationCity": tour.get("destination_city", "-"),
         "cargo": tour.get("cargo", "-"),
         "distanceKm": distance,
+        "completedDistanceKm": distance,
         "income": income,
         "incomeText": format_money(income, billing.get("currency")),
         "driverName": receipt_doc.get("driver", {}).get("name"),
@@ -3194,16 +3417,36 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
         {"_id": user_doc["_id"]},
         {
             "$set": {
-                "profile_km": str(round(new_km, 1)),
-                "profile_income": str(round(new_income, 2)),
-                "profile_revenue": str(round(new_income, 2)),
+                # Kompatible Profil-Felder
+                "profile_km": str(new_km),
+                "profile_income": str(new_income),
+                "profile_revenue": str(new_income),
                 "profile_deliveries": str(new_deliveries),
                 "profile_jobs": str(new_jobs),
+
+                # Neue persistente All-Time-Felder als echte Zahlen in MongoDB
+                "all_time_km": new_km,
+                "all_time_income": new_income,
+                "all_time_deliveries": new_deliveries,
+                "all_time_jobs": new_jobs,
+                "profile_all_time_km": new_km,
+                "profile_all_time_income": new_income,
+                "profile_all_time_deliveries": new_deliveries,
+                "profile_all_time_jobs": new_jobs,
+                "tracker_all_time_km": new_km,
+                "tracker_all_time_income": new_income,
+                "tracker_all_time_deliveries": new_deliveries,
+                "tracker_all_time_jobs": new_jobs,
+                "tracker_all_time_updated_at": now,
+
+                # Last-Trip bleibt separat und überschreibt nicht mehr All-Time
+                "tracker_last_completed_distance_km": distance,
+                "tracker_last_trip_distance_km": distance,
                 "tracker_online": False,
                 "tracker_current_job": None,
                 "tracker_last_receipt_id": receipt_doc.get("receipt_id"),
                 "tracker_last_receipt_number": receipt_doc.get("receipt_number"),
-                "tracker_last_job_completed_at": now_utc()
+                "tracker_last_job_completed_at": now
             },
             "$push": {
                 "job_history": {
@@ -3214,6 +3457,10 @@ def write_receipt_into_user_stats(user_doc, receipt_doc):
             }
         }
     )
+
+    # Eigener Company-All-Time-Datenbankeintrag: company_stats/company_all_time
+    # wird nach jeder abgeschlossenen Tour aus allen gespeicherten Belegen neu aufgebaut.
+    refresh_company_all_time_stats_from_receipts()
 
 
 def complete_tracker_tour_from_request():
@@ -3280,12 +3527,19 @@ def complete_tracker_tour_from_request():
     tour_receipts_collection.insert_one(receipt_doc)
     write_receipt_into_user_stats(user_doc, receipt_doc)
 
+    fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
+    company_all_time = get_company_all_time_stats()
+
     return jsonify({
         "success": True,
         "message": "Tour wurde vollständig abgegeben, als Job abgeschlossen und als Abrechnung erfasst.",
         "submitted": True,
         "completed": True,
         "billingRelevant": True,
+        "allTimeKilometers": round(positive_number(company_all_time.get("all_time_km"), 0), 1),
+        "companyAllTimeKilometers": round(positive_number(company_all_time.get("all_time_km"), 0), 1),
+        "driverAllTimeKilometers": round(get_user_all_time_km(fresh_user), 1),
+        "databaseEntryId": COMPANY_STATS_DOCUMENT_ID,
         "receipt": {
             "receiptId": receipt_doc.get("receipt_id"),
             "receiptNumber": receipt_doc.get("receipt_number"),
@@ -3304,7 +3558,7 @@ def complete_tracker_tour_from_request():
             "currency": receipt_doc.get("billing", {}).get("currency"),
             "submittedAt": receipt_doc.get("submitted_at").isoformat() + "Z"
         },
-        "state": tracker_state_payload(users_collection.find_one({"_id": user_doc["_id"]}))
+        "state": tracker_state_payload(fresh_user)
     })
 
 
@@ -3372,7 +3626,13 @@ def tracker_webhook_dedupe_key(payload):
     destination = first_payload_value(payload, "destinationCity", "destination_city", "destination", "to", fallback="")
     cargo = first_payload_value(payload, "cargo", "freight", "cargoName", "jobCargo", fallback="")
     truck = first_payload_value(payload, "truck", "truckName", "truckModel", fallback="")
-    distance = str(round(first_payload_number(payload, "navigationDistanceKm", "remainingDistanceKm", "tripDistanceKm", "plannedDistanceKm", fallback=0.0), 1))
+    distance = str(round(first_payload_number(
+        payload,
+        "completedDistanceKm", "completed_distance_km", "drivenDistanceKm", "driven_distance_km",
+        "distanceKm", "distance", "routeDistanceKm", "route_distance_km", "plannedDistanceKm",
+        "tripDistanceKm",
+        fallback=0.0
+    ), 1))
 
     raw_key = "|".join([driver, source, destination, cargo, truck, distance])
     return "payload:" + hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:24]
@@ -3414,8 +3674,9 @@ def build_tracker_webhook_discord_payload(payload):
 
     distance = first_payload_number(
         payload,
-        "navigationDistanceKm", "remainingDistanceKm", "tripDistanceKm", "plannedDistanceKm",
-        "routeDistanceKm", "distanceKm",
+        "completedDistanceKm", "completed_distance_km", "drivenDistanceKm", "driven_distance_km",
+        "distanceKm", "distance", "routeDistanceKm", "route_distance_km", "plannedDistanceKm",
+        "tripDistanceKm",
         fallback=0.0
     )
     damage = first_payload_number(payload, "damagePercent", "truckDamagePercent", "trailerDamagePercent", "damage", fallback=0.0)
@@ -3505,6 +3766,138 @@ def post_json_to_discord_webhook(discord_payload):
     }
 
 
+def payload_bool(payload, *keys, fallback=False):
+    payload = payload or {}
+    for key in keys:
+        if key not in payload:
+            continue
+        value = payload.get(key)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return value != 0
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "ja", "on", "completed", "delivered"}
+    return fallback
+
+
+def tracker_webhook_payload_is_completed(payload):
+    payload = payload or {}
+    status = first_payload_value(payload, "status", "jobStatus", "job_status", fallback="").lower()
+
+    return (
+        payload_bool(payload, "jobFinished", "jobDelivered", "jobCompleted", "completed", "delivered", fallback=False)
+        or status in {"finished", "completed", "complete", "delivered", "done", "fertig", "submitted"}
+    )
+
+
+def tracker_webhook_completed_distance(payload):
+    return first_payload_number(
+        payload,
+        "completedDistanceKm", "completed_distance_km", "drivenDistanceKm", "driven_distance_km",
+        "distanceKm", "distance", "routeDistanceKm", "route_distance_km", "plannedDistanceKm",
+        "tripDistanceKm",
+        fallback=0.0
+    )
+
+
+def resolve_tracker_webhook_user(payload):
+    payload = payload or {}
+
+    client_token = first_payload_value(
+        payload,
+        "clientToken", "trackerClientToken", "tracker_token", "token",
+        fallback=""
+    )
+    if client_token:
+        user_doc = find_tracker_user_by_client_token(client_token)
+        if user_doc:
+            return user_doc
+
+    for key in ("discordId", "discord_id", "driverDiscordId", "driver_discord_id"):
+        discord_id = safe_str(payload.get(key))
+        if discord_id:
+            user_doc = users_collection.find_one({"discord_id": discord_id})
+            if user_doc:
+                return user_doc
+
+    driver_name = first_payload_value(payload, "driverName", "displayName", "username", "driver", fallback="")
+    if driver_name:
+        return find_user_for_tracker_name(driver_name)
+
+    return None
+
+
+def stable_webhook_job_id(payload):
+    job_id = first_payload_value(payload, "jobId", "job_id", "id", "deliveryId", "delivery_id", fallback="")
+    if job_id:
+        return job_id
+
+    return "webhook-" + tracker_webhook_dedupe_key(payload).split(":", 1)[-1]
+
+
+def store_tracker_webhook_completed_job(payload):
+    payload = payload or {}
+
+    if not tracker_webhook_payload_is_completed(payload):
+        return {"stored": False, "reason": "Payload ist kein abgeschlossener Auftrag."}
+
+    distance = tracker_webhook_completed_distance(payload)
+    if distance <= 0:
+        return {"stored": False, "reason": "Keine abgeschlossene Distanz im Payload gefunden."}
+
+    user_doc = resolve_tracker_webhook_user(payload)
+    if not user_doc:
+        return {"stored": False, "reason": "Kein Fahrer/User zum Webhook-Payload gefunden."}
+
+    payload_for_db = dict(payload)
+    payload_for_db["jobId"] = stable_webhook_job_id(payload_for_db)
+    payload_for_db["completedDistanceKm"] = distance
+    payload_for_db["distanceKm"] = distance
+
+    receipt_doc = build_tour_receipt_doc(user_doc, payload_for_db, telemetry=payload_for_db)
+    receipt_doc["source"] = "tracker_webhook"
+    receipt_doc["status"] = "completed"
+    receipt_doc["completed"] = True
+    receipt_doc["submitted"] = True
+    receipt_doc["billing_relevant"] = True
+    receipt_doc["pdf"] = receipt_doc.get("pdf") or {}
+    receipt_doc["discord"] = receipt_doc.get("discord") or {}
+
+    existing = tour_receipts_collection.find_one({
+        "job_id": receipt_doc["job_id"],
+        "driver.discord_id": safe_str(user_doc.get("discord_id")),
+        "archived": {"$ne": True}
+    })
+    if existing:
+        refresh_company_all_time_stats_from_receipts()
+        company_stats = get_company_all_time_stats()
+        return {
+            "stored": False,
+            "alreadyStored": True,
+            "reason": "Dieser Auftrag ist bereits in der Datenbank gespeichert.",
+            "jobId": existing.get("job_id"),
+            "allTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1)
+        }
+
+    tour_receipts_collection.insert_one(receipt_doc)
+    write_receipt_into_user_stats(user_doc, receipt_doc)
+
+    fresh_user = users_collection.find_one({"_id": user_doc["_id"]}) or user_doc
+    company_stats = get_company_all_time_stats()
+
+    return {
+        "stored": True,
+        "jobId": receipt_doc.get("job_id"),
+        "receiptId": receipt_doc.get("receipt_id"),
+        "driverName": receipt_doc.get("driver", {}).get("name"),
+        "distanceKm": round(distance, 1),
+        "driverAllTimeKilometers": round(get_user_all_time_km(fresh_user), 1),
+        "allTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1),
+        "databaseEntryId": COMPANY_STATS_DOCUMENT_ID
+    }
+
+
 @app.route("/webhook", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/tracker/webhook", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/tracker/discord/webhook", methods=["GET", "POST", "OPTIONS"])
@@ -3529,8 +3922,10 @@ def tracker_local_webhook():
         return jsonify({
             "success": True,
             "duplicate": True,
-            "message": "Webhook wurde als Duplikat erkannt und nicht erneut an Discord gesendet."
+            "message": "Webhook wurde als Duplikat erkannt und nicht erneut verarbeitet."
         })
+
+    database_result = store_tracker_webhook_completed_job(payload)
 
     if isinstance(data, dict) and ("embeds" in data or "content" in data):
         discord_payload = data
@@ -3539,10 +3934,13 @@ def tracker_local_webhook():
 
     discord_result = post_json_to_discord_webhook(discord_payload)
 
-    status_code = 200 if discord_result.get("sent") else 502
+    success = bool(discord_result.get("sent")) or bool(database_result.get("stored")) or bool(database_result.get("alreadyStored"))
+    status_code = 200 if success else 502
+
     return jsonify({
-        "success": bool(discord_result.get("sent")),
-        "message": "Webhook empfangen und an Discord gesendet." if discord_result.get("sent") else "Webhook empfangen, Discord-Versand fehlgeschlagen.",
+        "success": success,
+        "message": "Webhook empfangen. All-Time-KM wurden gespeichert und Discord wurde informiert." if success else "Webhook empfangen, aber Datenbank/Discord-Verarbeitung fehlgeschlagen.",
+        "database": database_result,
         "discord": discord_result
     }), status_code
 
