@@ -37,11 +37,13 @@
 {% set safe_dispatch_messages = dispo_messages|default([], true) %}
 {% set safe_dispatch_notes = dispo_notes|default([], true) %}
 {% set safe_recent_events = dispo_recent_events|default([], true) %}
+{% set safe_dispo_form_entries = dispo_form_entries|default([], true) %}
 
 {% set open_tours_count = open_tours_count|default(safe_open_tours|length, true) %}
 {% set active_tours_count = active_tours_count|default(safe_active_tours|length, true) %}
 {% set available_drivers_count = available_drivers_count|default(safe_available_drivers|length, true) %}
 {% set critical_messages_count = critical_messages_count|default(safe_dispatch_messages|selectattr('priority', 'equalto', 'critical')|list|length, true) %}
+{% set dispo_form_entries_count = dispo_form_entries_count|default(safe_dispo_form_entries|length, true) %}
 
 {% block title %}EifelLog - Disposition{% endblock %}
 
@@ -242,6 +244,13 @@
             </svg>
             Dashboard
         </a>
+        <a href="/dispo/form"
+           class="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/35 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"></path>
+            </svg>
+            Abschlussbelege
+        </a>
         <button id="btn-refresh-dispo"
                 type="button"
                 class="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[#5865F2]/10 border border-[#5865F2]/35 text-[#7b8cff] hover:bg-[#5865F2]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
@@ -308,6 +317,36 @@
         </h3>
         <p class="text-3xl font-bold text-white mt-2">{{ critical_messages_count }}</p>
         <p class="text-xs text-[var(--muted)] font-inter mt-2">Benötigen Prüfung</p>
+    </div>
+</div>
+
+<div class="glass-card p-6 mb-8 relative z-10 overflow-hidden border border-[var(--brand-green)]/20">
+    <div class="absolute -right-10 -top-10 opacity-5 text-[var(--brand-green)]">
+        <svg class="w-44 h-44" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM13 9V3.5L18.5 9H13zm-4 4h6v2H9v-2zm0 4h6v2H9v-2z"></path>
+        </svg>
+    </div>
+    <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+        <div class="min-w-0">
+            <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Abschlussbelege & Frachtpapiere</span>
+            <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Dispo-Formular öffnen</h2>
+            <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed max-w-3xl">
+                Hier können User Abschlussbelege, Frachtpapiere, Einnahmen und Schäden einreichen. Die Disposition sieht anschließend, von welchem User der Beleg kommt und kann den Status prüfen.
+            </p>
+        </div>
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+            <div class="rounded-2xl bg-black/30 border border-white/10 px-5 py-3 text-center sm:text-left">
+                <p class="font-orbitron text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest">Eingänge</p>
+                <p class="text-2xl font-bold text-white mt-1">{{ dispo_form_entries_count }}</p>
+            </div>
+            <a href="/dispo/form"
+               class="inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/35 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.16em]">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Belege verwalten
+            </a>
+        </div>
     </div>
 </div>
 
