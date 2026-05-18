@@ -337,16 +337,17 @@
                 </div>
             </div>
 
-            <div class="overflow-x-auto dispo-scrollbar flex-grow">
-                <table class="w-full text-left border-collapse min-w-[900px]">
-                    <thead>
+            <!-- HIER WURDE DIE MAXIMALE HÖHE UND VERTIKALE SCROLLBAR HINZUGEFÜGT -->
+            <div class="overflow-auto max-h-[400px] dispo-scrollbar flex-grow pr-1">
+                <table class="w-full text-left border-collapse min-w-[900px] relative">
+                    <thead class="sticky top-0 bg-[#0d0f0c]/95 backdrop-blur-sm z-10">
                         <tr class="border-b border-white/10 text-[10px] font-orbitron text-[var(--muted)] uppercase tracking-widest">
-                            <th class="pb-3 px-2">Eingang</th>
-                            <th class="pb-3 px-2">Route</th>
-                            <th class="pb-3 px-2">Fracht</th>
-                            <th class="pb-3 px-2">Priorität</th>
-                            <th class="pb-3 px-2">Deadline</th>
-                            <th class="pb-3 px-2 text-right">Aktion</th>
+                            <th class="pb-3 px-2 pt-2">Eingang</th>
+                            <th class="pb-3 px-2 pt-2">Route</th>
+                            <th class="pb-3 px-2 pt-2">Fracht</th>
+                            <th class="pb-3 px-2 pt-2">Priorität</th>
+                            <th class="pb-3 px-2 pt-2">Deadline</th>
+                            <th class="pb-3 px-2 pt-2 text-right">Aktion</th>
                         </tr>
                     </thead>
                     <tbody id="open-tours-table" class="text-sm font-inter text-gray-300">
