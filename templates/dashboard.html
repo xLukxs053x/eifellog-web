@@ -9,6 +9,8 @@
     - NEU: Blaues Tutorial-Alert, welches nur 1x pro User erscheint.
     - NEU: Tutorial-Status (Abgeschlossen / Ausstehend) landet sortiert nach Datum/Uhrzeit im Postfach.
     - NEU: Disposition-Schnellzugriff für Rolle 1473726639643820344 auf dispo.html.
+    - NEU: Servicecenter-Schnellzugriff über /servicecenter statt Mein-Profil-Kachel.
+    - NEU: System-Postfach-Hinweis für alle User: Fahrerkarten jetzt verfügbar / beantragbar.
 #}
 
 {% set primary_role_display = primary_role_name|default('User', true) %}
@@ -1000,12 +1002,13 @@
                     <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider">Support</span>
                 </button>
 
-                <a href="{{ url_for('profile', username=current_user.username) }}" class="p-4 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 transition-all text-center group relative overflow-hidden">
+                <a href="/servicecenter" class="p-4 rounded-xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/30 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 transition-all text-center group relative overflow-hidden">
                     <div class="absolute inset-0 bg-gradient-to-br from-[var(--brand-green)]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <span class="absolute top-2 right-2 z-20 rounded-full bg-[var(--brand-yellow)] text-black border border-black/30 px-2 py-0.5 text-[8px] font-orbitron font-black uppercase tracking-widest shadow-[0_0_12px_rgba(220,226,38,0.55)]">Neu</span>
                     <svg class="w-6 h-6 text-[var(--brand-green)] mx-auto mb-2 group-hover:scale-110 transition-transform relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A9 9 0 1118.879 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 0L14.121 9.879m4.243-4.243L14.121 9.879m0 0a3 3 0 00-4.242 4.242m4.242-4.242L9.879 14.121m0 0l-4.243 4.243m4.243-4.243l-4.243 4.243"></path>
                     </svg>
-                    <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider relative z-10">Mein Profil</span>
+                    <span class="text-[10px] font-orbitron text-[var(--text)] uppercase tracking-wider relative z-10">Servicecenter</span>
                 </a>
 
                 <a href="/downloads" class="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/10 transition-all text-center group">
@@ -1108,9 +1111,9 @@
 
                 <div class="min-w-0">
                     <span class="font-orbitron text-[10px] font-bold text-[var(--brand-yellow)] tracking-[0.22em] uppercase">System Alert</span>
-                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Wichtige Dokumente</h2>
+                    <h2 class="font-orbitron font-bold text-xl text-white tracking-wide mt-1">Fahrerkarten verfügbar</h2>
                     <p class="text-sm text-[var(--muted)] font-inter mt-3 leading-relaxed">
-                        Du hast wichtige Dokumente im Postfach. Schau nach!
+                        Fahrerkarten sind jetzt verfügbar und im Servicecenter beantragbar. Öffne dein Postfach für die Details.
                     </p>
                 </div>
             </div>
@@ -1157,6 +1160,40 @@
         </div>
 
         <div id="postfach-container" class="p-6 space-y-3 flex-grow min-h-0 overflow-y-auto custom-scrollbar">
+            <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-[var(--brand-green)]/[0.06] border border-[var(--brand-green)]/25 hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)]/[0.09] hover:-translate-y-0.5 transition-all duration-300 group relative"
+                    data-title="Fahrerkarten jetzt verfügbar"
+                    data-sender="Servicecenter"
+                    data-date="Heute"
+                    data-needs-signature="false"
+                    data-doc-id="system-fahrerkarten-verfuegbar-beantragbar-v1">
+                <span class="doc-attention-dot absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[var(--brand-green)] shadow-[0_0_12px_rgba(137,190,50,0.9)] animate-pulse"></span>
+
+                <div class="flex items-center gap-4 pr-5">
+                    <div class="p-3 rounded-xl bg-[var(--brand-green)]/10 text-[var(--brand-green)] border border-[var(--brand-green)]/20 group-hover:scale-105 transition-transform">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <h4 class="text-sm font-bold font-orbitron text-white truncate">Fahrerkarten jetzt verfügbar</h4>
+                        <p class="text-xs text-[var(--muted)] mt-1 font-inter truncate">Servicecenter • Heute</p>
+                        <p class="text-[10px] text-[var(--brand-green)] font-orbitron uppercase tracking-widest mt-2">Beantragbar</p>
+                    </div>
+                </div>
+
+                <div class="hidden doc-data-content">
+                    <p><strong>Fahrerkarten jetzt verfügbar / beantragbar</strong></p>
+                    <p class="mt-4">Fahrerkarten können ab sofort über das Servicecenter beantragt werden.</p>
+                    <p class="mt-4">Nutze dafür den neuen Schnellzugriff <strong>Servicecenter</strong> im Dashboard oder öffne direkt die Route <strong>/servicecenter</strong>.</p>
+                    <div class="mt-5 rounded-2xl bg-black/50 border border-[var(--brand-green)]/25 p-4">
+                        <p class="text-[10px] font-orbitron text-[var(--brand-green)] uppercase tracking-widest mb-2">Servicecenter</p>
+                        <a href="/servicecenter" class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-[var(--brand-green)]/15 border border-[var(--brand-green)]/40 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/25 hover:text-white transition-all font-orbitron text-[10px] font-bold uppercase tracking-[0.15em]">
+                            Fahrkarte beantragen
+                        </a>
+                    </div>
+                </div>
+            </button>
+
             {% if needs_signature_flag %}
             <button class="doc-trigger w-full text-left p-4 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-green)]/70 hover:bg-white/[0.07] hover:-translate-y-0.5 transition-all duration-300 group relative"
                     data-title="EifelLog Richtlinien"
