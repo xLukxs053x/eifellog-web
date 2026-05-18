@@ -128,6 +128,345 @@
         background: rgba(255, 255, 255, 0.2);
     }
 
+    .service-mailbox-card {
+        position: relative;
+        overflow: hidden;
+        min-height: 360px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .service-mailbox-card::before {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        pointer-events: none;
+        background:
+            radial-gradient(circle at 18% 0%, rgba(137, 190, 50, 0.14), transparent 34%),
+            radial-gradient(circle at 100% 15%, rgba(255, 202, 40, 0.10), transparent 32%);
+        opacity: 0.85;
+    }
+
+    .service-mailbox-head,
+    .service-mailbox-list,
+    .service-mailbox-empty {
+        position: relative;
+        z-index: 1;
+    }
+
+    .service-mailbox-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .service-mailbox-title {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        font-family: Orbitron, Inter, system-ui, sans-serif;
+        font-size: 1.05rem;
+        line-height: 1.25;
+        color: #fff;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+    }
+
+    .service-mailbox-icon {
+        width: 2.4rem;
+        height: 2.4rem;
+        border-radius: 1rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--brand-green);
+        background: rgba(137, 190, 50, 0.10);
+        border: 1px solid rgba(137, 190, 50, 0.24);
+        box-shadow: 0 0 28px rgba(137, 190, 50, 0.10);
+        flex: 0 0 auto;
+    }
+
+    .service-mailbox-subtitle {
+        margin-top: 0.35rem;
+        color: var(--muted);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 0.75rem;
+        line-height: 1.5;
+    }
+
+    .service-mailbox-count {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.45rem 0.65rem;
+        border-radius: 999px;
+        background: rgba(137, 190, 50, 0.10);
+        border: 1px solid rgba(137, 190, 50, 0.22);
+        color: var(--brand-green);
+        font-family: Orbitron, Inter, system-ui, sans-serif;
+        font-size: 0.55rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        white-space: nowrap;
+    }
+
+    .service-mailbox-count-dot {
+        width: 0.45rem;
+        height: 0.45rem;
+        border-radius: 999px;
+        background: var(--brand-green);
+        box-shadow: 0 0 12px rgba(137, 190, 50, 0.82);
+    }
+
+    .service-mailbox-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: 480px;
+        overflow-y: auto;
+        padding-right: 0.35rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+    }
+
+    .service-message-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.25rem;
+        padding: 1rem;
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035));
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        box-shadow: 0 18px 35px rgba(0, 0, 0, 0.18);
+    }
+
+    .service-message-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 3px;
+        height: 100%;
+        background: var(--brand-green);
+        box-shadow: 0 0 16px rgba(137, 190, 50, 0.45);
+    }
+
+    .service-message-card.is-warning::before,
+    .service-message-card.is-pending::before {
+        background: var(--brand-yellow);
+        box-shadow: 0 0 16px rgba(255, 202, 40, 0.35);
+    }
+
+    .service-message-card.is-danger::before,
+    .service-message-card.is-rejected::before {
+        background: var(--danger);
+        box-shadow: 0 0 16px rgba(255, 80, 80, 0.32);
+    }
+
+    .service-message-topline {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.85rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .service-message-title-wrap {
+        min-width: 0;
+    }
+
+    .service-message-title {
+        margin: 0;
+        color: #fff;
+        font-family: Orbitron, Inter, system-ui, sans-serif;
+        font-size: 0.78rem;
+        line-height: 1.35;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .service-message-meta {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        margin-top: 0.45rem;
+        color: rgba(255, 255, 255, 0.42);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 0.68rem;
+        line-height: 1.3;
+    }
+
+    .service-message-meta-dot {
+        width: 0.25rem;
+        height: 0.25rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.28);
+    }
+
+    .service-message-badge {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 1.55rem;
+        padding: 0.35rem 0.55rem;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 202, 40, 0.24);
+        background: rgba(255, 202, 40, 0.10);
+        color: var(--brand-yellow);
+        font-family: Orbitron, Inter, system-ui, sans-serif;
+        font-size: 0.54rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        white-space: nowrap;
+    }
+
+    .service-message-body {
+        color: rgba(255, 255, 255, 0.72);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 0.78rem;
+        line-height: 1.65;
+        overflow-wrap: anywhere;
+    }
+
+    .service-message-body :where(p, ul, ol, blockquote) {
+        margin-top: 0.65rem;
+        margin-bottom: 0;
+    }
+
+    .service-message-body :where(p:first-child, ul:first-child, ol:first-child, blockquote:first-child) {
+        margin-top: 0;
+    }
+
+    .service-message-body :where(strong, b) {
+        color: #fff;
+        font-weight: 800;
+    }
+
+    .service-message-body :where(em, i) {
+        color: var(--brand-yellow);
+        font-style: normal;
+    }
+
+    .service-message-body :where(a) {
+        color: var(--brand-green);
+        text-decoration: none;
+        border-bottom: 1px solid rgba(137, 190, 50, 0.35);
+        transition: color 160ms ease, border-color 160ms ease;
+    }
+
+    .service-message-body :where(a:hover) {
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.55);
+    }
+
+    .service-message-body :where(ul, ol) {
+        padding-left: 1.15rem;
+    }
+
+    .service-message-body :where(li + li) {
+        margin-top: 0.3rem;
+    }
+
+    .service-message-body :where(code) {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.1rem 0.38rem;
+        border-radius: 0.5rem;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: var(--brand-yellow);
+        font-size: 0.72rem;
+    }
+
+    .service-message-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.9rem;
+        padding-top: 0.85rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .service-message-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        padding: 0.55rem 0.75rem;
+        border-radius: 999px;
+        background: rgba(137, 190, 50, 0.10);
+        border: 1px solid rgba(137, 190, 50, 0.22);
+        color: var(--brand-green);
+        font-family: Orbitron, Inter, system-ui, sans-serif;
+        font-size: 0.55rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        transition: transform 160ms ease, background 160ms ease, color 160ms ease, border-color 160ms ease;
+    }
+
+    .service-message-action:hover {
+        transform: translateY(-1px);
+        background: rgba(137, 190, 50, 0.18);
+        border-color: rgba(137, 190, 50, 0.40);
+        color: #fff;
+    }
+
+    .service-mailbox-empty {
+        flex: 1 1 auto;
+        min-height: 240px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        border-radius: 1.35rem;
+        border: 1px dashed rgba(255, 255, 255, 0.12);
+        background: rgba(0, 0, 0, 0.18);
+        text-align: center;
+    }
+
+    .service-mailbox-empty-icon {
+        width: 3.25rem;
+        height: 3.25rem;
+        margin-inline: auto;
+        border-radius: 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--brand-green);
+        background: rgba(137, 190, 50, 0.10);
+        border: 1px solid rgba(137, 190, 50, 0.22);
+        box-shadow: 0 0 28px rgba(137, 190, 50, 0.10);
+    }
+
+    .service-mailbox-empty-title {
+        margin-top: 0.9rem;
+        color: #fff;
+        font-family: Orbitron, Inter, system-ui, sans-serif;
+        font-size: 0.8rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+    }
+
+    .service-mailbox-empty-text {
+        max-width: 18rem;
+        margin: 0.55rem auto 0;
+        color: var(--muted);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 0.76rem;
+        line-height: 1.6;
+    }
+
+
     #fahrerkarte-confirm-modal {
         overscroll-behavior: contain;
     }
@@ -690,32 +1029,80 @@
                 </div>
             </div>
 
-            <div class="glass-card p-6 flex-1 flex flex-col min-h-[250px]">
-                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4 flex items-center justify-between">
-                    ServiceCenter Postfach
-                    <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] animate-pulse"></span>
-                </h2>
+            <div class="glass-card p-6 service-mailbox-card">
+                <div class="service-mailbox-head">
+                    <div class="min-w-0">
+                        <div class="service-mailbox-title">
+                            <span class="service-mailbox-icon" aria-hidden="true">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-18 8.5A2.5 2.5 0 005.5 19h13A2.5 2.5 0 0021 16.5v-9A2.5 2.5 0 0018.5 5h-13A2.5 2.5 0 003 7.5v9z"></path>
+                                </svg>
+                            </span>
+                            <span>ServiceCenter Postfach</span>
+                        </div>
+                        <p class="service-mailbox-subtitle">
+                            Meldungen werden direkt formatiert angezeigt. HTML-Tags aus dem Nachrichteninhalt sind dadurch nicht mehr sichtbar.
+                        </p>
+                    </div>
 
-                <div class="flex-grow space-y-3 overflow-y-auto custom-scrollbar pr-2">
-                    {% if safe_servicecenter_messages %}
+                    <span class="service-mailbox-count">
+                        <span class="service-mailbox-count-dot"></span>
+                        {{ safe_servicecenter_messages|length if safe_servicecenter_messages else 0 }} Meldungen
+                    </span>
+                </div>
+
+                {% if safe_servicecenter_messages %}
+                    <div class="service-mailbox-list custom-scrollbar">
                         {% for message in safe_servicecenter_messages %}
-                            <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-4">
-                                <div class="flex items-center justify-between gap-3">
-                                    <p class="font-orbitron text-xs text-white font-bold uppercase tracking-wider truncate">{{ message.title }}</p>
-                                    <span class="text-[9px] font-orbitron uppercase tracking-widest text-[var(--brand-yellow)]">{{ message.date }}</span>
+                            {% set message_variant = message.variant|default(message.type|default(message.status|default('info', true), true), true)|lower %}
+                            {% set message_sender = message.sender|default('ServiceCenter', true) %}
+                            {% set message_badge = message.badge|default(message.category|default('Info', true), true) %}
+                            <article class="service-message-card is-{{ message_variant }}">
+                                <div class="service-message-topline">
+                                    <div class="service-message-title-wrap">
+                                        <h3 class="service-message-title">{{ message.title|default('ServiceCenter Meldung', true) }}</h3>
+                                        <div class="service-message-meta">
+                                            <span>{{ message_sender }}</span>
+                                            {% if message.date %}
+                                                <span class="service-message-meta-dot"></span>
+                                                <time>{{ message.date }}</time>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <span class="service-message-badge">{{ message_badge }}</span>
                                 </div>
-                                <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">{{ message.content }}</p>
-                            </div>
+
+                                <div class="service-message-body">
+                                    {{ message.content|default('Keine weiteren Details vorhanden.', true)|safe }}
+                                </div>
+
+                                {% if message.actions %}
+                                    <div class="service-message-actions">
+                                        {% for action in message.actions %}
+                                            <a href="{{ action.url|default('#', true) }}" class="service-message-action">
+                                                {{ action.label|default('Öffnen', true) }}
+                                            </a>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </article>
                         {% endfor %}
-                    {% else %}
-                        <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-4">
-                            <p class="font-orbitron text-xs text-white font-bold uppercase tracking-wider">Keine neuen Meldungen</p>
-                            <p class="text-xs text-[var(--muted)] font-inter mt-2 leading-relaxed">
-                                Statusmeldungen zur Fahrerkarte erscheinen hier, sobald eine Bearbeitung erfolgt.
+                    </div>
+                {% else %}
+                    <div class="service-mailbox-empty">
+                        <div>
+                            <div class="service-mailbox-empty-icon" aria-hidden="true">
+                                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V7.5A2.5 2.5 0 017.5 5h9A2.5 2.5 0 0119 7.5V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                            </div>
+                            <p class="service-mailbox-empty-title">Keine neuen Meldungen</p>
+                            <p class="service-mailbox-empty-text">
+                                Statusmeldungen zur Fahrerkarte erscheinen hier automatisch, sobald eine Bearbeitung erfolgt.
                             </p>
                         </div>
-                    {% endif %}
-                </div>
+                    </div>
+                {% endif %}
             </div>
         </aside>
     </div>
