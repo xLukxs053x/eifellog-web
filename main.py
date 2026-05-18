@@ -93,6 +93,12 @@ SERVICECENTER_FAHRERKARTE_FOLDER = env_first(
     "FAHRERKARTE_DOWNLOAD_FOLDER",
     default=os.path.join("static", "downloads", "servicecenter", "fahrerkarten")
 )
+DISPO_FORM_UPLOAD_FOLDER = env_first(
+    "DISPO_FORM_UPLOAD_FOLDER",
+    "DISPO_BELEG_UPLOAD_FOLDER",
+    default=os.path.join("static", "uploads", "dispo_form")
+)
+ALLOWED_DISPO_FORM_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "webp"}
 TOUR_RECEIPT_PUBLIC_BASE_URL = env_first("TOUR_RECEIPT_PUBLIC_BASE_URL", "PUBLIC_BASE_URL", default="")
 TOUR_RECEIPT_COMPANY_NAME = env_first("TOUR_RECEIPT_COMPANY_NAME", "COMPANY_NAME", default="Eifel LOG")
 TOUR_RECEIPT_CURRENCY = env_first("TOUR_RECEIPT_CURRENCY", "DEFAULT_CURRENCY", default="EUR")
@@ -161,6 +167,7 @@ company_stats_collection = db["company_stats"]
 dispo_tours_collection = db["dispo_tours"]
 dispo_notes_collection = db["dispo_notes"]
 dispo_messages_collection = db["dispo_messages"]
+dispo_form_entries_collection = db["dispo_form_entries"]
 fahrerkarte_requests_collection = db["fahrerkarte_requests"]
 
 
@@ -229,6 +236,17 @@ def ensure_indexes():
         dispo_messages_collection.create_index([("created_at", DESCENDING)], unique=False)
         dispo_messages_collection.create_index([("priority", ASCENDING)], unique=False)
         dispo_messages_collection.create_index([("archived", ASCENDING)], unique=False)
+
+        dispo_form_entries_collection.create_index([("entry_id", ASCENDING)], unique=False)
+        dispo_form_entries_collection.create_index([("entry_source", ASCENDING)], unique=False)
+        dispo_form_entries_collection.create_index([("entry_type", ASCENDING)], unique=False)
+        dispo_form_entries_collection.create_index([("document_type", ASCENDING)], unique=False)
+        dispo_form_entries_collection.create_index([("status", ASCENDING)], unique=False)
+        dispo_form_entries_collection.create_index([("submitted_by.discord_id", ASCENDING)], unique=False)
+        dispo_form_entries_collection.create_index([("submitted_by.username", ASCENDING)], unique=False)
+        dispo_form_entries_collection.create_index([("reference", ASCENDING)], unique=False)
+        dispo_form_entries_collection.create_index([("created_at", DESCENDING)], unique=False)
+        dispo_form_entries_collection.create_index([("archived", ASCENDING)], unique=False)
 
         fahrerkarte_requests_collection.create_index([("request_id", ASCENDING)], unique=False)
         fahrerkarte_requests_collection.create_index([("discord_id", ASCENDING)], unique=False)
@@ -5313,6 +5331,462 @@ def dispo_assign_tour(tour_id=None):
 
     flash("Tour wurde erfolgreich zugewiesen.", "success")
     return redirect(url_for("dispo"))
+
+
+# ==========================================
+# DISPOSITION FORMULAR / ABSCHLUSSBELEGE
+# ==========================================
+
+def resolve_dispo_form_upload_folder():
+    folder = safe_str(DISPO_FORM_UPLOAD_FOLDER, os.path.join("static", "uploads", "dispo_form"))
+    if not os.path.isabs(folder):
+        folder = os.path.join(BASE_DIR, folder)
+    return folder
+
+
+def allowed_dispo_form_document(filename):
+    filename = safe_str(filename)
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_DISPO_FORM_EXTENSIONS
+
+
+def dispo_form_entry_lookup_query(entry_id):
+    entry_id = safe_str(entry_id)
+    query_items = [{"entry_id": entry_id}, {"id": entry_id}]
+    object_id = object_id_or_none(entry_id)
+    if object_id:
+        query_items.append({"_id": object_id})
+    return {"$or": query_items}
+
+
+def normalize_dispo_form_status(status):
+    status = safe_str(status, "pending").lower()
+    if status in {"approved", "freigegeben", "accepted", "ok"}:
+        return "approved"
+    if status in {"rejected", "abgelehnt", "declined", "denied"}:
+        return "rejected"
+    if status in {"completed", "done", "abgeschlossen", "finished"}:
+        return "completed"
+    return "pending"
+
+
+def normalize_dispo_form_entry_type(entry_type):
+    entry_type = safe_str(entry_type, "income").lower()
+    if entry_type in {"damage", "schaden", "loss"}:
+        return "damage"
+    return "income"
+
+
+def dispo_form_document_type_label(document_type):
+    return {
+        "freight_papers": "Frachtpapiere",
+        "abschlussbeleg": "Abschlussbeleg",
+        "delivery_note": "Lieferschein",
+        "invoice": "Rechnung",
+        "damage_receipt": "Schadenbeleg",
+        "manual_income": "Manuelle Einnahme",
+        "manual_damage": "Manueller Schaden",
+        "other": "Sonstiges",
+    }.get(safe_str(document_type).lower(), safe_str(document_type, "Beleg"))
+
+
+def dispo_form_tax_mode_label(tax_mode):
+    return {
+        "eifellog_internal": "EifelLog intern",
+        "external_receipt": "Externer Beleg",
+        "no_tax": "Keine Steuer",
+    }.get(safe_str(tax_mode).lower(), safe_str(tax_mode, "EifelLog intern"))
+
+
+def calculate_dispo_form_tax(amount_net, tax_rate, tax_mode="eifellog_internal"):
+    net = round(max(parse_number(amount_net, 0), 0), 2)
+    rate = round(max(parse_number(tax_rate, 19), 0), 2)
+    mode = safe_str(tax_mode, "eifellog_internal")
+
+    if mode == "no_tax":
+        rate = 0.0
+
+    tax_amount = round(net * (rate / 100), 2)
+    gross = round(net + tax_amount, 2)
+    return net, rate, tax_amount, gross
+
+
+def current_dispo_form_submitter():
+    actor = current_disposition_identity()
+    return {
+        "discord_id": safe_str(actor.get("discord_id")),
+        "username": safe_str(actor.get("username"), "Disposition"),
+        "display_name": safe_str(actor.get("display_name") or actor.get("username"), "Disposition"),
+        "roles": actor.get("roles", []),
+    }
+
+
+def prepare_dispo_form_entry_for_template(entry_doc):
+    item = dict(entry_doc or {})
+    mongo_id = str(item.get("_id")) if item.get("_id") else ""
+    submitted_by = item.get("submitted_by") or {}
+    files = item.get("files") or []
+    first_file = files[0] if files else {}
+
+    entry_source = safe_str(item.get("entry_source"), "manual")
+    entry_type = normalize_dispo_form_entry_type(item.get("entry_type"))
+    document_type = safe_str(item.get("document_type"))
+
+    if entry_source == "manual" and not document_type:
+        document_type = "manual_damage" if entry_type == "damage" else "manual_income"
+
+    entry_id = safe_str(item.get("entry_id") or item.get("id") or mongo_id)
+
+    return {
+        "id": entry_id,
+        "entry_id": entry_id,
+        "entry_source": entry_source,
+        "entry_type": entry_type,
+        "type": "Schaden" if entry_type == "damage" else "Einnahme",
+        "document_type": dispo_form_document_type_label(document_type),
+        "document_type_raw": document_type,
+        "reference": safe_str(item.get("reference"), "-"),
+        "title": safe_str(item.get("title") or item.get("note") or dispo_form_document_type_label(document_type), "Beleg"),
+        "description": safe_str(item.get("description") or item.get("note"), ""),
+        "note": safe_str(item.get("note") or item.get("description"), ""),
+        "amount_net": format_money(item.get("amount_net"), "EUR"),
+        "amount_gross": format_money(item.get("amount_gross"), "EUR"),
+        "tax_rate": int(parse_number(item.get("tax_rate"), 19)) if parse_number(item.get("tax_rate"), 19).is_integer() else parse_number(item.get("tax_rate"), 19),
+        "tax_amount": format_money(item.get("tax_amount"), "EUR"),
+        "tax_mode": dispo_form_tax_mode_label(item.get("tax_mode")),
+        "status": normalize_dispo_form_status(item.get("status")),
+        "submitted_by": safe_str(submitted_by.get("display_name") or submitted_by.get("username") or item.get("submitted_by_name"), "Unbekannt"),
+        "submitted_by_id": safe_str(submitted_by.get("discord_id") or item.get("submitted_by_id"), "-"),
+        "author": safe_str(submitted_by.get("display_name") or submitted_by.get("username") or item.get("author"), "Unbekannt"),
+        "created_at": format_datetime_for_template(item.get("created_at")) or "-",
+        "updated_at": format_datetime_for_template(item.get("updated_at")) or "-",
+        "file_url": url_for("dispo_form_file_download", entry_id=entry_id, filename=first_file.get("stored_filename")) if first_file.get("stored_filename") else "",
+        "file_name": first_file.get("original_filename") or first_file.get("stored_filename") or "",
+        "files": files,
+    }
+
+
+def save_dispo_form_uploaded_files(entry_id, uploaded_files):
+    saved_files = []
+    upload_root = resolve_dispo_form_upload_folder()
+    dated_folder = os.path.join(now_utc().strftime("%Y"), now_utc().strftime("%m"), safe_str(entry_id))
+    target_folder = os.path.join(upload_root, dated_folder)
+    os.makedirs(target_folder, exist_ok=True)
+
+    for uploaded_file in uploaded_files:
+        if not uploaded_file or not uploaded_file.filename:
+            continue
+
+        if not allowed_dispo_form_document(uploaded_file.filename):
+            raise ValueError("Nur PDF, PNG, JPG, JPEG oder WEBP Dateien sind erlaubt.")
+
+        original_filename = secure_filename(uploaded_file.filename)
+        extension = original_filename.rsplit(".", 1)[1].lower()
+        stored_filename = f"{uuid.uuid4().hex}.{extension}"
+        absolute_path = os.path.join(target_folder, stored_filename)
+        uploaded_file.save(absolute_path)
+
+        relative_path = os.path.relpath(absolute_path, BASE_DIR)
+        saved_files.append({
+            "original_filename": original_filename,
+            "stored_filename": stored_filename,
+            "extension": extension,
+            "relative_path": relative_path.replace(os.sep, "/"),
+            "size_bytes": os.path.getsize(absolute_path),
+            "uploaded_at": now_utc(),
+        })
+
+    return saved_files
+
+
+def get_dispo_form_stats(entries):
+    pending_count = 0
+    total_documents = 0
+    income_sum = 0.0
+    damage_sum = 0.0
+
+    for entry in entries:
+        if normalize_dispo_form_status(entry.get("status")) == "pending":
+            pending_count += 1
+
+        if safe_str(entry.get("entry_source")) == "document":
+            total_documents += max(len(entry.get("files") or []), 1)
+
+        amount = parse_number(entry.get("amount_net"), 0)
+        entry_type = normalize_dispo_form_entry_type(entry.get("entry_type"))
+        document_type = safe_str(entry.get("document_type")).lower()
+
+        if entry_type == "damage" or document_type == "damage_receipt":
+            damage_sum += amount
+        elif amount > 0:
+            income_sum += amount
+
+    return {
+        "pending_count": pending_count,
+        "total_documents": total_documents,
+        "income_sum": income_sum,
+        "damage_sum": damage_sum,
+    }
+
+
+@app.route("/dispo/form", methods=["GET"])
+@app.route("/dispo_form.html", methods=["GET"])
+def dispo_form():
+    permission_response = require_disposition_permission()
+    if permission_response:
+        return permission_response
+
+    user = session.get("user") or {}
+    user_roles = user.get("roles", [])
+    primary_role_name = get_primary_role_name(user_roles)
+
+    if isinstance(session.get("user"), dict):
+        session["user"]["is_disposition"] = True
+        permissions = set(item for item in session["user"].get("permissions", []) if item)
+        permissions.add("disposition.view")
+        permissions.add("disposition.form")
+        permissions.add("disposition.documents")
+        session["user"]["permissions"] = sorted(permissions)
+        session.modified = True
+
+    entries_cursor = dispo_form_entries_collection.find(
+        {"archived": {"$ne": True}}
+    ).sort([("created_at", DESCENDING)]).limit(300)
+
+    raw_entries = list(entries_cursor)
+    prepared_entries = [prepare_dispo_form_entry_for_template(entry) for entry in raw_entries]
+    manual_entries = [entry for entry in prepared_entries if entry.get("entry_source") == "manual"][:80]
+    stats = get_dispo_form_stats(raw_entries)
+
+    return render_template(
+        "dispo_form.html",
+        current_user=user,
+        primary_role_name=primary_role_name,
+        dispo_form_submissions=prepared_entries,
+        dispo_manual_entries=manual_entries,
+        dispo_form_pending_count=stats["pending_count"],
+        dispo_form_total_documents=stats["total_documents"],
+        dispo_form_income_sum=format_money(stats["income_sum"], "EUR"),
+        dispo_form_damage_sum=format_money(stats["damage_sum"], "EUR"),
+        role_disposition_id=ROLE_DISPOSITION_ID,
+    )
+
+
+@app.route("/dispo/form/manual", methods=["POST"])
+def dispo_form_manual_submit():
+    permission_response = require_disposition_permission()
+    if permission_response:
+        return permission_response
+
+    submitter = current_dispo_form_submitter()
+    entry_type = normalize_dispo_form_entry_type(request.form.get("entry_type"))
+    reference = safe_str(request.form.get("reference"))[:160]
+    title = safe_str(request.form.get("title"))[:180]
+    description = safe_str(request.form.get("description"))[:2000]
+    tax_mode = safe_str(request.form.get("tax_mode"), "eifellog_internal")[:80]
+    amount_net, tax_rate, tax_amount, amount_gross = calculate_dispo_form_tax(
+        request.form.get("amount_net"),
+        request.form.get("tax_rate", 19),
+        tax_mode,
+    )
+
+    if len(reference) < 2 or len(title) < 2:
+        flash("Referenz und Titel müssen ausgefüllt sein.", "error")
+        return redirect(url_for("dispo_form"))
+
+    if amount_net <= 0:
+        flash("Bitte einen gültigen Netto-Betrag eintragen.", "error")
+        return redirect(url_for("dispo_form"))
+
+    now = now_utc()
+    entry_id = uuid.uuid4().hex
+    entry_doc = {
+        "entry_id": entry_id,
+        "entry_source": "manual",
+        "entry_type": entry_type,
+        "document_type": "manual_damage" if entry_type == "damage" else "manual_income",
+        "reference": reference,
+        "title": title,
+        "description": description,
+        "amount_net": amount_net,
+        "tax_rate": tax_rate,
+        "tax_amount": tax_amount,
+        "amount_gross": amount_gross,
+        "tax_mode": tax_mode,
+        "currency": "EUR",
+        "status": "pending",
+        "submitted_by": submitter,
+        "archived": False,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    dispo_form_entries_collection.insert_one(entry_doc)
+    dispo_messages_collection.insert_one({
+        "message_id": uuid.uuid4().hex,
+        "title": "Neue manuelle Dispo-Erfassung",
+        "content": f"{submitter.get('display_name')} hat {title} für {reference} eingereicht.",
+        "priority": "high" if entry_type == "damage" else "normal",
+        "archived": False,
+        "created_at": now,
+        "created_by": submitter,
+        "dispo_form_entry_id": entry_id,
+    })
+
+    flash("Erfassung wurde gespeichert und ist für die Disposition sichtbar.", "success")
+    return redirect(url_for("dispo_form"))
+
+
+@app.route("/dispo/form/documents/upload", methods=["POST"])
+def dispo_form_documents_upload():
+    permission_response = require_disposition_permission()
+    if permission_response:
+        return permission_response
+
+    submitter = current_dispo_form_submitter()
+    document_type = safe_str(request.form.get("document_type"), "freight_papers")[:80]
+    reference = safe_str(request.form.get("reference"))[:160]
+    note = safe_str(request.form.get("note"))[:2000]
+    status = normalize_dispo_form_status(request.form.get("status"))
+    tax_mode = safe_str(request.form.get("tax_mode"), "eifellog_internal")[:80]
+    amount_net, tax_rate, tax_amount, amount_gross = calculate_dispo_form_tax(
+        request.form.get("amount_net"),
+        request.form.get("tax_rate", 19),
+        tax_mode,
+    )
+
+    if len(reference) < 2:
+        flash("Bitte eine Referenz zur Tour oder zum Auftrag eintragen.", "error")
+        return redirect(url_for("dispo_form"))
+
+    uploaded_files = request.files.getlist("documents")
+    uploaded_files = [file for file in uploaded_files if file and file.filename]
+
+    if not uploaded_files:
+        flash("Bitte mindestens einen Beleg oder ein Frachtpapier hochladen.", "error")
+        return redirect(url_for("dispo_form"))
+
+    entry_id = uuid.uuid4().hex
+
+    try:
+        saved_files = save_dispo_form_uploaded_files(entry_id, uploaded_files)
+    except ValueError as error:
+        flash(str(error), "error")
+        return redirect(url_for("dispo_form"))
+    except Exception as error:
+        print(f"Dispo-Form Upload fehlgeschlagen: {error}")
+        flash("Upload fehlgeschlagen. Bitte später erneut versuchen.", "error")
+        return redirect(url_for("dispo_form"))
+
+    if not saved_files:
+        flash("Es konnte keine gültige Datei gespeichert werden.", "error")
+        return redirect(url_for("dispo_form"))
+
+    now = now_utc()
+    entry_type = "damage" if document_type == "damage_receipt" else "income"
+    entry_doc = {
+        "entry_id": entry_id,
+        "entry_source": "document",
+        "entry_type": entry_type,
+        "document_type": document_type,
+        "reference": reference,
+        "title": dispo_form_document_type_label(document_type),
+        "note": note,
+        "amount_net": amount_net,
+        "tax_rate": tax_rate,
+        "tax_amount": tax_amount,
+        "amount_gross": amount_gross,
+        "tax_mode": tax_mode,
+        "currency": "EUR",
+        "status": status,
+        "files": saved_files,
+        "submitted_by": submitter,
+        "archived": False,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    dispo_form_entries_collection.insert_one(entry_doc)
+    dispo_messages_collection.insert_one({
+        "message_id": uuid.uuid4().hex,
+        "title": "Neue Frachtpapiere eingereicht",
+        "content": f"{submitter.get('display_name')} hat {len(saved_files)} Datei(en) für {reference} eingereicht.",
+        "priority": "high" if document_type == "damage_receipt" else "normal",
+        "archived": False,
+        "created_at": now,
+        "created_by": submitter,
+        "dispo_form_entry_id": entry_id,
+    })
+
+    flash("Beleg wurde hochgeladen und ist für die Disposition sichtbar.", "success")
+    return redirect(url_for("dispo_form"))
+
+
+@app.route("/dispo/form/file/<entry_id>/<filename>", methods=["GET"])
+def dispo_form_file_download(entry_id, filename):
+    permission_response = require_disposition_permission()
+    if permission_response:
+        return permission_response
+
+    entry_doc = dispo_form_entries_collection.find_one(dispo_form_entry_lookup_query(entry_id))
+    if not entry_doc or entry_doc.get("archived") is True:
+        abort(404)
+
+    filename = secure_filename(filename)
+    matched_file = None
+    for file_item in entry_doc.get("files") or []:
+        if secure_filename(file_item.get("stored_filename")) == filename:
+            matched_file = file_item
+            break
+
+    if not matched_file:
+        abort(404)
+
+    absolute_path = os.path.abspath(os.path.join(BASE_DIR, matched_file.get("relative_path", "")))
+    upload_root = os.path.abspath(resolve_dispo_form_upload_folder())
+
+    if not absolute_path.startswith(upload_root) or not os.path.exists(absolute_path):
+        abort(404)
+
+    return send_file(
+        absolute_path,
+        as_attachment=False,
+        download_name=matched_file.get("original_filename") or filename,
+    )
+
+
+@app.route("/dispo/form/<entry_id>/status", methods=["POST"])
+def dispo_form_update_status(entry_id):
+    permission_response = require_disposition_permission()
+    if permission_response:
+        return permission_response
+
+    data = request.get_json(silent=True) or request.form or {}
+    new_status = normalize_dispo_form_status(data.get("status"))
+    actor = current_dispo_form_submitter()
+
+    result = dispo_form_entries_collection.update_one(
+        {**dispo_form_entry_lookup_query(entry_id), "archived": {"$ne": True}},
+        {
+            "$set": {
+                "status": new_status,
+                "reviewed_by": actor,
+                "reviewed_at": now_utc(),
+                "updated_at": now_utc(),
+            }
+        }
+    )
+
+    if result.matched_count == 0:
+        if request.is_json:
+            return jsonify({"success": False, "message": "Eintrag wurde nicht gefunden."}), 404
+        flash("Eintrag wurde nicht gefunden.", "error")
+        return redirect(url_for("dispo_form"))
+
+    if request.is_json:
+        return jsonify({"success": True, "status": new_status})
+
+    flash("Status wurde aktualisiert.", "success")
+    return redirect(url_for("dispo_form"))
 
 
 # ==========================================
