@@ -77,6 +77,8 @@
                 <div class="flex flex-col gap-3 w-full lg:w-auto">
                     <a id="setup-download-btn"
                        href="#"
+                       target="_blank"
+                       rel="noopener noreferrer"
                        class="inline-flex items-center justify-center px-6 py-4 rounded-2xl bg-[var(--brand-green)]/10 border border-[var(--brand-green)]/50 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20 hover:-translate-y-0.5 transition-all text-xs font-orbitron uppercase tracking-widest shadow-[0_0_25px_rgba(137,190,50,0.08)] opacity-60 cursor-not-allowed"
                        aria-disabled="true">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -153,9 +155,9 @@
 
                 <button type="button"
                         class="doc-modal-trigger p-5 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-[var(--brand-yellow)]/60 hover:bg-white/[0.07] transition-all group text-left"
-                        data-title="nutzungsbedingunen.doc"
+                        data-title="nutzungsbedingungen.doc"
                         data-type="DOC"
-                        data-file="nutzungsbedingunen.doc"
+                        data-file="nutzungsbedingungen.doc"
                         data-content='
                             <p><strong>Nutzungsbedingungen</strong></p>
                             <p>Dieses Dokument beschreibt die grundlegenden Regeln für die Nutzung von EifelLog und den verantwortungsvollen Umgang mit dem System.</p>
@@ -175,7 +177,7 @@
 
                         <div class="min-w-0 flex-1">
                             <h3 class="font-orbitron font-bold text-sm text-white truncate">
-                                nutzungsbedingunen.doc
+                                nutzungsbedingungen.doc
                             </h3>
                             <p class="text-xs text-[var(--muted)] font-inter mt-1 leading-relaxed">
                                 Regeln und Bedingungen für die Nutzung.
@@ -320,7 +322,9 @@
         <div class="border-t border-white/10 p-6 md:p-8 pt-5 shrink-0 bg-black/20">
             <a id="doc-modal-download"
                href="#"
-               class="btn-primary w-full justify-center opacity-50 cursor-not-allowed"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="btn-primary w-full justify-center opacity-50 cursor-not-allowed flex items-center"
                aria-disabled="true">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
@@ -361,20 +365,17 @@
 
         const knownAssets = {
             'Frachtterminal.doc': null,
-            'nutzungsbedingunen.doc': null
+            'nutzungsbedingungen.doc': null
         };
 
         let latestVersion = 'Latest';
 
         function formatBytes(bytes) {
             if (!bytes || Number.isNaN(bytes)) return '-';
-
             const mb = bytes / (1024 * 1024);
-
             if (mb >= 1) {
                 return `${mb.toFixed(2)} MB`;
             }
-
             const kb = bytes / 1024;
             return `${kb.toFixed(1)} KB`;
         }
@@ -383,22 +384,14 @@
             if (!Array.isArray(assets)) return null;
 
             const setupKeywords = [
-                'setup',
-                'installer',
-                'install',
-                'eifellog',
-                'eifel-log',
-                'tracking',
-                'fahrer'
+                'setup', 'installer', 'install', 'eifellog', 'eifel-log', 'tracking', 'fahrer'
             ];
-
             const setupExtensions = ['.exe', '.msi', '.zip'];
 
             return assets.find(asset => {
                 const name = (asset.name || '').toLowerCase();
                 const hasSetupKeyword = setupKeywords.some(keyword => name.includes(keyword));
                 const hasSetupExtension = setupExtensions.some(extension => name.endsWith(extension));
-
                 return hasSetupExtension && hasSetupKeyword;
             }) || assets.find(asset => {
                 const name = (asset.name || '').toLowerCase();
@@ -480,7 +473,6 @@
             if (!response.ok) {
                 throw new Error('Kein Release gefunden');
             }
-
             return response.json();
         })
         .then(release => {
@@ -510,15 +502,18 @@
                 setSetupButtonUnavailable();
             }
 
+            // Flexiblere Namenssuche für Dokumente 
             assets.forEach(asset => {
-                if (asset.name === 'Frachtterminal.doc') {
+                const assetNameLower = (asset.name || '').toLowerCase();
+                
+                if (assetNameLower.includes('frachtterminal')) {
                     knownAssets['Frachtterminal.doc'] = asset;
                     docFrachtterminalVersion.textContent = `Version: ${latestVersion}`;
                     docFrachtterminalSize.textContent = `Größe: ${formatBytes(asset.size)}`;
                 }
 
-                if (asset.name === 'nutzungsbedingunen.doc') {
-                    knownAssets['nutzungsbedingunen.doc'] = asset;
+                if (assetNameLower.includes('nutzung')) {
+                    knownAssets['nutzungsbedingungen.doc'] = asset;
                     docNutzungVersion.textContent = `Version: ${latestVersion}`;
                     docNutzungSize.textContent = `Größe: ${formatBytes(asset.size)}`;
                 }
@@ -529,7 +524,7 @@
                 docFrachtterminalSize.textContent = 'Größe: Datei fehlt';
             }
 
-            if (!knownAssets['nutzungsbedingunen.doc']) {
+            if (!knownAssets['nutzungsbedingungen.doc']) {
                 docNutzungVersion.textContent = `Version: ${latestVersion}`;
                 docNutzungSize.textContent = 'Größe: Datei fehlt';
             }
@@ -568,7 +563,7 @@
                 docModalDownload.removeAttribute('aria-disabled');
                 docModalDownload.classList.remove('opacity-50', 'cursor-not-allowed');
                 docModalDownload.innerHTML = `
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"></path>
                     </svg>
                     Dokument herunterladen
@@ -579,7 +574,7 @@
                 docModalDownload.setAttribute('aria-disabled', 'true');
                 docModalDownload.classList.add('opacity-50', 'cursor-not-allowed');
                 docModalDownload.innerHTML = `
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z"></path>
                     </svg>
                     Dokument nicht verfügbar
