@@ -36,32 +36,97 @@
 {% set fahrer_token_value = fahrer_token_value|default('', true) %}
 {% set fahrer_token_created_at = fahrer_token_created_at|default('Heute', true) %}
 
-{# Live-Fahrerdaten aus main.py / Datenbank.
-   Übergib bevorzugt:
-   driver_stats = {
-       'total_km': 0, 'last_trip_distance': 0, 'balance': 0,
-       'completed_trips': 0, 'level': '-', 'xp': 0, 'level_progress': 0
-   }
-   fahrtenbuch_entries = [
-       {'date': '18.05.2026', 'route': 'A → B', 'distance': 120.5,
-        'cargo': 'Fracht', 'earnings': 450.0, 'status': 'Abgeschlossen'}
-   ]
-   driver_current_trip = {
-       'from_city': 'A', 'to_city': 'B', 'departure': '18:00',
-       'progress': 40, 'cargo': 'Fracht', 'expected_earnings': 450.0
-   }
+{# Live-Fahrerdaten direkt aus MongoDB:
+   Datenbank: eifellog_db
+   Collection: users
+
+   Priorität der Werte:
+   1. user_doc / user_data / db_user, falls main.py den User-Datensatz aus eifellog_db.users explizit übergibt
+   2. current_user, falls Flask-Login den Mongo-User direkt enthält
+   3. vorhandene Fallback-Variablen wie driver_stats, total_driven_km, kontostand usw.
+
+   Unterstützte Feldnamen in users:
+   - Gefahrene KM, gefahrene_km, gefahreneKM, gefahreneKilometer, total_driven_km, total_km, driven_km, km
+   - Kontostand, kontostand, balance, account_balance, konto, money
+   - Abgeschlossen, abgeschlossen, completed_trips, completedTrips, abgeschlossene_fahrten, touren_abgeschlossen
+   - Fahrer Level, fahrer_level, fahrerLevel, driver_level, level
 #}
 {% set driver_stats = driver_stats|default({}, true) %}
 {% set safe_fahrtenbuch_entries = fahrtenbuch_entries|default(driver_trips|default([], true), true) %}
 {% set driver_current_trip = driver_current_trip|default(current_trip|default({}, true), true) %}
 
-{% set driver_total_km = driver_stats.total_km|default(total_driven_km|default(driver_stats.last_trip_distance|default(last_trip_distance|default(0, true), true), true), true) %}
-{% set driver_last_trip_distance = driver_stats.last_trip_distance|default(last_trip_distance|default(0, true), true) %}
-{% set driver_account_balance = driver_stats.balance|default(account_balance|default(kontostand|default(0, true), true), true) %}
-{% set driver_completed_trips = driver_stats.completed_trips|default(completed_trips|default(abgeschlossen_trips|default(0, true), true), true) %}
-{% set driver_level_name = driver_stats.level|default(driver_level|default('-', true), true) %}
-{% set driver_xp_value = driver_stats.xp|default(driver_xp|default(0, true), true) %}
-{% set driver_level_progress = driver_stats.level_progress|default(driver_level_progress|default(0, true), true) %}
+{% set user_doc_context = user_doc|default(user_data|default(db_user|default({}, true), true), true) %}
+{% if user_doc_context is mapping %}
+    {% set user_db = user_doc_context %}
+{% elif current_user is mapping %}
+    {% set user_db = current_user %}
+{% else %}
+    {% set user_db = {} %}
+{% endif %}
+
+{# Exakte/alternative Mongo-Feldnamen aus eifellog_db.users lesen. #}
+{% set db_total_km = user_db.get('Gefahrene KM',
+    user_db.get('gefahrene_km',
+    user_db.get('gefahreneKM',
+    user_db.get('gefahreneKilometer',
+    user_db.get('total_driven_km',
+    user_db.get('total_km',
+    user_db.get('driven_km',
+    user_db.get('km', none)))))))) %}
+
+{% set db_last_trip_distance = user_db.get('Letzte Fahrt KM',
+    user_db.get('letzte_fahrt_km',
+    user_db.get('last_trip_distance',
+    user_db.get('lastTripDistance', none)))) %}
+
+{% set db_account_balance = user_db.get('Kontostand',
+    user_db.get('kontostand',
+    user_db.get('balance',
+    user_db.get('account_balance',
+    user_db.get('konto',
+    user_db.get('money', none)))))) %}
+
+{% set db_completed_trips = user_db.get('Abgeschlossen',
+    user_db.get('abgeschlossen',
+    user_db.get('completed_trips',
+    user_db.get('completedTrips',
+    user_db.get('abgeschlossene_fahrten',
+    user_db.get('touren_abgeschlossen', none)))))) %}
+
+{% set db_level_name = user_db.get('Fahrer Level',
+    user_db.get('fahrer_level',
+    user_db.get('fahrerLevel',
+    user_db.get('driver_level',
+    user_db.get('level', none))))) %}
+
+{% set db_xp_value = user_db.get('Fahrer XP',
+    user_db.get('fahrer_xp',
+    user_db.get('driver_xp',
+    user_db.get('xp', none)))) %}
+
+{% set db_level_progress = user_db.get('Level Fortschritt',
+    user_db.get('level_fortschritt',
+    user_db.get('fahrer_level_progress',
+    user_db.get('driver_level_progress',
+    user_db.get('level_progress', none))))) %}
+
+{# Attribute-Fallback, falls current_user kein Mapping ist, sondern ein User-Objekt. #}
+{% set attr_total_km = current_user.gefahrene_km|default(current_user.gefahreneKM|default(current_user.gefahreneKilometer|default(current_user.total_driven_km|default(current_user.total_km|default(current_user.driven_km|default(current_user.km|default(none), true), true), true), true), true), true) %}
+{% set attr_last_trip_distance = current_user.letzte_fahrt_km|default(current_user.last_trip_distance|default(current_user.lastTripDistance|default(none), true), true) %}
+{% set attr_account_balance = current_user.kontostand|default(current_user.balance|default(current_user.account_balance|default(current_user.konto|default(current_user.money|default(none), true), true), true), true) %}
+{% set attr_completed_trips = current_user.abgeschlossen|default(current_user.completed_trips|default(current_user.completedTrips|default(current_user.abgeschlossene_fahrten|default(current_user.touren_abgeschlossen|default(none), true), true), true), true) %}
+{% set attr_level_name = current_user.fahrer_level|default(current_user.fahrerLevel|default(current_user.driver_level|default(current_user.level|default(none), true), true), true) %}
+{% set attr_xp_value = current_user.fahrer_xp|default(current_user.driver_xp|default(current_user.xp|default(none), true), true) %}
+{% set attr_level_progress = current_user.level_fortschritt|default(current_user.fahrer_level_progress|default(current_user.driver_level_progress|default(current_user.level_progress|default(none), true), true), true) %}
+
+{# Finale Dashboard-Werte: zuerst users-Collection/current_user, danach bisherige Fallbacks. #}
+{% set driver_total_km = db_total_km if db_total_km is not none else (attr_total_km if attr_total_km is not none else driver_stats.total_km|default(total_driven_km|default(driver_stats.last_trip_distance|default(last_trip_distance|default(0, true), true), true), true)) %}
+{% set driver_last_trip_distance = db_last_trip_distance if db_last_trip_distance is not none else (attr_last_trip_distance if attr_last_trip_distance is not none else driver_stats.last_trip_distance|default(last_trip_distance|default(0, true), true)) %}
+{% set driver_account_balance = db_account_balance if db_account_balance is not none else (attr_account_balance if attr_account_balance is not none else driver_stats.balance|default(account_balance|default(kontostand|default(0, true), true), true)) %}
+{% set driver_completed_trips = db_completed_trips if db_completed_trips is not none else (attr_completed_trips if attr_completed_trips is not none else driver_stats.completed_trips|default(completed_trips|default(abgeschlossen_trips|default(0, true), true), true)) %}
+{% set driver_level_name = db_level_name if db_level_name is not none else (attr_level_name if attr_level_name is not none else driver_stats.level|default(driver_level|default('-', true), true)) %}
+{% set driver_xp_value = db_xp_value if db_xp_value is not none else (attr_xp_value if attr_xp_value is not none else driver_stats.xp|default(driver_xp|default(0, true), true)) %}
+{% set driver_level_progress = db_level_progress if db_level_progress is not none else (attr_level_progress if attr_level_progress is not none else driver_stats.level_progress|default(driver_level_progress|default(0, true), true)) %}
 
 {% set current_trip_from = driver_current_trip.from_city|default(driver_current_trip.start|default(driver_current_trip.origin|default('-', true), true), true) %}
 {% set current_trip_to = driver_current_trip.to_city|default(driver_current_trip.destination|default(driver_current_trip.target|default('-', true), true), true) %}
