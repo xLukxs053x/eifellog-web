@@ -9948,6 +9948,645 @@ def write_simple_pdf_file(title, lines, filename_prefix):
     return filename, relative_path, make_external_url(url_for("static", filename=relative_path.replace("static/", "", 1)))
 
 
+
+def driver_card_minutes_from_ms(value):
+    """Wandelt Tracker-Millisekunden robust in Minuten um."""
+    try:
+        milliseconds = tracker_ms(value, 0) if "tracker_ms" in globals() else int(float(value or 0))
+    except Exception:
+        milliseconds = 0
+    return max(0, int(round(milliseconds / 60000)))
+
+
+def driver_card_minutes_display(minutes):
+    """Zeigt Minuten mit Stunden-Zusatz an, damit der PDF-Beleg schnell lesbar bleibt."""
+    try:
+        minutes = max(0, int(round(float(minutes or 0))))
+    except Exception:
+        minutes = 0
+    hours, mins = divmod(minutes, 60)
+    if hours and mins:
+        return f"{minutes} Min ({hours}h {mins}m)"
+    if hours:
+        return f"{minutes} Min ({hours}h)"
+    return f"{minutes} Min"
+
+
+def driver_card_ms_display(value):
+    return driver_card_minutes_display(driver_card_minutes_from_ms(value))
+
+
+def driver_card_row_status_max(value_min, limit_min, warn_ratio=0.9):
+    value_min = int(value_min or 0)
+    limit_min = int(limit_min or 0)
+    if limit_min <= 0:
+        return "info", "Kein Limit", "Keine Grenze hinterlegt"
+    if value_min > limit_min:
+        return "violation", f"Überzogen um {value_min - limit_min} Min", "Überzogen"
+    if value_min == limit_min:
+        return "warning", "Grenze erreicht", "Erreicht"
+    if value_min >= int(limit_min * warn_ratio):
+        return "warning", f"Noch {limit_min - value_min} Min frei", "Kurz vor Limit"
+    return "ok", f"Noch {limit_min - value_min} Min frei", "OK"
+
+
+def driver_card_row_status_min(value_min, required_min, required_now=True, label_ok="Erfüllt"):
+    value_min = int(value_min or 0)
+    required_min = int(required_min or 0)
+    if required_min <= 0:
+        return "info", "Kein Sollwert", "Info"
+    if not required_now:
+        return "info", "Noch nicht fällig", "Info"
+    if value_min >= required_min:
+        return "ok", f"{value_min - required_min} Min über Soll", label_ok
+    return "violation", f"Fehlt {required_min - value_min} Min", "Nicht erfüllt"
+
+
+def driver_card_status_rank(status):
+    return {"violation": 3, "warning": 2, "unknown": 2, "info": 1, "ok": 0}.get(safe_str(status).lower(), 1)
+
+
+def build_driver_card_lenk_ruhe_audit(user_doc, card_doc=None):
+    """
+    Baut eine prüfbare Minuten-Aufgliederung für Lenkzeit, Pause und Ruhezeit.
+    Die Werte kommen aus tracker_work_sessions / tracker_work_session und werden
+    bewusst in Minuten ausgegeben, damit HR/Personal die Prüfung sofort sehen kann.
+    """
+    user_doc = user_doc or {}
+    card_doc = card_doc or {}
+
+    session_doc = None
+    try:
+        session_doc = tracker_get_latest_work_session_doc(user_doc) if "tracker_get_latest_work_session_doc" in globals() else None
+    except Exception:
+        session_doc = None
+
+    source_label = "Keine Tracker-Session"
+    session_updated_at = ""
+    if session_doc:
+        work_session = tracker_prepare_work_session_payload(session_doc) if "tracker_prepare_work_session_payload" in globals() else (session_doc.get("work_session") or {})
+        source_label = "tracker_work_sessions"
+        session_updated_at = format_driver_card_datetime_for_personalabteilung(session_doc.get("updated_at") or session_doc.get("created_at"), "")
+    else:
+        raw_session = (
+            user_doc.get("tracker_work_session")
+            or card_doc.get("work_session")
+            or card_doc.get("tracker_work_session")
+            or {}
+        )
+        if raw_session:
+            work_session = tracker_prepare_work_session_payload(raw_session) if "tracker_prepare_work_session_payload" in globals() else raw_session
+            source_label = "gespeicherter Tracker-Snapshot"
+            session_updated_at = (
+                format_driver_card_datetime_for_personalabteilung(user_doc.get("tracker_work_session_updated_at"), "")
+                or format_driver_card_datetime_for_personalabteilung(card_doc.get("updated_at"), "")
+            )
+        else:
+            work_session = tracker_default_work_session() if "tracker_default_work_session" in globals() else {}
+
+    work_status = safe_str(work_session.get("status"), "offDuty")
+    work_status_label = {
+        "working": "Arbeitszeit aktiv",
+        "pause": "Pause aktiv",
+        "offDuty": "Ruhezeit / außer Dienst",
+    }.get(work_status, "Status unbekannt")
+
+    try:
+        validation = tracker_validate_job_requirements(user_doc, card_doc, work_session) if "tracker_validate_job_requirements" in globals() else {"allowed": True, "issues": [], "limits": {}}
+    except Exception as error:
+        validation = {"allowed": False, "issues": [f"Tracker-Prüfung konnte nicht vollständig ausgeführt werden: {error}"], "limits": {}}
+
+    limits = validation.get("limits") or {}
+    daily_drive_limit_min = driver_card_minutes_from_ms(limits.get("dailyDriveMs") or 8 * 60 * 60 * 1000)
+    continuous_drive_limit_min = driver_card_minutes_from_ms(limits.get("continuousDriveMs") or int(4.5 * 60 * 60 * 1000))
+    daily_rest_min = driver_card_minutes_from_ms(limits.get("dailyRestMs") or 11 * 60 * 60 * 1000)
+    reduced_daily_rest_min = driver_card_minutes_from_ms(limits.get("reducedDailyRestMs") or 9 * 60 * 60 * 1000)
+    weekly_rest_min = driver_card_minutes_from_ms(limits.get("weeklyRestMs") or 45 * 60 * 60 * 1000)
+
+    drive_min = driver_card_minutes_from_ms(work_session.get("driveMs"))
+    continuous_drive_min = driver_card_minutes_from_ms(work_session.get("continuousDriveMs"))
+    break_min = driver_card_minutes_from_ms(work_session.get("breakMs"))
+    current_break_min = driver_card_minutes_from_ms(work_session.get("currentBreakMs"))
+    effective_break_min = driver_card_minutes_from_ms(validation.get("effectiveBreakMs"))
+    rest_min = driver_card_minutes_from_ms(work_session.get("restMs"))
+    weekly_rest_value_min = driver_card_minutes_from_ms(work_session.get("weeklyRestMs"))
+    work_min = driver_card_minutes_from_ms(work_session.get("workMs"))
+    split_break_first_min = driver_card_minutes_from_ms(work_session.get("splitBreakFirstMs"))
+    reduced_daily_rest_used = driver_card_minutes_from_ms(work_session.get("reducedDailyRestUsed"))
+    weekly_rest_due = bool(work_session.get("weeklyRestDue", False))
+
+    if effective_break_min <= 0:
+        effective_break_min = max(break_min, current_break_min, split_break_first_min)
+
+    rows = []
+
+    def add_row(category, value_min, rule_text, diff_text, evaluation, status, details=""):
+        rows.append({
+            "category": category,
+            "value_min": int(value_min or 0),
+            "value_display": driver_card_minutes_display(value_min),
+            "rule": rule_text,
+            "difference": diff_text,
+            "evaluation": evaluation,
+            "status": status,
+            "details": details,
+        })
+
+    status, diff, eval_label = driver_card_row_status_max(drive_min, daily_drive_limit_min)
+    add_row(
+        "Tageslenkzeit",
+        drive_min,
+        f"max. {driver_card_minutes_display(daily_drive_limit_min)}",
+        diff,
+        eval_label,
+        status,
+        "Gesamte Lenkzeit im aktuellen Tages-/Schichtfenster."
+    )
+
+    status, diff, eval_label = driver_card_row_status_max(continuous_drive_min, continuous_drive_limit_min)
+    add_row(
+        "Lenkzeit am Stück",
+        continuous_drive_min,
+        f"max. {driver_card_minutes_display(continuous_drive_limit_min)} vor Pflichtpause",
+        diff,
+        eval_label,
+        status,
+        "Lenkzeit seit der letzten wirksamen Pause."
+    )
+
+    pause_required_now = continuous_drive_min >= continuous_drive_limit_min
+    status, diff, eval_label = driver_card_row_status_min(
+        effective_break_min,
+        45,
+        required_now=pause_required_now,
+        label_ok="Pause erfüllt",
+    )
+    add_row(
+        "Pause wirksam",
+        effective_break_min,
+        "mind. 45 Min nach 4,5h Lenkzeit; auch 15 + 30 Min möglich",
+        diff,
+        eval_label,
+        status,
+        f"Pause gesamt: {break_min} Min, aktuelle Pause: {current_break_min} Min, Split-Pause 1: {split_break_first_min} Min."
+    )
+
+    daily_rest_required_now = work_status == "working" and bool(work_session.get("lastShiftEndedAt"))
+    status, diff, eval_label = driver_card_row_status_min(
+        rest_min,
+        daily_rest_min,
+        required_now=daily_rest_required_now,
+        label_ok="Ruhezeit erfüllt",
+    )
+    if not daily_rest_required_now and rest_min >= daily_rest_min:
+        status, diff, eval_label = "ok", f"{rest_min - daily_rest_min} Min über Soll", "Ruhezeit erfüllt"
+    add_row(
+        "Tägliche Ruhezeit",
+        rest_min,
+        f"mind. {driver_card_minutes_display(daily_rest_min)} regulär",
+        diff,
+        eval_label,
+        status,
+        f"Reduzierte tägliche Ruhezeit möglich ab {reduced_daily_rest_min} Min; Zähler reduziert genutzt: {reduced_daily_rest_used}."
+    )
+
+    reduced_required_now = daily_rest_required_now and rest_min < daily_rest_min
+    status, diff, eval_label = driver_card_row_status_min(
+        rest_min,
+        reduced_daily_rest_min,
+        required_now=reduced_required_now,
+        label_ok="Reduzierte Ruhezeit erfüllt",
+    )
+    add_row(
+        "Reduzierte Ruhezeit",
+        rest_min,
+        f"mind. {driver_card_minutes_display(reduced_daily_rest_min)} nur zulässig begrenzt",
+        diff,
+        eval_label,
+        status,
+        "Kontrollwert für die 9-Stunden-Ausnahme."
+    )
+
+    status, diff, eval_label = driver_card_row_status_min(
+        weekly_rest_value_min,
+        weekly_rest_min,
+        required_now=weekly_rest_due,
+        label_ok="Wochenruhe erfüllt",
+    )
+    add_row(
+        "Wöchentliche Ruhezeit",
+        weekly_rest_value_min,
+        f"mind. {driver_card_minutes_display(weekly_rest_min)} wenn fällig",
+        diff,
+        eval_label,
+        status,
+        "Nur als Verstoß markiert, wenn weeklyRestDue in der Tracker-Session gesetzt ist."
+    )
+
+    add_row(
+        "Arbeitszeit gesamt",
+        work_min,
+        "Informationswert",
+        "-",
+        work_status_label,
+        "info",
+        "Kein Grenzwert; dient der Transparenz im Beleg."
+    )
+
+    issues = [safe_str(item) for item in validation.get("issues", []) if safe_str(item)]
+    # Der PA-Beleg darf Ruhe/Pause/offDuty sauber anzeigen, ohne eine beendete Arbeitszeit pauschal als Verstoß zu führen.
+    issues = [item for item in issues if item.lower() != "arbeitszeit ist nicht aktiv."]
+
+    worst_status = "ok"
+    for row in rows:
+        if driver_card_status_rank(row.get("status")) > driver_card_status_rank(worst_status):
+            worst_status = row.get("status")
+
+    severe_keywords = ("nicht erfüllt", "muss", "erreicht", "fehlt", "gesperrt", "blocked", "überzogen")
+    has_severe_issue = any(any(keyword in item.lower() for keyword in severe_keywords) for item in issues)
+    if has_severe_issue:
+        worst_status = "violation" if driver_card_status_rank(worst_status) < 3 else worst_status
+    elif issues and worst_status == "ok":
+        worst_status = "warning"
+
+    ok_count = sum(1 for row in rows if row.get("status") == "ok")
+    warning_count = sum(1 for row in rows if row.get("status") == "warning")
+    violation_count = sum(1 for row in rows if row.get("status") == "violation")
+
+    if worst_status == "violation":
+        label = "Überziehung / Verstoß erkannt"
+    elif worst_status == "warning":
+        label = "Prüfung erforderlich"
+    elif worst_status == "unknown":
+        label = "Datenbasis unklar"
+    else:
+        label = "Lenk-/Ruhezeiten eingehalten"
+
+    summary = (
+        f"{work_status_label}; Lenkzeit {drive_min} Min, Lenkzeit am Stück {continuous_drive_min} Min, "
+        f"Pause wirksam {effective_break_min} Min, Ruhezeit {rest_min} Min."
+    )
+    if issues:
+        summary += " Hinweise: " + "; ".join(issues[:4])
+    elif worst_status == "ok":
+        summary += " Keine gespeicherten Auffälligkeiten."
+
+    return {
+        "status": worst_status,
+        "label": label,
+        "summary": summary,
+        "rows": rows,
+        "issues": issues,
+        "source": source_label,
+        "work_status": work_status,
+        "work_status_label": work_status_label,
+        "session_updated_at": session_updated_at,
+        "work_session": work_session,
+        "counts": {
+            "ok": ok_count,
+            "warning": warning_count,
+            "violation": violation_count,
+            "total": len(rows),
+        },
+        "limits_min": {
+            "daily_drive": daily_drive_limit_min,
+            "continuous_drive": continuous_drive_limit_min,
+            "daily_rest": daily_rest_min,
+            "reduced_daily_rest": reduced_daily_rest_min,
+            "weekly_rest": weekly_rest_min,
+        },
+        "minutes": {
+            "drive": drive_min,
+            "continuous_drive": continuous_drive_min,
+            "break": break_min,
+            "current_break": current_break_min,
+            "effective_break": effective_break_min,
+            "rest": rest_min,
+            "weekly_rest": weekly_rest_value_min,
+            "work": work_min,
+        },
+    }
+
+
+def driver_card_pdf_status_hex(status):
+    status = safe_str(status).lower()
+    if status == "ok":
+        return "#dff7e8", "#127a3a", "OK"
+    if status == "warning":
+        return "#fff3cd", "#946200", "WARNUNG"
+    if status == "violation":
+        return "#fde2e1", "#b42318", "ÜBERZOGEN"
+    if status == "unknown":
+        return "#e8eef7", "#17345f", "UNKLAR"
+    return "#eef2f7", "#475467", "INFO"
+
+
+def build_driver_card_pdf_fallback_lines(title, reference, meta, audit, note):
+    lines = [
+        f"Referenz: {reference}",
+        f"Erstellt am: {format_datetime_for_template(now_utc())}",
+        "",
+        "Fahrer / Fahrerkarte",
+    ]
+    for key, value in meta:
+        lines.append(f"{key}: {value}")
+    lines.extend([
+        "",
+        "Minuten-Aufgliederung Lenkzeit / Pause / Ruhezeit",
+        "Bereich | Ist-Minuten | Soll/Grenze | Differenz | Bewertung",
+    ])
+    for row in audit.get("rows", []):
+        lines.append(
+            f"{row.get('category')}: {row.get('value_min')} Min | {row.get('rule')} | {row.get('difference')} | {row.get('evaluation')}"
+        )
+    lines.extend([
+        "",
+        f"Gesamtstatus: {audit.get('label')}",
+        f"Zusammenfassung: {audit.get('summary')}",
+    ])
+    if audit.get("issues"):
+        lines.append("")
+        lines.append("Hinweise / Verstöße")
+        lines.extend([f"- {issue}" for issue in audit.get("issues", [])])
+    lines.extend(["", "Interner Hinweis", safe_str(note) or "Kein interner Hinweis angegeben."])
+    return lines
+
+
+def write_driver_card_beleg_pdf_file(title, reference, meta, audit, note, filename_prefix):
+    """Erzeugt den schön gestalteten Fahrerkarten-/Lenkzeiten-PDF-Beleg mit farbiger Minutenprüfung."""
+    os.makedirs(os.path.join(BASE_DIR, FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER), exist_ok=True)
+    filename = f"{filename_prefix}_{now_utc().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.pdf"
+    relative_path = os.path.join(FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER, filename).replace("\\", "/")
+    absolute_path = os.path.join(BASE_DIR, relative_path)
+
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.colors import HexColor
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=16 * mm,
+            leftMargin=16 * mm,
+            topMargin=14 * mm,
+            bottomMargin=14 * mm,
+            title=title,
+            author="EifelLog",
+        )
+
+        styles = getSampleStyleSheet()
+        styles.add(ParagraphStyle(
+            name="EifelTitle",
+            parent=styles["Title"],
+            fontName="Helvetica-Bold",
+            fontSize=20,
+            leading=24,
+            textColor=colors.white,
+            alignment=TA_LEFT,
+            spaceAfter=4,
+        ))
+        styles.add(ParagraphStyle(
+            name="EifelSubtitle",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=9,
+            leading=12,
+            textColor=HexColor("#d7e7ff"),
+            alignment=TA_LEFT,
+        ))
+        styles.add(ParagraphStyle(
+            name="SectionTitle",
+            parent=styles["Heading2"],
+            fontName="Helvetica-Bold",
+            fontSize=12,
+            leading=15,
+            textColor=HexColor("#17345f"),
+            spaceBefore=8,
+            spaceAfter=5,
+        ))
+        styles.add(ParagraphStyle(
+            name="Small",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8,
+            leading=10,
+            textColor=HexColor("#344054"),
+        ))
+        styles.add(ParagraphStyle(
+            name="SmallBold",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=8,
+            leading=10,
+            textColor=HexColor("#17345f"),
+        ))
+        styles.add(ParagraphStyle(
+            name="Cell",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=7.5,
+            leading=9,
+            textColor=HexColor("#101828"),
+        ))
+        styles.add(ParagraphStyle(
+            name="CellBold",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=7.5,
+            leading=9,
+            textColor=HexColor("#101828"),
+        ))
+        styles.add(ParagraphStyle(
+            name="Badge",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=8,
+            leading=10,
+            alignment=TA_CENTER,
+            textColor=colors.white,
+        ))
+
+        def p(text, style="Small"):
+            return Paragraph(safe_str(text).replace("\n", "<br/>"), styles[style])
+
+        def page_footer(canvas, pdf_doc):
+            canvas.saveState()
+            canvas.setStrokeColor(HexColor("#d0d5dd"))
+            canvas.setLineWidth(0.5)
+            canvas.line(16 * mm, 12 * mm, A4[0] - 16 * mm, 12 * mm)
+            canvas.setFont("Helvetica", 7)
+            canvas.setFillColor(HexColor("#667085"))
+            canvas.drawString(16 * mm, 8 * mm, f"EifelLog Fahrerkarten-Daten Beleg • {reference}")
+            canvas.drawRightString(A4[0] - 16 * mm, 8 * mm, f"Seite {pdf_doc.page}")
+            canvas.restoreState()
+
+        story = []
+
+        overall_bg, overall_fg, overall_badge = driver_card_pdf_status_hex(audit.get("status"))
+        header = Table(
+            [[
+                [p(title, "EifelTitle"), p(f"Referenz: {reference}  •  Erstellt: {format_datetime_for_template(now_utc())}", "EifelSubtitle")],
+                p(overall_badge, "Badge"),
+            ]],
+            colWidths=[132 * mm, 32 * mm],
+            rowHeights=[24 * mm],
+        )
+        header.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#17345f")),
+            ("BACKGROUND", (1, 0), (1, 0), HexColor(overall_fg)),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("BOX", (0, 0), (-1, -1), 0.6, HexColor("#0b1f3a")),
+        ]))
+        story.append(header)
+        story.append(Spacer(1, 8))
+
+        story.append(p("Fahrer / Fahrerkarte", "SectionTitle"))
+        meta_rows = []
+        for index in range(0, len(meta), 2):
+            left = meta[index]
+            right = meta[index + 1] if index + 1 < len(meta) else ("", "")
+            meta_rows.append([
+                p(left[0], "SmallBold"), p(left[1], "Small"),
+                p(right[0], "SmallBold"), p(right[1], "Small"),
+            ])
+        meta_table = Table(meta_rows, colWidths=[28 * mm, 54 * mm, 28 * mm, 54 * mm])
+        meta_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#f8fbff")),
+            ("GRID", (0, 0), (-1, -1), 0.35, HexColor("#d0d5dd")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(meta_table)
+        story.append(Spacer(1, 7))
+
+        story.append(p("Schnellübersicht in Minuten", "SectionTitle"))
+        m = audit.get("minutes", {})
+        cards = [
+            ("Lenkzeit", driver_card_minutes_display(m.get("drive")), "Tageswert"),
+            ("Am Stück", driver_card_minutes_display(m.get("continuous_drive")), "bis Pflichtpause"),
+            ("Pause", driver_card_minutes_display(m.get("effective_break")), "wirksam"),
+            ("Ruhezeit", driver_card_minutes_display(m.get("rest")), "täglich"),
+        ]
+        card_table = Table(
+            [[p(label, "SmallBold"), p(value, "SmallBold"), p(subtitle, "Small")] for label, value, subtitle in cards],
+            colWidths=[32 * mm, 54 * mm, 78 * mm],
+        )
+        card_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#f2f6fc")),
+            ("GRID", (0, 0), (-1, -1), 0.35, HexColor("#c5d5e8")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(card_table)
+        story.append(Spacer(1, 7))
+
+        story.append(p("Detailprüfung: Lenkzeit, Pause und Ruhezeit", "SectionTitle"))
+        table_data = [[
+            p("Bereich", "CellBold"),
+            p("Ist-Minuten", "CellBold"),
+            p("Soll / Grenze", "CellBold"),
+            p("Differenz", "CellBold"),
+            p("Bewertung", "CellBold"),
+        ]]
+        row_statuses = []
+        for row in audit.get("rows", []):
+            table_data.append([
+                p(row.get("category"), "CellBold"),
+                p(row.get("value_display"), "Cell"),
+                p(row.get("rule"), "Cell"),
+                p(row.get("difference"), "Cell"),
+                p(row.get("evaluation"), "CellBold"),
+            ])
+            row_statuses.append(row.get("status"))
+
+        audit_table = Table(table_data, colWidths=[34 * mm, 28 * mm, 48 * mm, 28 * mm, 26 * mm], repeatRows=1)
+        table_style = [
+            ("BACKGROUND", (0, 0), (-1, 0), HexColor("#17345f")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -1), 0.35, HexColor("#d0d5dd")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]
+        for index, status in enumerate(row_statuses, start=1):
+            bg, fg, _ = driver_card_pdf_status_hex(status)
+            table_style.append(("BACKGROUND", (0, index), (-1, index), HexColor(bg)))
+            table_style.append(("TEXTCOLOR", (0, index), (-1, index), HexColor("#101828")))
+            table_style.append(("LINEBEFORE", (0, index), (0, index), 3, HexColor(fg)))
+        audit_table.setStyle(TableStyle(table_style))
+        story.append(audit_table)
+
+        detail_lines = [row.get("details") for row in audit.get("rows", []) if safe_str(row.get("details"))]
+        if detail_lines:
+            story.append(Spacer(1, 6))
+            story.append(p("Detailhinweise", "SectionTitle"))
+            for detail in detail_lines[:8]:
+                story.append(p(f"• {detail}", "Small"))
+
+        story.append(Spacer(1, 7))
+        story.append(p("Gesamtbewertung", "SectionTitle"))
+        summary_table = Table(
+            [[
+                p("Status", "SmallBold"),
+                p(audit.get("label"), "SmallBold"),
+            ], [
+                p("Zusammenfassung", "SmallBold"),
+                p(audit.get("summary"), "Small"),
+            ]],
+            colWidths=[34 * mm, 130 * mm],
+        )
+        summary_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor(overall_bg)),
+            ("GRID", (0, 0), (-1, -1), 0.35, HexColor("#d0d5dd")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(summary_table)
+
+        if audit.get("issues"):
+            story.append(Spacer(1, 7))
+            story.append(p("Markierte Hinweise / Verstöße", "SectionTitle"))
+            for issue in audit.get("issues", [])[:8]:
+                story.append(p(f"• {issue}", "Small"))
+
+        story.append(Spacer(1, 7))
+        story.append(p("Interner Hinweis", "SectionTitle"))
+        story.append(p(safe_str(note) or "Kein interner Hinweis angegeben.", "Small"))
+        story.append(Spacer(1, 7))
+        story.append(p("Technischer Nachweis", "SectionTitle"))
+        story.append(p("Dieser PDF-Beleg wurde serverseitig aus den gespeicherten EifelLog-Daten erzeugt. Datenbasis: users, tracker_driver_cards, tracker_work_sessions und ServiceCenter-Fahrerkarte.", "Small"))
+
+        doc.build(story, onFirstPage=page_footer, onLaterPages=page_footer)
+        pdf_bytes = buffer.getvalue()
+        with open(absolute_path, "wb") as file:
+            file.write(pdf_bytes)
+
+        return filename, relative_path, make_external_url(url_for("static", filename=relative_path.replace("static/", "", 1)))
+
+    except Exception as error:
+        app.logger.exception("Gestalteter Fahrerkarten-PDF-Beleg konnte nicht erzeugt werden, nutze Fallback.")
+        fallback_lines = build_driver_card_pdf_fallback_lines(title, reference, meta, audit, note)
+        return write_simple_pdf_file(title, fallback_lines, filename_prefix)
+
 def create_driver_card_beleg(user_doc, card_doc, document_type="driver_card_data_pdf", date_from="", date_to="", note=""):
     user_doc = user_doc or {}
     card_doc = refresh_driver_card_snapshot_for_personalabteilung(user_doc, card_doc) if card_doc else None
@@ -9963,9 +10602,10 @@ def create_driver_card_beleg(user_doc, card_doc, document_type="driver_card_data
     period = f"{safe_str(date_from, 'nicht gesetzt')} bis {safe_str(date_to, 'nicht gesetzt')}"
 
     compliance = resolve_driver_card_compliance_for_personalabteilung(user_doc, card_doc if card_doc else None)
-    compliance_status = compliance["status"]
-    compliance_label = compliance["label"]
-    compliance_summary = compliance["summary"]
+    audit = build_driver_card_lenk_ruhe_audit(user_doc, card_doc if card_doc else None)
+    compliance_status = safe_str(audit.get("status") or compliance["status"], "unknown").lower()
+    compliance_label = safe_str(audit.get("label") or compliance["label"])
+    compliance_summary = safe_str(audit.get("summary") or compliance["summary"])
     last_query = (
         format_driver_card_datetime_for_personalabteilung(card_doc.get("last_query_at"), "")
         or format_driver_card_datetime_for_personalabteilung(card_doc.get("updated_at"), "")
@@ -9974,38 +10614,30 @@ def create_driver_card_beleg(user_doc, card_doc, document_type="driver_card_data
     )
     card_status = normalize_driver_card_db_status(card_doc.get("status"), "Nicht hinterlegt" if not card_doc else "Aktiv")
 
-    lines = [
-        f"Referenz: {reference}",
-        f"Erstellt am: {format_datetime_for_template(now_utc())}",
-        "",
-        "Fahrer",
-        f"Name: {driver_name}",
-        f"Username: {username}",
-        f"Discord-ID: {safe_str(user_doc.get('discord_id'))}",
-        f"Aktenzeichen: {aktenzeichen}",
-        f"Karten-ID: {card_id}",
-        f"Karten-Status: {card_status}",
-        f"Letzte Abfrage: {last_query}",
-        "",
-        "Zeitraum",
-        f"Von/Bis: {period}",
-        "",
-        "Lenk-/Ruhezeiten und Status",
-        f"Status: {compliance_label}",
-        f"Status-Code: {compliance_status}",
-        f"Zusammenfassung: {compliance_summary}",
-        f"Tracker-Status: {compliance.get('work_status_label') or '-'}",
-        f"Tracker-Session aktualisiert: {compliance.get('session_updated_at') or '-'}",
-        "",
-        "Hinweis",
-        safe_str(note) or "Kein interner Hinweis angegeben.",
-        "",
-        "Technischer Nachweis",
-        "Dieser PDF-Beleg wurde serverseitig aus den gespeicherten EifelLog-Daten erzeugt.",
-        "Datenbasis: users, tracker_driver_cards, tracker_work_sessions und ServiceCenter-Fahrerkarte.",
+    meta = [
+        ("Name", driver_name),
+        ("Username", username),
+        ("Discord-ID", safe_str(user_doc.get("discord_id")) or "-"),
+        ("Aktenzeichen", aktenzeichen),
+        ("Karten-ID", card_id),
+        ("Karten-Status", card_status),
+        ("Zeitraum", period),
+        ("Letzte Abfrage", last_query),
+        ("Tracker-Status", audit.get("work_status_label") or compliance.get("work_status_label") or "-"),
+        ("Session aktualisiert", audit.get("session_updated_at") or compliance.get("session_updated_at") or "-"),
+        ("Datenquelle", audit.get("source") or "EifelLog Datenbank"),
+        ("Dokumenttyp", "Lenk-/Ruhezeiten Prüfung" if is_compliance else "Fahrerkarten-Daten"),
     ]
+
     prefix = "lenk_ruhezeiten" if is_compliance else "fahrerkarte_daten"
-    filename, relative_path, download_url = write_simple_pdf_file(title, lines, prefix)
+    filename, relative_path, download_url = write_driver_card_beleg_pdf_file(
+        title=title,
+        reference=reference,
+        meta=meta,
+        audit=audit,
+        note=note,
+        filename_prefix=prefix,
+    )
 
     now = now_utc()
     report_doc = {
@@ -10028,9 +10660,14 @@ def create_driver_card_beleg(user_doc, card_doc, document_type="driver_card_data
         "compliance_status": compliance_status,
         "compliance_label": compliance_label,
         "compliance_summary": compliance_summary,
-        "work_status": compliance.get("work_status"),
-        "work_status_label": compliance.get("work_status_label"),
-        "session_updated_at": compliance.get("session_updated_at"),
+        "work_status": audit.get("work_status") or compliance.get("work_status"),
+        "work_status_label": audit.get("work_status_label") or compliance.get("work_status_label"),
+        "session_updated_at": audit.get("session_updated_at") or compliance.get("session_updated_at"),
+        "audit_minutes": audit.get("minutes"),
+        "audit_limits_min": audit.get("limits_min"),
+        "audit_rows": audit.get("rows"),
+        "audit_issues": audit.get("issues"),
+        "audit_counts": audit.get("counts"),
         "created_at": now,
         "created_by": current_staff_identity(),
         "source": "personalabteilung_fahrerkarten_daten",
@@ -10041,7 +10678,16 @@ def create_driver_card_beleg(user_doc, card_doc, document_type="driver_card_data
         "title": title,
         "sender": "Personalabteilung",
         "date": format_datetime_for_template(now),
-        "content": f"<p>{title} wurde erstellt.</p><p><strong>Referenz:</strong> {reference}</p><p><strong>Karten-ID:</strong> {card_id}</p><p><strong>Status:</strong> {compliance_label}</p><p>{compliance_summary}</p>",
+        "content": (
+            f"<p>{title} wurde erstellt.</p>"
+            f"<p><strong>Referenz:</strong> {reference}</p>"
+            f"<p><strong>Karten-ID:</strong> {card_id}</p>"
+            f"<p><strong>Status:</strong> {compliance_label}</p>"
+            f"<p>{compliance_summary}</p>"
+            f"<p><strong>Minuten:</strong> Lenkzeit {audit.get('minutes', {}).get('drive', 0)} Min, "
+            f"Pause {audit.get('minutes', {}).get('effective_break', 0)} Min, "
+            f"Ruhezeit {audit.get('minutes', {}).get('rest', 0)} Min.</p>"
+        ),
         "type": document_type,
         "needs_signature": False,
         "created_at": now,
