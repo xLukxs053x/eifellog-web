@@ -564,6 +564,30 @@ def now_utc():
     return datetime.utcnow()
 
 
+
+def mongo_upsert_set_preserve_created_at(document):
+    """
+    Baut ein sicheres MongoDB-Upsert-Update.
+
+    Hintergrund:
+    MongoDB verbietet denselben Feldpfad gleichzeitig in $set und $setOnInsert.
+    Wenn ein Dokument also created_at enthält, darf created_at nicht zusätzlich
+    in $setOnInsert stehen, solange das komplette Dokument per $set gesetzt wird.
+
+    Diese Funktion entfernt created_at aus $set und setzt es nur beim Insert.
+    Dadurch bleibt created_at bei bestehenden Datensätzen stabil und bei neuen
+    Datensätzen trotzdem vorhanden.
+    """
+    set_fields = dict(document or {})
+    created_at_value = set_fields.pop("created_at", None)
+
+    update_doc = {"$set": set_fields}
+    if created_at_value is not None:
+        update_doc["$setOnInsert"] = {"created_at": created_at_value}
+
+    return update_doc
+
+
 def safe_str(value, fallback=""):
     if value is None:
         return fallback
@@ -4069,7 +4093,7 @@ def tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
     card_doc = tracker_build_driver_card_doc(user_doc, source_request=source_request, source="servicecenter_issue")
     tracker_driver_cards_collection.update_one(
         {"discord_id": discord_id, "card_id": card_doc["card_id"]},
-        {"$set": card_doc, "$setOnInsert": {"created_at": card_doc["created_at"]}},
+        mongo_upsert_set_preserve_created_at(card_doc),
         upsert=True
     )
     return tracker_driver_cards_collection.find_one({"discord_id": discord_id, "card_id": card_doc["card_id"]})
@@ -6476,7 +6500,7 @@ def tracker_driver_card():
         card_doc = tracker_build_driver_card_doc(user_doc, source_request=latest_request or {}, source="tracker_manual_sync", extra=incoming)
         tracker_driver_cards_collection.update_one(
             {"discord_id": user_doc.get("discord_id"), "card_id": card_doc["card_id"]},
-            {"$set": card_doc, "$setOnInsert": {"created_at": card_doc["created_at"]}},
+            mongo_upsert_set_preserve_created_at(card_doc),
             upsert=True
         )
         card_doc = tracker_driver_cards_collection.find_one({"discord_id": user_doc.get("discord_id"), "card_id": card_doc["card_id"]})
@@ -6547,7 +6571,7 @@ def tracker_driver_card_upload():
     )
     tracker_driver_cards_collection.update_one(
         {"discord_id": discord_id, "card_id": card_doc["card_id"], "file_relative_path": relative_path},
-        {"$set": card_doc, "$setOnInsert": {"created_at": card_doc["created_at"]}},
+        mongo_upsert_set_preserve_created_at(card_doc),
         upsert=True
     )
 
