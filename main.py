@@ -302,6 +302,35 @@ ROLE_FUHRPARKMANAGEMENT_ID = env_first("ROLE_FUHRPARKMANAGEMENT_ID", "FUHRPARKMA
 ROLE_HR_CONTROLLING_ID = env_first("ROLE_HR_CONTROLLING_ID", "HR_CONTROLLING_ROLE_ID", default=ROLE_HR_CONTROLLING or "1473726292963885188")
 ROLE_DISPOSITION_ID = env_first("ROLE_DISPOSITION_ID", "DISPOSITION_ROLE_ID", default=ROLE_DISPOSITION or "")
 
+# ==========================================
+# SERVICECENTER / DISCORD-SYNC
+# ==========================================
+# Zielchannel fuer Fahrerkarte-Beantragungen.
+# Kann in der .env mit SERVICECENTER_DISCORD_CHANNEL_ID ueberschrieben werden.
+SERVICECENTER_DISCORD_ENABLED = env_bool("SERVICECENTER_DISCORD_ENABLED", default=True)
+SERVICECENTER_DISCORD_CHANNEL_ID = env_first(
+    "SERVICECENTER_DISCORD_CHANNEL_ID",
+    "SERVICECENTER_CHANNEL_ID",
+    default="1505988896952156350"
+)
+SERVICECENTER_DISCORD_CREATE_THREAD = env_bool("SERVICECENTER_DISCORD_CREATE_THREAD", default=True)
+SERVICECENTER_DISCORD_ATTACH_PDF_ON_ISSUE = env_bool("SERVICECENTER_DISCORD_ATTACH_PDF_ON_ISSUE", default=True)
+SERVICECENTER_DISCORD_THREAD_AUTO_ARCHIVE_DURATION = int(env_float(
+    "SERVICECENTER_DISCORD_THREAD_AUTO_ARCHIVE_DURATION",
+    default=10080
+))
+SERVICECENTER_PUBLIC_BASE_URL = env_first(
+    "SERVICECENTER_PUBLIC_BASE_URL",
+    "PUBLIC_BASE_URL",
+    "TOUR_RECEIPT_PUBLIC_BASE_URL",
+    default=""
+).rstrip("/")
+SERVICECENTER_DISCORD_REVIEW_ROLE_IDS_RAW = env_first(
+    "SERVICECENTER_DISCORD_REVIEW_ROLE_IDS",
+    "SERVICECENTER_REVIEW_ROLE_IDS",
+    default=""
+)
+
 ALLOWED_HUB_ROLES = [
     ROLE_FAHRER,
     ROLE_FAHRER_ID,
@@ -2300,7 +2329,586 @@ def update_user_fahrerkarte_state(user_doc, request_doc, status, actor=None, ext
     if extra_set:
         update_fields.update(extra_set)
 
+
     users_collection.update_one({"_id": user_doc["_id"]}, {"$set": update_fields})
+
+
+# ==========================================
+# SERVICECENTER / DISCORD CHANNEL + THREAD SYNC
+# ==========================================
+
+def servicecenter_discord_role_ids():
+    role_ids = []
+    raw_items = []
+
+    if SERVICECENTER_DISCORD_REVIEW_ROLE_IDS_RAW:
+        raw_items.extend(re.split(r"[,;\s]+", SERVICECENTER_DISCORD_REVIEW_ROLE_IDS_RAW))
+
+    raw_items.extend([
+        ROLE_PERSONALABTEILUNG_ID,
+        ROLE_HR_CONTROLLING_ID,
+        ROLE_GESCHAEFTSFUEHRUNG_ID,
+        ROLE_PROJEKTLEITUNG_ID,
+    ])
+
+    for role_id in raw_items:
+        role_id = safe_str(role_id)
+        if role_id.isdigit() and role_id not in role_ids:
+            role_ids.append(role_id)
+    return role_ids
+
+
+def servicecenter_discord_mentions(include_roles=True):
+    if not include_roles:
+        return ""
+    role_ids = servicecenter_discord_role_ids()
+    return " ".join(f"<@&{role_id}>" for role_id in role_ids)
+
+
+def discord_api_request(method, endpoint, json_payload=None, data=None, files=None, timeout=12):
+    if not DISCORD_BOT_TOKEN:
+        return False, {"error": "DISCORD_BOT_TOKEN fehlt."}, 0
+
+    endpoint = safe_str(endpoint)
+    if not endpoint.startswith("/"):
+        endpoint = f"/{endpoint}"
+
+    headers = {"Authorization": f"Bot {DISCORD_BOT_TOKEN}"}
+    if not files:
+        headers["Content-Type"] = "application/json"
+
+    try:
+        response = requests.request(
+            method.upper(),
+            f"{API_BASE_URL}{endpoint}",
+            headers=headers,
+            json=json_payload if not files else None,
+            data=data,
+            files=files,
+            timeout=timeout,
+        )
+    except Exception as error:
+        return False, {"error": str(error)}, 0
+
+    payload = None
+    try:
+        payload = response.json()
+    except Exception:
+        payload = {"text": response.text}
+
+    if 200 <= response.status_code < 300:
+        return True, payload or {}, response.status_code
+
+    return False, payload or {}, response.status_code
+
+
+def discord_truncate(value, limit=1024, fallback="-"):
+    value = safe_str(value, fallback)
+    if not value:
+        value = fallback
+    if len(value) <= limit:
+        return value
+    return value[: max(0, limit - 3)] + "..."
+
+
+def servicecenter_discord_absolute_url(path):
+    path = safe_str(path)
+    if not path:
+        return ""
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+
+    base = SERVICECENTER_PUBLIC_BASE_URL or safe_str(TOUR_RECEIPT_PUBLIC_BASE_URL).rstrip("/")
+    if base:
+        return f"{base}/{path.lstrip('/')}"
+
+    try:
+        return request.host_url.rstrip("/") + (path if path.startswith("/") else f"/{path}")
+    except Exception:
+        return path
+
+
+def servicecenter_discord_message_link(channel_id, message_id, guild_id=None):
+    guild_id = safe_str(guild_id or DISCORD_GUILD_ID)
+    channel_id = safe_str(channel_id)
+    message_id = safe_str(message_id)
+    if guild_id and channel_id and message_id:
+        return f"https://discord.com/channels/{guild_id}/{channel_id}/{message_id}"
+    return ""
+
+
+def servicecenter_discord_thread_link(thread_id):
+    guild_id = safe_str(DISCORD_GUILD_ID)
+    thread_id = safe_str(thread_id)
+    if guild_id and thread_id:
+        return f"https://discord.com/channels/{guild_id}/{thread_id}"
+    return ""
+
+
+def servicecenter_discord_status_color(status):
+    status = normalize_fahrerkarte_status(status)
+    return {
+        "pending": 0xFAA61A,
+        "open": 0xFAA61A,
+        "claimed": 0x5865F2,
+        "approved": 0x2BA044,
+        "issued": 0x2BA044,
+        "rejected": 0xD83C3E,
+        "postponed": 0x6E8096,
+        "archived": 0x2F3136,
+    }.get(status, 0x2BA044)
+
+
+def servicecenter_discord_event_title(event, request_doc):
+    status = normalize_fahrerkarte_status(request_doc.get("status") or "pending")
+    if event == "created":
+        return "🪪 Neue Fahrerkarte-Beantragung"
+    if event == "existing":
+        return "🪪 Vorhandene Fahrerkarte-Beantragung"
+    if event == "claimed":
+        return "👤 Fahrerkarte-Beantragung übernommen"
+    if event == "approved":
+        return "✅ Fahrerkarte-Beantragung genehmigt"
+    if event == "issued":
+        return "🟢 Fahrerkarte ausgestellt"
+    if event == "rejected":
+        return "❌ Fahrerkarte-Beantragung abgelehnt"
+    if event == "postponed":
+        return "⏸️ Fahrerkarte-Beantragung zurückgestellt"
+    return f"🪪 Fahrerkarte-Beantragung: {fahrerkarte_status_label(status)}"
+
+
+def servicecenter_discord_thread_name(request_doc):
+    request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+    user_name = safe_str(request_doc.get("display_name") or request_doc.get("full_name") or request_doc.get("name") or request_doc.get("username"), "user")
+    user_slug = normalize_username(user_name, fallback="user").lower()
+    suffix = request_id[-6:] if request_id else secrets.token_hex(3)
+    name = f"fahrerkarte-{user_slug}-{suffix}"
+    return discord_truncate(name, 95, fallback="fahrerkarte-antrag")
+
+
+def servicecenter_discord_components(request_doc):
+    request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+    buttons = []
+
+    personal_url = servicecenter_discord_absolute_url("/personalabteilung")
+    if personal_url.startswith("http"):
+        buttons.append({"type": 2, "style": 5, "label": "Personalabteilung öffnen", "url": personal_url})
+
+    service_url = servicecenter_discord_absolute_url("/servicecenter")
+    if service_url.startswith("http"):
+        buttons.append({"type": 2, "style": 5, "label": "ServiceCenter", "url": service_url})
+
+    if request_doc.get("pdf_relative_path") or request_doc.get("pdf_path") or normalize_fahrerkarte_status(request_doc.get("status")) == "issued":
+        download_url = servicecenter_discord_absolute_url(servicecenter_fahrerkarte_download_url(request_id))
+        if download_url.startswith("http"):
+            buttons.append({"type": 2, "style": 5, "label": "PDF Download", "url": download_url})
+
+    return [{"type": 1, "components": buttons[:5]}] if buttons else []
+
+
+def servicecenter_discord_allowed_mentions(request_doc, include_roles=True):
+    roles = servicecenter_discord_role_ids() if include_roles else []
+    users = []
+    discord_id = safe_str(request_doc.get("discord_id") or request_doc.get("user_id"))
+    if discord_id.isdigit():
+        users.append(discord_id)
+    return {"parse": [], "roles": roles, "users": users}
+
+
+def servicecenter_discord_request_embed(request_doc, event="updated", actor=None):
+    actor = actor or {}
+    request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+    discord_id = safe_str(request_doc.get("discord_id") or request_doc.get("user_id"))
+    status = normalize_fahrerkarte_status(request_doc.get("status") or "pending")
+    display_name = safe_str(request_doc.get("display_name") or request_doc.get("full_name") or request_doc.get("name") or request_doc.get("username"), "Unbekannter User")
+    role_name = safe_str(request_doc.get("role") or request_doc.get("role_name"), "-")
+    handler = safe_str(
+        request_doc.get("handler_name")
+        or (request_doc.get("issued_by") or {}).get("display_name")
+        or (request_doc.get("approved_by") or {}).get("display_name")
+        or (request_doc.get("claimed_by") or {}).get("display_name")
+        or (actor or {}).get("display_name"),
+        "Noch nicht zugewiesen"
+    )
+
+    description = (
+        f"**{display_name}** hat eine personalisierte Fahrerkarte im ServiceCenter beantragt.\n"
+        f"Status: **{fahrerkarte_status_label(status)}**"
+    )
+    if event == "issued":
+        description = f"Die personalisierte Fahrerkarte fuer **{display_name}** wurde ausgestellt."
+    elif event == "rejected":
+        description = f"Die Fahrerkarte-Beantragung von **{display_name}** wurde abgelehnt."
+    elif event == "postponed":
+        description = f"Die Fahrerkarte-Beantragung von **{display_name}** wurde zurueckgestellt."
+
+    fields = [
+        {"name": "👤 Antragsteller", "value": discord_truncate(f"<@{discord_id}>\n`{discord_id}`" if discord_id else display_name), "inline": True},
+        {"name": "🏷️ Rolle", "value": discord_truncate(role_name), "inline": True},
+        {"name": "📌 Status", "value": discord_truncate(fahrerkarte_status_label(status)), "inline": True},
+        {"name": "🆔 Antrag-ID", "value": discord_truncate(f"`{request_id}`"), "inline": False},
+        {"name": "⚡ Priorität", "value": discord_truncate(fahrerkarte_priority_label(request_doc.get("priority"))), "inline": True},
+        {"name": "📝 Grund", "value": discord_truncate(fahrerkarte_reason_label(request_doc.get("reason"))), "inline": True},
+        {"name": "📦 Bereitstellung", "value": discord_truncate(fahrerkarte_delivery_label(request_doc.get("delivery_method"))), "inline": True},
+        {"name": "👮 Sachbearbeiter", "value": discord_truncate(handler), "inline": True},
+        {"name": "🕒 Eingang", "value": discord_truncate(format_datetime_for_template(request_doc.get("created_at")) or "-"), "inline": True},
+    ]
+
+    if request_doc.get("driver_number"):
+        fields.append({"name": "🚛 Fahrer-/Personalnummer", "value": discord_truncate(request_doc.get("driver_number")), "inline": True})
+    if request_doc.get("card_id"):
+        fields.append({"name": "💳 Karten-ID", "value": discord_truncate(f"`{request_doc.get('card_id')}`"), "inline": False})
+    if request_doc.get("notes"):
+        fields.append({"name": "📄 Hinweise", "value": discord_truncate(request_doc.get("notes"), 900), "inline": False})
+    if request_doc.get("approval_note"):
+        fields.append({"name": "✅ Freigabe-Hinweis", "value": discord_truncate(request_doc.get("approval_note"), 900), "inline": False})
+    if request_doc.get("issue_note"):
+        fields.append({"name": "🟢 Ausstellungs-Hinweis", "value": discord_truncate(request_doc.get("issue_note"), 900), "inline": False})
+    if request_doc.get("reject_reason"):
+        fields.append({"name": "❌ Ablehnungsgrund", "value": discord_truncate(request_doc.get("reject_reason"), 900), "inline": False})
+    if request_doc.get("postpone_reason"):
+        fields.append({"name": "⏸️ Zurückgestellt", "value": discord_truncate(request_doc.get("postpone_reason"), 900), "inline": False})
+
+    embed = {
+        "title": servicecenter_discord_event_title(event, request_doc),
+        "description": discord_truncate(description, 3900),
+        "color": servicecenter_discord_status_color(status),
+        "fields": fields[:25],
+        "footer": {"text": "EifelLog ServiceCenter • Fahrerkarte"},
+        "timestamp": now_utc().isoformat() + "Z",
+    }
+
+    avatar_url = safe_str(request_doc.get("avatar_url"))
+    if avatar_url.startswith("http://") or avatar_url.startswith("https://"):
+        embed["thumbnail"] = {"url": avatar_url}
+
+    return embed
+
+
+def servicecenter_discord_history_embed(discord_id, current_request_id=""):
+    discord_id = safe_str(discord_id)
+    current_request_id = safe_str(current_request_id)
+    if not discord_id:
+        return None
+
+    records = list(fahrerkarte_requests_collection.find(
+        {"discord_id": discord_id, "archived": {"$ne": True}}
+    ).sort([("created_at", DESCENDING)]).limit(10))
+
+    if not records:
+        description = "Keine bisherigen Fahrerkarte-Beantragungen gefunden."
+    else:
+        lines = []
+        for item in records:
+            item_request_id = safe_str(item.get("request_id") or item.get("_id"))
+            marker = "➡️" if item_request_id == current_request_id else "•"
+            date_text = format_datetime_for_template(item.get("created_at")) or "-"
+            status_text = fahrerkarte_status_label(item.get("status"))
+            reason_text = fahrerkarte_reason_label(item.get("reason"))
+            card_id = safe_str(item.get("card_id"))
+            card_text = f" / `{card_id}`" if card_id else ""
+            lines.append(f"{marker} `{date_text}` **{status_text}** — {reason_text}{card_text}")
+        description = "\n".join(lines)
+
+    return {
+        "title": "🗂️ Vorhandene Beantragungen dieses Users",
+        "description": discord_truncate(description, 3900),
+        "color": 0x2BA044,
+        "footer": {"text": "EifelLog ServiceCenter • Historie"},
+        "timestamp": now_utc().isoformat() + "Z",
+    }
+
+
+def servicecenter_discord_send_message(channel_id, payload):
+    channel_id = safe_str(channel_id)
+    if not channel_id:
+        return False, {"error": "Channel-ID fehlt."}, 0
+    return discord_api_request("POST", f"/channels/{channel_id}/messages", json_payload=payload)
+
+
+def servicecenter_discord_patch_message(channel_id, message_id, payload):
+    channel_id = safe_str(channel_id)
+    message_id = safe_str(message_id)
+    if not channel_id or not message_id:
+        return False, {"error": "Channel-ID oder Message-ID fehlt."}, 0
+    return discord_api_request("PATCH", f"/channels/{channel_id}/messages/{message_id}", json_payload=payload)
+
+
+def servicecenter_discord_upsert_message(channel_id, message_id, payload):
+    if message_id:
+        ok, result, status_code = servicecenter_discord_patch_message(channel_id, message_id, payload)
+        if ok:
+            return True, result, status_code
+    return servicecenter_discord_send_message(channel_id, payload)
+
+
+def servicecenter_discord_create_thread_from_message(parent_channel_id, parent_message_id, thread_name):
+    if not SERVICECENTER_DISCORD_CREATE_THREAD:
+        return False, {"error": "Thread-Erstellung ist deaktiviert."}, 0
+
+    payload = {
+        "name": thread_name,
+        "auto_archive_duration": SERVICECENTER_DISCORD_THREAD_AUTO_ARCHIVE_DURATION,
+    }
+    return discord_api_request(
+        "POST",
+        f"/channels/{parent_channel_id}/messages/{parent_message_id}/threads",
+        json_payload=payload,
+    )
+
+
+def servicecenter_discord_create_forum_thread(parent_channel_id, request_doc, event="created"):
+    if not SERVICECENTER_DISCORD_CREATE_THREAD:
+        return False, {"error": "Thread-Erstellung ist deaktiviert."}, 0
+
+    content = servicecenter_discord_mentions(include_roles=True)
+    if content:
+        content += "\n"
+    content += "Neue ServiceCenter-Beantragung. Bitte im Thread prüfen."
+
+    payload = {
+        "name": servicecenter_discord_thread_name(request_doc),
+        "auto_archive_duration": SERVICECENTER_DISCORD_THREAD_AUTO_ARCHIVE_DURATION,
+        "message": {
+            "content": content,
+            "embeds": [servicecenter_discord_request_embed(request_doc, event=event)],
+            "components": servicecenter_discord_components(request_doc),
+            "allowed_mentions": servicecenter_discord_allowed_mentions(request_doc, include_roles=True),
+        },
+    }
+    return discord_api_request("POST", f"/channels/{parent_channel_id}/threads", json_payload=payload)
+
+
+def ensure_servicecenter_discord_thread(request_doc, event="created"):
+    parent_channel_id = safe_str(SERVICECENTER_DISCORD_CHANNEL_ID)
+    if not parent_channel_id:
+        return {"ok": False, "error": "SERVICECENTER_DISCORD_CHANNEL_ID fehlt."}
+
+    existing_thread_id = safe_str(request_doc.get("discord_thread_id") or request_doc.get("thread_id"))
+    existing_parent_message_id = safe_str(request_doc.get("discord_parent_message_id") or request_doc.get("discord_message_id"))
+    if existing_thread_id:
+        return {
+            "ok": True,
+            "thread_id": existing_thread_id,
+            "parent_channel_id": safe_str(request_doc.get("discord_parent_channel_id") or parent_channel_id),
+            "parent_message_id": existing_parent_message_id,
+            "created": False,
+        }
+
+    thread_name = servicecenter_discord_thread_name(request_doc)
+    parent_payload = {
+        "content": f"{servicecenter_discord_mentions(include_roles=True)}\n🪪 **Neue Fahrerkarte-Beantragung** von <@{safe_str(request_doc.get('discord_id') or request_doc.get('user_id'))}>".strip(),
+        "embeds": [servicecenter_discord_request_embed(request_doc, event=event)],
+        "components": servicecenter_discord_components(request_doc),
+        "allowed_mentions": servicecenter_discord_allowed_mentions(request_doc, include_roles=True),
+    }
+
+    parent_ok, parent_message, parent_status = servicecenter_discord_send_message(parent_channel_id, parent_payload)
+    if parent_ok and parent_message.get("id"):
+        parent_message_id = safe_str(parent_message.get("id"))
+        if SERVICECENTER_DISCORD_CREATE_THREAD:
+            thread_ok, thread_payload, thread_status = servicecenter_discord_create_thread_from_message(parent_channel_id, parent_message_id, thread_name)
+            if thread_ok and thread_payload.get("id"):
+                return {
+                    "ok": True,
+                    "thread_id": safe_str(thread_payload.get("id")),
+                    "parent_channel_id": parent_channel_id,
+                    "parent_message_id": parent_message_id,
+                    "created": True,
+                }
+
+            return {
+                "ok": True,
+                "thread_id": "",
+                "parent_channel_id": parent_channel_id,
+                "parent_message_id": parent_message_id,
+                "created": False,
+                "warning": f"Message erstellt, Thread konnte nicht erstellt werden: {thread_payload}",
+            }
+
+        return {
+            "ok": True,
+            "thread_id": "",
+            "parent_channel_id": parent_channel_id,
+            "parent_message_id": parent_message_id,
+            "created": False,
+        }
+
+    # Fallback fuer Forum-/Media-Channels: dort wird direkt ein Thread mit Startnachricht erstellt.
+    forum_ok, forum_thread, forum_status = servicecenter_discord_create_forum_thread(parent_channel_id, request_doc, event=event)
+    if forum_ok and forum_thread.get("id"):
+        return {
+            "ok": True,
+            "thread_id": safe_str(forum_thread.get("id")),
+            "parent_channel_id": parent_channel_id,
+            "parent_message_id": "",
+            "created": True,
+        }
+
+    return {
+        "ok": False,
+        "error": f"Discord Message/Thread konnte nicht erstellt werden. MessageStatus={parent_status}, Message={parent_message}, ForumStatus={forum_status}, Forum={forum_thread}",
+    }
+
+
+def servicecenter_discord_sync_fahrerkarte_request(request_doc, event="updated", actor=None):
+    if not SERVICECENTER_DISCORD_ENABLED:
+        return {"ok": False, "skipped": True, "error": "SERVICECENTER_DISCORD_ENABLED ist deaktiviert."}
+    if not request_doc:
+        return {"ok": False, "error": "Request-Dokument fehlt."}
+    if not DISCORD_BOT_TOKEN:
+        return {"ok": False, "error": "DISCORD_BOT_TOKEN fehlt."}
+
+    request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+    if not request_id:
+        return {"ok": False, "error": "Request-ID fehlt."}
+
+    thread_info = ensure_servicecenter_discord_thread(request_doc, event=event)
+    if not thread_info.get("ok"):
+        fahrerkarte_requests_collection.update_one(
+            request_lookup_query(request_id),
+            {"$set": {
+                "discord_sync_status": "failed",
+                "discord_sync_error": safe_str(thread_info.get("error"))[:1800],
+                "discord_synced_at": now_utc(),
+            }}
+        )
+        return thread_info
+
+    target_channel_id = safe_str(thread_info.get("thread_id") or thread_info.get("parent_channel_id"))
+    parent_channel_id = safe_str(thread_info.get("parent_channel_id") or SERVICECENTER_DISCORD_CHANNEL_ID)
+    parent_message_id = safe_str(thread_info.get("parent_message_id"))
+
+    # Datenbank zuerst aktualisieren, damit Folgesyncs den Thread wiederverwenden.
+    set_fields = {
+        "discord_sync_status": "synced",
+        "discord_sync_error": "",
+        "discord_synced_at": now_utc(),
+        "discord_parent_channel_id": parent_channel_id,
+        "discord_parent_message_id": parent_message_id,
+        "discord_channel_id": target_channel_id,
+    }
+    if thread_info.get("thread_id"):
+        set_fields["discord_thread_id"] = safe_str(thread_info.get("thread_id"))
+        set_fields["thread_id"] = safe_str(thread_info.get("thread_id"))
+    if parent_message_id:
+        set_fields["discord_message_id"] = parent_message_id
+        set_fields["discord_message_url"] = servicecenter_discord_message_link(parent_channel_id, parent_message_id)
+    if target_channel_id:
+        set_fields["discord_thread_url"] = servicecenter_discord_thread_link(target_channel_id)
+
+    fahrerkarte_requests_collection.update_one(request_lookup_query(request_id), {"$set": set_fields})
+    fresh_request = fahrerkarte_requests_collection.find_one(request_lookup_query(request_id)) or request_doc
+
+    admin_payload = {
+        "content": "🪪 **ServiceCenter Fahrerkarte – Bearbeitung**",
+        "embeds": [servicecenter_discord_request_embed(fresh_request, event=event, actor=actor)],
+        "components": servicecenter_discord_components(fresh_request),
+        "allowed_mentions": {"parse": []},
+    }
+    admin_message_id = safe_str(fresh_request.get("discord_admin_message_id"))
+    admin_ok, admin_msg, admin_status = servicecenter_discord_upsert_message(target_channel_id, admin_message_id, admin_payload)
+
+    if admin_ok and admin_msg.get("id"):
+        fahrerkarte_requests_collection.update_one(request_lookup_query(request_id), {"$set": {
+            "discord_admin_message_id": safe_str(admin_msg.get("id")),
+            "discord_admin_message_url": servicecenter_discord_message_link(target_channel_id, admin_msg.get("id")),
+            "discord_synced_at": now_utc(),
+        }})
+
+    history_embed = servicecenter_discord_history_embed(
+        safe_str(fresh_request.get("discord_id") or fresh_request.get("user_id")),
+        current_request_id=request_id,
+    )
+    history_ok = False
+    history_msg = {}
+    if history_embed:
+        history_payload = {
+            "content": "📚 **Historie dieses Users**",
+            "embeds": [history_embed],
+            "allowed_mentions": {"parse": []},
+        }
+        history_message_id = safe_str(fresh_request.get("discord_history_message_id"))
+        history_ok, history_msg, _history_status = servicecenter_discord_upsert_message(target_channel_id, history_message_id, history_payload)
+        if history_ok and history_msg.get("id"):
+            fahrerkarte_requests_collection.update_one(request_lookup_query(request_id), {"$set": {
+                "discord_history_message_id": safe_str(history_msg.get("id")),
+                "discord_history_message_url": servicecenter_discord_message_link(target_channel_id, history_msg.get("id")),
+                "discord_synced_at": now_utc(),
+            }})
+
+    if not admin_ok:
+        fahrerkarte_requests_collection.update_one(request_lookup_query(request_id), {"$set": {
+            "discord_sync_status": "partial",
+            "discord_sync_error": safe_str(admin_msg)[:1800],
+            "discord_synced_at": now_utc(),
+        }})
+
+    return {
+        "ok": bool(admin_ok),
+        "thread_id": target_channel_id,
+        "parent_message_id": parent_message_id,
+        "admin_message_id": safe_str(admin_msg.get("id")) if isinstance(admin_msg, dict) else "",
+        "history_message_id": safe_str(history_msg.get("id")) if isinstance(history_msg, dict) else "",
+        "history_ok": bool(history_ok),
+        "created": bool(thread_info.get("created")),
+        "warning": thread_info.get("warning", ""),
+        "status": admin_status,
+    }
+
+
+def servicecenter_discord_send_pdf_fallback(request_doc, file_path, actor=None, reason="PDF-Fallback"):
+    if not SERVICECENTER_DISCORD_ENABLED or not SERVICECENTER_DISCORD_ATTACH_PDF_ON_ISSUE:
+        return {"ok": False, "skipped": True}
+    if not DISCORD_BOT_TOKEN:
+        return {"ok": False, "error": "DISCORD_BOT_TOKEN fehlt."}
+
+    request_id = safe_str(request_doc.get("request_id") or request_doc.get("_id"))
+    thread_id = safe_str(request_doc.get("discord_thread_id") or request_doc.get("thread_id") or request_doc.get("discord_channel_id"))
+    if not thread_id:
+        sync_result = servicecenter_discord_sync_fahrerkarte_request(request_doc, event="issued", actor=actor)
+        thread_id = safe_str(sync_result.get("thread_id"))
+
+    if not thread_id:
+        return {"ok": False, "error": "Kein Discord-Thread/Channel fuer PDF-Fallback vorhanden."}
+
+    resolved_path = resolve_fahrerkarte_pdf_path(file_path)
+    if not resolved_path or not os.path.exists(resolved_path):
+        return {"ok": False, "error": "PDF-Datei wurde nicht gefunden."}
+
+    filename = safe_str(request_doc.get("pdf_filename") or os.path.basename(resolved_path), "Fahrerkarte.pdf")
+    payload = {
+        "content": (
+            f"📎 **{reason}**\n"
+            f"Falls der Web-Download nicht funktioniert, liegt die ausgestellte Fahrerkarte hier direkt als PDF im Thread.\n"
+            f"Antrag-ID: `{request_id}`"
+        ),
+        "allowed_mentions": {"parse": []},
+    }
+
+    try:
+        with open(resolved_path, "rb") as pdf_file:
+            files = {"files[0]": (filename, pdf_file, "application/pdf")}
+            data = {"payload_json": json.dumps(payload)}
+            ok, result, status_code = discord_api_request(
+                "POST",
+                f"/channels/{thread_id}/messages",
+                data=data,
+                files=files,
+                timeout=20,
+            )
+    except Exception as error:
+        return {"ok": False, "error": str(error)}
+
+    if ok and isinstance(result, dict):
+        fahrerkarte_requests_collection.update_one(request_lookup_query(request_id), {"$set": {
+            "discord_pdf_message_id": safe_str(result.get("id")),
+            "discord_pdf_message_url": servicecenter_discord_message_link(thread_id, result.get("id")),
+            "discord_pdf_uploaded_at": now_utc(),
+        }})
+
+    return {"ok": ok, "result": result, "status": status_code}
 
 
 def tracker_confirmation_document_content(name, role, handler_name, tracker_code, reason=None):
@@ -4807,7 +5415,8 @@ def servicecenter_fahrerkarte_beantragen():
         "status": {"$in": ["pending", "open", "claimed", "approved", "postponed"]},
     })
     if existing_open:
-        flash("Du hast bereits eine offene Beantragung für eine personalisierte Fahrerkarte.", "info")
+        servicecenter_discord_sync_fahrerkarte_request(existing_open, event="existing")
+        flash("Du hast bereits eine offene Beantragung für eine personalisierte Fahrerkarte. Sie wurde erneut mit dem Discord-ServiceCenter synchronisiert.", "info")
         return redirect(url_for("servicecenter"))
 
     now = now_utc()
@@ -4838,7 +5447,8 @@ def servicecenter_fahrerkarte_beantragen():
         "card_id": "",
     }
 
-    fahrerkarte_requests_collection.insert_one(request_doc)
+    insert_result = fahrerkarte_requests_collection.insert_one(request_doc)
+    request_doc["_id"] = insert_result.inserted_id
 
     users_collection.update_one(
         {"discord_id": discord_id},
@@ -4882,7 +5492,12 @@ def servicecenter_fahrerkarte_beantragen():
         "request_id": request_id,
     })
 
-    flash("Deine personalisierte Fahrerkarte wurde beantragt und im ServiceCenter hinterlegt.", "success")
+    discord_sync = servicecenter_discord_sync_fahrerkarte_request(request_doc, event="created")
+    if discord_sync.get("ok"):
+        flash("Deine personalisierte Fahrerkarte wurde beantragt und direkt im Discord-ServiceCenter erstellt.", "success")
+    else:
+        print(f"ServiceCenter Discord-Sync fehlgeschlagen: {discord_sync.get('error') or discord_sync}")
+        flash("Deine personalisierte Fahrerkarte wurde beantragt. Discord konnte nicht automatisch synchronisiert werden; die Personalabteilung sieht den Antrag trotzdem im System.", "warning")
     return redirect(url_for("servicecenter"))
 
 
@@ -6894,6 +7509,7 @@ def personalabteilung():
         "issue": url_for("api_personalabteilung_servicecenter_fahrerkarte_issue"),
         "reject": url_for("api_personalabteilung_servicecenter_fahrerkarte_reject"),
         "postpone": url_for("api_personalabteilung_servicecenter_fahrerkarte_postpone"),
+        "discordSync": url_for("api_personalabteilung_servicecenter_fahrerkarte_discord_sync"),
     }
 
     # Tasks abrufen: Buchhaltungsanfragen laufen ab jetzt nur noch über den eigenen Tab.
@@ -7863,6 +8479,7 @@ def api_personalabteilung_servicecenter_fahrerkarte_claim():
     fresh_request = fahrerkarte_requests_collection.find_one({"_id": request_doc["_id"]})
     user_doc = find_user_for_request_doc(fresh_request)
     update_user_fahrerkarte_state(user_doc, fresh_request, "claimed", actor)
+    servicecenter_discord_sync_fahrerkarte_request(fresh_request, event="claimed", actor=actor)
 
     return jsonify({
         "success": True,
@@ -7932,6 +8549,7 @@ def api_personalabteilung_servicecenter_fahrerkarte_approve():
     )
 
     tasks_collection.update_many({"source": "servicecenter_fahrerkarte", "request_id": fresh_request.get("request_id")}, {"$set": {"status": "approved", "updated_at": now}})
+    servicecenter_discord_sync_fahrerkarte_request(fresh_request, event="approved", actor=actor)
 
     return jsonify({
         "success": True,
@@ -8019,6 +8637,8 @@ def api_personalabteilung_servicecenter_fahrerkarte_issue():
     create_fahrerkarte_pdf_dashboard_document(fresh_request, actor=actor, description=issue_note)
 
     tasks_collection.update_many({"source": "servicecenter_fahrerkarte", "request_id": fresh_request.get("request_id")}, {"$set": {"status": "done", "completed_at": now, "updated_at": now}})
+    servicecenter_discord_sync_fahrerkarte_request(fresh_request, event="issued", actor=actor)
+    servicecenter_discord_send_pdf_fallback(fresh_request, file_path, actor=actor, reason="Fahrerkarte ausgestellt / PDF-Fallback")
 
     return jsonify({
         "success": True,
@@ -8081,6 +8701,7 @@ def api_personalabteilung_servicecenter_fahrerkarte_reject():
         )
 
     tasks_collection.update_many({"source": "servicecenter_fahrerkarte", "request_id": fresh_request.get("request_id")}, {"$set": {"status": "rejected", "updated_at": now}})
+    servicecenter_discord_sync_fahrerkarte_request(fresh_request, event="rejected", actor=actor)
 
     return jsonify({
         "success": True,
@@ -8164,6 +8785,7 @@ def api_personalabteilung_servicecenter_fahrerkarte_postpone():
         )
 
     tasks_collection.update_many({"source": "servicecenter_fahrerkarte", "request_id": fresh_request.get("request_id")}, {"$set": {"status": "postponed", "updated_at": now}})
+    servicecenter_discord_sync_fahrerkarte_request(fresh_request, event="postponed", actor=actor)
 
     return jsonify({
         "success": True,
@@ -8172,6 +8794,30 @@ def api_personalabteilung_servicecenter_fahrerkarte_postpone():
         "handlerName": handler_name,
         "request": prepare_fahrerkarte_request_for_personalabteilung(fresh_request),
     })
+
+
+@app.route("/api/personalabteilung/servicecenter/fahrerkarte/discord-sync", methods=["POST"])
+def api_personalabteilung_servicecenter_fahrerkarte_discord_sync():
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response: return permission_response
+
+    data = request.get_json(silent=True) or {}
+    request_id = safe_str(data.get("requestId") or data.get("id"))
+    if not request_id:
+        return jsonify({"success": False, "message": "Request-ID fehlt."}), 400
+
+    request_doc = find_fahrerkarte_request(request_id)
+    if not request_doc:
+        return jsonify({"success": False, "message": "Fahrerkarte-Antrag wurde nicht gefunden."}), 404
+
+    result = servicecenter_discord_sync_fahrerkarte_request(request_doc, event="updated", actor=current_staff_identity())
+    fresh_request = find_fahrerkarte_request(request_id) or request_doc
+    return jsonify({
+        "success": bool(result.get("ok")),
+        "message": "Discord-Sync ausgeführt." if result.get("ok") else "Discord-Sync fehlgeschlagen.",
+        "result": result,
+        "request": prepare_fahrerkarte_request_for_personalabteilung(fresh_request),
+    }), (200 if result.get("ok") else 502)
 
 
 @app.route("/servicecenter/fahrerkarte/download/<request_id>", methods=["GET"])
