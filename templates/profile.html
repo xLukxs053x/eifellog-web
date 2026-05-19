@@ -49,21 +49,9 @@
 {% set completion = ((filled_fields / 12) * 100) | round(0, 'floor') %}
 
 <style>
-    .font-orbitron,
-    .driver-font {
-        font-family: 'Orbitron', sans-serif;
-    }
-
+    /* Profil-spezifisches Grid & Layouting. 
+       Design-Variablen wie var(--brand-green) stammen aus der base.html */
     .driver-profile {
-        --driver-bg: rgba(4, 10, 6, 0.84);
-        --driver-bg-soft: rgba(255, 255, 255, 0.045);
-        --driver-border: rgba(255, 255, 255, 0.08);
-        --driver-border-strong: rgba(var(--brand-green-rgb), 0.34);
-        --driver-green: var(--brand-green, #89be32);
-        --driver-yellow: var(--brand-yellow, #dce226);
-        --driver-muted: var(--muted, rgba(255,255,255,0.62));
-        --driver-text: var(--text, #f6fff1);
-        --driver-shadow: 0 1.6rem 5rem rgba(0, 0, 0, 0.38);
         width: 100%;
         display: flex;
         flex-direction: column;
@@ -73,23 +61,18 @@
         isolation: isolate;
     }
 
-    .driver-profile *,
-    .driver-profile *::before,
-    .driver-profile *::after {
-        box-sizing: border-box;
-    }
-
     .driver-hero {
         position: relative;
         min-height: 25.5rem;
         overflow: hidden;
-        border-radius: 1.75rem;
-        border: 1px solid rgba(255,255,255,0.08);
-        box-shadow: var(--driver-shadow);
+        border-radius: 28px; /* Angepasst an glass-card in base.html */
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-top: 1px solid rgba(137, 190, 50, 0.2);
+        box-shadow: var(--shadow);
         background:
             radial-gradient(circle at 12% 18%, rgba(var(--brand-green-rgb), 0.32), transparent 28%),
             radial-gradient(circle at 86% 14%, rgba(220, 226, 38, 0.22), transparent 30%),
-            linear-gradient(135deg, rgba(4, 10, 6, 0.94), rgba(18, 32, 15, 0.9));
+            linear-gradient(135deg, rgba(20, 30, 20, 0.8), rgba(5, 10, 5, 0.95));
     }
 
     .driver-hero.has-banner {
@@ -121,7 +104,7 @@
         height: 28rem;
         right: -9rem;
         bottom: -11rem;
-        border-radius: 62.4375rem;
+        border-radius: 50%;
         background: radial-gradient(circle, rgba(var(--brand-green-rgb), 0.26), transparent 67%);
         filter: blur(0.25rem);
         z-index: 1;
@@ -149,18 +132,19 @@
         align-items: center;
         flex-wrap: wrap;
         gap: 0.625rem;
-        color: var(--driver-muted);
+        color: var(--muted);
         font-size: 0.6875rem;
         letter-spacing: 0.16em;
         text-transform: uppercase;
         font-weight: 800;
+        font-family: 'Orbitron', sans-serif;
     }
 
     .driver-dot {
         width: 0.4375rem;
         height: 0.4375rem;
-        border-radius: 62.4375rem;
-        background: var(--driver-green);
+        border-radius: 50%;
+        background: var(--brand-green);
         box-shadow: 0 0 1.125rem rgba(var(--brand-green-rgb), 0.75);
     }
 
@@ -176,7 +160,7 @@
         height: 7.25rem;
         padding: 0.25rem;
         border-radius: 1.65rem;
-        background: linear-gradient(135deg, var(--driver-yellow), var(--driver-green));
+        background: linear-gradient(135deg, var(--brand-yellow), var(--brand-green));
         box-shadow:
             0 0 0 0.5rem rgba(4,10,6,0.54),
             0 1.5rem 4.375rem rgba(0,0,0,0.42),
@@ -192,8 +176,8 @@
         bottom: 0.6875rem;
         width: 1.125rem;
         height: 1.125rem;
-        border-radius: 62.4375rem;
-        background: var(--driver-green);
+        border-radius: 50%;
+        background: var(--brand-green);
         border: 0.1875rem solid rgba(4,10,6,1);
         box-shadow: 0 0 1.125rem rgba(var(--brand-green-rgb), 0.95);
     }
@@ -202,7 +186,7 @@
         width: 100%;
         height: 100%;
         display: block;
-        border-radius: 1.75rem;
+        border-radius: 1.4rem;
         object-fit: cover;
         border: 0.1875rem solid rgba(4,10,6,0.94);
         background: rgba(0,0,0,0.35);
@@ -218,12 +202,12 @@
 
     .driver-name {
         margin: 0;
-        color: var(--driver-text);
+        color: var(--text);
         font-family: 'Orbitron', sans-serif;
         font-size: clamp(2.05rem, 4.2vw, 4.35rem);
         line-height: 0.92;
-        font-weight: 950;
-        letter-spacing: -0.04em;
+        font-weight: 800;
+        letter-spacing: -0.02em;
         text-transform: uppercase;
         text-wrap: balance;
         text-shadow: 0 1rem 2.8rem rgba(0,0,0,0.48);
@@ -231,7 +215,7 @@
 
     .driver-username {
         margin-top: 0.8125rem;
-        color: rgba(255,255,255,0.72);
+        color: var(--muted);
         font-size: 0.9375rem;
         letter-spacing: 0.08em;
     }
@@ -255,34 +239,26 @@
         align-items: center;
     }
 
-    .driver-pill,
-    .driver-chip,
-    .driver-tab,
-    .driver-mini-label,
-    .driver-section-kicker,
-    .driver-btn {
-        font-family: 'Orbitron', sans-serif;
-    }
-
     .driver-pill {
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
         min-height: 2.125rem;
         padding: 0.5rem 0.8125rem;
-        border-radius: 62.4375rem;
-        color: var(--driver-muted);
+        border-radius: 50px;
+        color: var(--muted);
         background: rgba(255,255,255,0.055);
         border: 1px solid rgba(255,255,255,0.09);
         font-size: 0.625rem;
-        font-weight: 850;
+        font-weight: 700;
+        font-family: 'Orbitron', sans-serif;
         letter-spacing: 0.14em;
         text-transform: uppercase;
         white-space: nowrap;
     }
 
     .driver-pill.is-green {
-        color: var(--driver-green);
+        color: var(--brand-green);
         background: rgba(var(--brand-green-rgb), 0.13);
         border-color: rgba(var(--brand-green-rgb), 0.3);
     }
@@ -292,80 +268,12 @@
         background: rgba(0,0,0,0.34);
     }
 
-    .driver-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.625rem;
-        min-height: 2.55rem;
-        padding: 0.72rem 1rem;
-        border-radius: 62.4375rem;
-        border: 1px solid rgba(255,255,255,0.1);
-        outline: 0;
-        cursor: pointer;
-        text-decoration: none;
-        color: #fff;
-        font-size: 0.625rem;
-        font-weight: 900;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-        transition: transform 0.25s ease, border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
-    }
-
-    .driver-btn:hover {
-        transform: translateY(-0.125rem);
-    }
-
-    .driver-btn-primary {
-        background: linear-gradient(135deg, rgba(var(--brand-green-rgb), 0.96), rgba(220, 226, 38, 0.86));
-        color: rgba(4,10,6,0.96);
-        box-shadow: 0 1.125rem 2.8125rem rgba(var(--brand-green-rgb), 0.22);
-    }
-
-    .driver-btn-secondary {
-        background: rgba(255,255,255,0.055);
-        color: rgba(255,255,255,0.88);
-        backdrop-filter: blur(1.25rem);
-        -webkit-backdrop-filter: blur(1.25rem);
-    }
-
-    .driver-btn-secondary:hover {
-        border-color: rgba(var(--brand-green-rgb), 0.35);
-        background: rgba(var(--brand-green-rgb), 0.1);
-    }
-
     .driver-hero-panel {
         align-self: stretch;
         display: flex;
         flex-direction: column;
         justify-content: flex-end;
         gap: 0.875rem;
-    }
-
-    .driver-glass-card {
-        position: relative;
-        overflow: hidden;
-        border-radius: 1.75rem;
-        background: linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.025));
-        border: 1px solid rgba(255,255,255,0.1);
-        box-shadow: 0 1.5rem 4.375rem rgba(0,0,0,0.28);
-        backdrop-filter: blur(1.625rem);
-        -webkit-backdrop-filter: blur(1.625rem);
-    }
-
-    .driver-glass-card::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background:
-            linear-gradient(135deg, rgba(var(--brand-green-rgb), 0.13), transparent 36%),
-            radial-gradient(circle at 88% 12%, rgba(220,226,38,0.13), transparent 36%);
-    }
-
-    .driver-glass-card > * {
-        position: relative;
-        z-index: 1;
     }
 
     .driver-card-padding {
@@ -387,16 +295,16 @@
     }
 
     .driver-progress-value {
-        color: var(--driver-green);
+        color: var(--brand-green);
         font-family: 'Orbitron', sans-serif;
         font-size: 1.75rem;
         line-height: 1;
-        font-weight: 950;
+        font-weight: 800;
     }
 
     .driver-progress-track {
         height: 0.625rem;
-        border-radius: 62.4375rem;
+        border-radius: 50px;
         overflow: hidden;
         background: rgba(0,0,0,0.32);
         border: 1px solid rgba(255,255,255,0.08);
@@ -406,7 +314,7 @@
         height: 100%;
         width: var(--completion);
         border-radius: inherit;
-        background: linear-gradient(90deg, var(--driver-green), var(--driver-yellow));
+        background: linear-gradient(90deg, var(--brand-green), var(--brand-yellow));
         box-shadow: 0 0 1.375rem rgba(var(--brand-green-rgb), 0.42);
     }
 
@@ -425,16 +333,17 @@
     }
 
     .driver-mini-label {
-        color: var(--driver-muted);
+        color: var(--muted);
+        font-family: 'Orbitron', sans-serif;
         font-size: 0.5625rem;
         letter-spacing: 0.15em;
         text-transform: uppercase;
-        font-weight: 850;
+        font-weight: 700;
     }
 
     .driver-mini-value {
         margin-top: 0.5rem;
-        color: var(--driver-text);
+        color: var(--text);
         font-size: 0.875rem;
         font-weight: 700;
         overflow-wrap: anywhere;
@@ -453,36 +362,8 @@
         gap: 1.15rem;
     }
 
-    .driver-card {
-        position: relative;
-        overflow: hidden;
-        border-radius: 1.65rem;
-        background:
-            linear-gradient(145deg, rgba(255,255,255,0.058), rgba(255,255,255,0.022)),
-            rgba(4,10,6,0.62);
-        border: 1px solid rgba(255,255,255,0.08);
-        box-shadow: 0 1.5rem 5rem rgba(0,0,0,0.28);
-        backdrop-filter: blur(1.75rem);
-        -webkit-backdrop-filter: blur(1.75rem);
-    }
-
-    .driver-card::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background:
-            linear-gradient(135deg, rgba(var(--brand-green-rgb), 0.09), transparent 34%),
-            linear-gradient(to bottom, rgba(255,255,255,0.035), transparent 30%);
-    }
-
-    .driver-card > * {
-        position: relative;
-        z-index: 1;
-    }
-
     .driver-section {
-        padding: 1.25rem;
+        padding: 1.5rem;
     }
 
     .driver-section-head {
@@ -497,10 +378,10 @@
         margin: 0;
         font-family: 'Orbitron', sans-serif;
         font-size: 0.8125rem;
-        font-weight: 950;
+        font-weight: 800;
         letter-spacing: 0.17em;
         text-transform: uppercase;
-        color: var(--driver-text);
+        color: var(--text);
     }
 
     .driver-section-line {
@@ -511,9 +392,10 @@
     }
 
     .driver-section-kicker {
-        color: var(--driver-muted);
+        color: var(--muted);
+        font-family: 'Orbitron', sans-serif;
         font-size: 0.5625rem;
-        font-weight: 850;
+        font-weight: 700;
         letter-spacing: 0.17em;
         text-transform: uppercase;
         white-space: nowrap;
@@ -537,10 +419,10 @@
     }
 
     .driver-info-label {
-        color: var(--driver-muted);
+        color: var(--muted);
         font-family: 'Orbitron', sans-serif;
         font-size: 0.5625rem;
-        font-weight: 850;
+        font-weight: 700;
         letter-spacing: 0.14em;
         text-transform: uppercase;
     }
@@ -553,7 +435,7 @@
     }
 
     .driver-info-value a {
-        color: var(--driver-green);
+        color: var(--brand-green);
         text-decoration: none;
         transition: color 0.25s ease;
     }
@@ -586,24 +468,24 @@
         align-items: center;
         justify-content: center;
         border-radius: 1rem;
-        color: var(--driver-green);
+        color: var(--brand-green);
         background: rgba(var(--brand-green-rgb), 0.12);
         border: 1px solid rgba(var(--brand-green-rgb), 0.22);
         flex: 0 0 auto;
     }
 
     .driver-contact-title {
-        color: var(--driver-muted);
+        color: var(--muted);
         font-family: 'Orbitron', sans-serif;
         font-size: 0.5625rem;
-        font-weight: 850;
+        font-weight: 700;
         letter-spacing: 0.15em;
         text-transform: uppercase;
     }
 
     .driver-contact-value {
         margin-top: 0.3125rem;
-        color: var(--driver-text);
+        color: var(--text);
         font-size: 0.875rem;
         overflow-wrap: anywhere;
     }
@@ -642,7 +524,7 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        color: var(--driver-green);
+        color: var(--brand-green);
         background: rgba(var(--brand-green-rgb), 0.12);
         border: 1px solid rgba(var(--brand-green-rgb), 0.22);
         margin-bottom: 1.125rem;
@@ -650,19 +532,19 @@
 
     .driver-stat-value {
         font-family: 'Orbitron', sans-serif;
-        color: var(--driver-text);
+        color: var(--text);
         font-size: clamp(1.45rem, 2.5vw, 2rem);
         line-height: 1;
-        font-weight: 950;
+        font-weight: 800;
         overflow-wrap: anywhere;
     }
 
     .driver-stat-label {
         margin-top: 0.625rem;
-        color: var(--driver-muted);
+        color: var(--muted);
         font-family: 'Orbitron', sans-serif;
         font-size: 0.5625rem;
-        font-weight: 850;
+        font-weight: 700;
         letter-spacing: 0.16em;
         text-transform: uppercase;
     }
@@ -691,10 +573,11 @@
         cursor: pointer;
         border-radius: 1.25rem;
         padding: 0.75rem 0.875rem;
-        color: var(--driver-muted);
+        color: var(--muted);
         background: transparent;
+        font-family: 'Orbitron', sans-serif;
         font-size: 0.625rem;
-        font-weight: 900;
+        font-weight: 700;
         letter-spacing: 0.14em;
         text-transform: uppercase;
         transition: color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
@@ -707,7 +590,7 @@
 
     .driver-tab.active {
         color: rgba(4,10,6,0.96);
-        background: linear-gradient(135deg, var(--driver-green), var(--driver-yellow));
+        background: linear-gradient(135deg, var(--brand-green), var(--brand-yellow));
         box-shadow: 0 0.875rem 2rem rgba(var(--brand-green-rgb), 0.2);
     }
 
@@ -754,20 +637,20 @@
     }
 
     .driver-highlight-value {
-        color: var(--driver-text);
+        color: var(--text);
         font-family: 'Orbitron', sans-serif;
         font-size: 1.125rem;
-        font-weight: 950;
+        font-weight: 800;
         line-height: 1.35;
         overflow-wrap: anywhere;
     }
 
     .driver-highlight-label {
         margin-top: 0.625rem;
-        color: var(--driver-muted);
+        color: var(--muted);
         font-family: 'Orbitron', sans-serif;
         font-size: 0.5625rem;
-        font-weight: 850;
+        font-weight: 700;
         letter-spacing: 0.16em;
         text-transform: uppercase;
     }
@@ -789,27 +672,27 @@
 
     .driver-timeline-title {
         margin: 0;
-        color: var(--driver-text);
+        color: var(--text);
         font-family: 'Orbitron', sans-serif;
         font-size: 0.8125rem;
-        font-weight: 900;
+        font-weight: 800;
         letter-spacing: 0.12em;
         text-transform: uppercase;
     }
 
     .driver-timeline-text {
         margin-top: 0.5rem;
-        color: var(--driver-muted);
+        color: var(--muted);
         font-size: 0.875rem;
         line-height: 1.65;
     }
 
     .driver-timeline-date {
         margin-top: 0.75rem;
-        color: var(--driver-green);
+        color: var(--brand-green);
         font-family: 'Orbitron', sans-serif;
         font-size: 0.5625rem;
-        font-weight: 900;
+        font-weight: 700;
         letter-spacing: 0.16em;
         text-transform: uppercase;
     }
@@ -854,7 +737,7 @@
         bottom: 0.8125rem;
         padding: 0.6875rem 0.8125rem;
         border-radius: 1rem;
-        color: var(--driver-text);
+        color: var(--text);
         background: rgba(4,10,6,0.74);
         border: 1px solid rgba(255,255,255,0.09);
         backdrop-filter: blur(1rem);
@@ -865,7 +748,7 @@
     .driver-empty {
         padding: 2rem;
         border-radius: 1.3rem;
-        color: var(--driver-muted);
+        color: var(--muted);
         text-align: center;
         line-height: 1.7;
         background: rgba(255,255,255,0.03);
@@ -875,7 +758,7 @@
     .driver-empty strong {
         display: block;
         margin-bottom: 0.5rem;
-        color: var(--driver-text);
+        color: var(--text);
         font-family: 'Orbitron', sans-serif;
         font-size: 0.75rem;
         letter-spacing: 0.13em;
@@ -903,10 +786,10 @@
     }
 
     .driver-form-label {
-        color: var(--driver-muted);
+        color: var(--muted);
         font-family: 'Orbitron', sans-serif;
         font-size: 0.5625rem;
-        font-weight: 900;
+        font-weight: 700;
         letter-spacing: 0.16em;
         text-transform: uppercase;
     }
@@ -920,7 +803,7 @@
         border: 1px solid rgba(255,255,255,0.095);
         outline: 0;
         background: rgba(0,0,0,0.32);
-        color: var(--driver-text);
+        color: var(--text);
         padding: 0.8125rem 0.9375rem;
         font-size: 0.875rem;
         transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
@@ -941,7 +824,7 @@
     }
 
     .driver-form-hint {
-        color: var(--driver-muted);
+        color: var(--muted);
         font-size: 0.75rem;
         line-height: 1.55;
     }
@@ -963,13 +846,13 @@
     }
 
     .driver-switch-row strong {
-        color: var(--driver-text);
+        color: var(--text);
         font-size: 0.875rem;
     }
 
     .driver-switch-row p {
         margin: 0.3125rem 0 0;
-        color: var(--driver-muted);
+        color: var(--muted);
         font-size: 0.75rem;
         line-height: 1.55;
     }
@@ -991,7 +874,7 @@
         position: absolute;
         inset: 0;
         cursor: pointer;
-        border-radius: 62.4375rem;
+        border-radius: 50px;
         background: rgba(255,255,255,0.13);
         border: 1px solid rgba(255,255,255,0.13);
         transition: 0.24s ease;
@@ -1004,7 +887,7 @@
         height: 1.32rem;
         left: 0.24rem;
         top: 0.22rem;
-        border-radius: 62.4375rem;
+        border-radius: 50%;
         background: rgba(255,255,255,0.78);
         transition: 0.24s ease;
     }
@@ -1016,7 +899,7 @@
 
     .driver-switch input:checked + .driver-slider::before {
         transform: translateX(1.5rem);
-        background: var(--driver-green);
+        background: var(--brand-green);
         box-shadow: 0 0 1.125rem rgba(var(--brand-green-rgb), 0.65);
     }
 
@@ -1039,13 +922,13 @@
         transition: opacity 0.25s ease, transform 0.25s ease;
         padding: 0.875rem 1.0625rem;
         border-radius: 1.0625rem;
-        color: var(--driver-green);
+        color: var(--brand-green);
         background: rgba(4,10,6,0.94);
         border: 1px solid rgba(var(--brand-green-rgb), 0.36);
         box-shadow: 0 1.5rem 4.375rem rgba(0,0,0,0.45);
         font-family: 'Orbitron', sans-serif;
         font-size: 0.625rem;
-        font-weight: 900;
+        font-weight: 800;
         letter-spacing: 0.16em;
         text-transform: uppercase;
     }
@@ -1132,11 +1015,6 @@
             padding: 1rem;
         }
 
-        .driver-card,
-        .driver-glass-card {
-            border-radius: 1.3rem;
-        }
-
         .driver-status,
         .driver-highlight-card,
         .driver-stat-card,
@@ -1147,11 +1025,12 @@
             border-radius: 1.25rem;
         }
 
-        .driver-btn {
+        .btn-primary, .btn-secondary {
             width: 100%;
         }
 
-        .driver-form-actions .driver-btn {
+        .driver-form-actions .btn-primary,
+        .driver-form-actions .btn-secondary {
             width: 100%;
         }
 
@@ -1162,7 +1041,6 @@
         }
     }
 
-    /* Base.html-Fit: die Unterseite bleibt innerhalb der base-shell und nutzt rem-Skalierung. */
     @media (min-width: 1536px) {
         .driver-profile {
             gap: 1.2rem;
@@ -1196,7 +1074,6 @@
             min-width: 100%;
         }
     }
-
 </style>
 
 <section class="driver-profile">
@@ -1240,8 +1117,8 @@
                 </div>
 
                 <div class="driver-actions">
-                    <button type="button" onclick="copyProfileLink()" class="driver-btn driver-btn-secondary">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <button type="button" onclick="copyProfileLink()" class="btn-secondary">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5"></path>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5"></path>
                         </svg>
@@ -1249,8 +1126,8 @@
                     </button>
 
                     {% if website %}
-                        <a href="{{ website }}" target="_blank" rel="noopener" class="driver-btn driver-btn-secondary">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <a href="{{ website }}" target="_blank" rel="noopener" class="btn-secondary">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.5 6H18m0 0v4.5M18 6l-7.5 7.5"></path>
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 8.25v9.75h9.75"></path>
                             </svg>
@@ -1259,8 +1136,8 @@
                     {% endif %}
 
                     {% if own_profile %}
-                        <button type="button" data-open-tab="settings" class="driver-btn driver-btn-primary">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <button type="button" data-open-tab="settings" class="btn-primary">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.757.426 1.757 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.757-2.924 1.757-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.757-.426-1.757-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.607 2.296.07 2.572-1.065z"></path>
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                             </svg>
@@ -1271,7 +1148,7 @@
             </div>
 
             <aside class="driver-hero-panel">
-                <div class="driver-glass-card driver-card-padding">
+                <div class="glass-card driver-card-padding">
                     <div class="driver-progress-top">
                         <div>
                             <div class="driver-mini-label">Profilstatus</div>
@@ -1301,7 +1178,7 @@
 
     <div class="driver-layout">
         <aside class="driver-sidebar">
-            <section class="driver-card driver-section">
+            <section class="glass-card driver-section">
                 <div class="driver-section-head">
                     <h2 class="driver-section-title">Driver Info</h2>
                     <span class="driver-section-line"></span>
@@ -1336,7 +1213,7 @@
                 </div>
             </section>
 
-            <section class="driver-card driver-section">
+            <section class="glass-card driver-section">
                 <div class="driver-section-head">
                     <h2 class="driver-section-title">Kontakt</h2>
                     <span class="driver-section-line"></span>
@@ -1430,7 +1307,7 @@
 
         <main class="driver-main">
             {% if show_stats %}
-                <section class="driver-card driver-section">
+                <section class="glass-card driver-section">
                     <div class="driver-section-head">
                         <h2 class="driver-section-title">Performance</h2>
                         <span class="driver-section-line"></span>
@@ -1481,7 +1358,7 @@
                 </section>
             {% endif %}
 
-            <section class="driver-card driver-section">
+            <section class="glass-card driver-section">
                 <div class="driver-tabs-wrap">
                     <div class="driver-tabs {% if not own_profile %}three-tabs{% endif %}" role="tablist" aria-label="Profilbereiche">
                         <button class="driver-tab active" type="button" data-tab="overview" role="tab" aria-controls="tab-overview" aria-selected="true">Übersicht</button>
@@ -1743,9 +1620,9 @@
                             </div>
 
                             <div class="driver-form-actions">
-                                <button type="reset" class="driver-btn driver-btn-secondary">Zurücksetzen</button>
-                                <button type="submit" class="driver-btn driver-btn-primary">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <button type="reset" class="btn-secondary">Zurücksetzen</button>
+                                <button type="submit" class="btn-primary">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                                     </svg>
                                     Einstellungen speichern
