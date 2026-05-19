@@ -301,7 +301,7 @@
     }
 
     .document-paper-wrap {
-        --document-paper-zoom: 0.78;
+        --document-paper-zoom: 1;
         padding: clamp(0.8rem, 1.4vw, 1.2rem);
         overflow: auto;
         height: 100%;
@@ -520,9 +520,29 @@
         }
     }
 
-    /* Dokumentenansicht bewusst herausgezoomt: nur die Papier-/Dokumentfläche
-       aus „Eingereichte Dokumente“ > Aktion „Dokument“ wird kleiner dargestellt.
-       Die rechte Aktionsspalte bleibt normal groß und bedienbar. */
+    /* Dokumentenmodal aus „Eingereichte Dokumente“ > Aktion „Dokument“
+       komplett auf 80% herausgezoomt, damit Papieransicht und Aktionsspalte
+       wie im Screenshot gemeinsam kleiner und vollständig sichtbar sind. */
+    @media (min-width: 1025px) {
+        .document-modal-backdrop {
+            padding: 0;
+        }
+
+        .document-modal-shell {
+            --document-modal-zoom: 0.80;
+            width: 1210px;
+            height: 860px;
+            max-height: 860px;
+            transform: scale(var(--document-modal-zoom));
+            transform-origin: center center;
+            will-change: transform;
+        }
+
+        .document-paper-wrap {
+            --document-paper-zoom: 1;
+        }
+    }
+
     @media (max-width: 1024px) {
         .document-paper-wrap {
             --document-paper-zoom: 0.72;
