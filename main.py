@@ -146,6 +146,11 @@ TOUR_RECEIPT_CURRENCY = env_first("TOUR_RECEIPT_CURRENCY", "DEFAULT_CURRENCY", d
 TOUR_RECEIPT_RATE_PER_KM = env_float("TOUR_RECEIPT_RATE_PER_KM", "TRACKER_EURO_PER_KM", default=3.2)
 SERVER_HOST = env_first("SERVER_HOST", "HOST", default="0.0.0.0")
 SERVER_PORT = int(env_float("SERVER_PORT", "PORT", default=5005))
+TRACKER_JOB_START_PUBLIC_URL = env_first(
+    "TRACKER_JOB_START_PUBLIC_URL",
+    "TRACKER_JOBS_START_PUBLIC_URL",
+    default="https://www.eifellog.de/api/tracker/jobs/start"
+)
 
 
 # ==========================================
@@ -332,6 +337,7 @@ def ensure_indexes():
 
         tracker_job_starts_collection.create_index([("discord_id", ASCENDING)], unique=False)
         tracker_job_starts_collection.create_index([("job_id", ASCENDING)], unique=False)
+        tracker_job_starts_collection.create_index([("job_start_key", ASCENDING)], unique=False)
         tracker_job_starts_collection.create_index([("status", ASCENDING)], unique=False)
         tracker_job_starts_collection.create_index([("created_at", DESCENDING)], unique=False)
     except Exception as error:
@@ -6732,10 +6738,18 @@ def tracker_work_session():
     })
 
 
-@app.route("/api/tracker/jobs/start", methods=["POST", "OPTIONS"])
+@app.route("/api/tracker/jobs/start", methods=["GET", "POST", "OPTIONS"])
 def tracker_jobs_start():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
+    if request.method == "GET":
+        return jsonify({
+            "success": True,
+            "message": "Tracker Job-Start API ist aktiv. Bitte per POST JSON senden.",
+            "endpoint": TRACKER_JOB_START_PUBLIC_URL,
+            "route": "/api/tracker/jobs/start",
+            "method": "POST"
+        })
 
     data = request.get_json(silent=True) or {}
     user_doc, client_token, error_response = tracker_auth_user_from_payload(data)
@@ -6772,8 +6786,18 @@ def tracker_jobs_start():
     current_job = current_job_from_live(telemetry) if telemetry else None
     now = now_utc()
 
+    current_job_key = tracker_current_job_key(telemetry, user_doc) if telemetry else ""
+    job_start_key = current_job_key or f"job:{safe_str(job_id)}"
+
+    existing_job_start = tracker_job_starts_collection.find_one({
+        "discord_id": safe_str(user_doc.get("discord_id")),
+        "job_start_key": job_start_key,
+        "status": "started",
+    })
+
     job_doc = {
         "job_id": job_id,
+        "job_start_key": job_start_key,
         "discord_id": safe_str(user_doc.get("discord_id")),
         "user_id": safe_str(user_doc.get("discord_id")),
         "user_mongo_id": safe_str(user_doc.get("_id")),
@@ -6787,10 +6811,26 @@ def tracker_jobs_start():
         "current_job": current_job,
         "status": "started",
         "checked_at": safe_str(data.get("checkedAt")),
-        "created_at": now,
+        "endpoint": TRACKER_JOB_START_PUBLIC_URL,
         "updated_at": now,
     }
-    tracker_job_starts_collection.insert_one(job_doc)
+
+    if existing_job_start:
+        tracker_job_starts_collection.update_one(
+            {"_id": existing_job_start["_id"]},
+            {
+                "$set": job_doc,
+                "$inc": {"start_request_count": 1},
+                "$setOnInsert": {"created_at": now},
+            },
+            upsert=False,
+        )
+        already_started = True
+    else:
+        job_doc["created_at"] = now
+        job_doc["start_request_count"] = 1
+        tracker_job_starts_collection.insert_one(job_doc)
+        already_started = False
 
     set_payload = {
         "tracker_last_job_start_id": job_id,
@@ -6807,7 +6847,6 @@ def tracker_jobs_start():
         })
     start_discord_result = {"sent": False, "skipped": True, "reason": "Keine aktive Tour-Telemetrie beim Job-Start."}
     if current_job:
-        current_job_key = tracker_current_job_key(telemetry, user_doc)
         set_payload["tracker_current_job"] = current_job
         set_payload["tracker_current_job_key"] = current_job_key
         start_discord_result = send_tour_start_once_for_active_tour(user_doc, telemetry, current_job_key=current_job_key)
@@ -6821,10 +6860,14 @@ def tracker_jobs_start():
     response_payload = tracker_state_payload(fresh_user)
     response_payload.update({
         "message": "Auftrag gestartet. Voraussetzungen wurden serverseitig geprüft.",
+        "endpoint": TRACKER_JOB_START_PUBLIC_URL,
         "jobStart": {
             "jobId": job_id,
+            "jobStartKey": job_start_key,
             "status": "started",
+            "alreadyStarted": already_started,
             "startedAt": datetime_to_iso(now),
+            "endpoint": TRACKER_JOB_START_PUBLIC_URL,
         },
         "eligibility": eligibility,
         "workSession": work_session,
@@ -11041,11 +11084,13 @@ def health_check():
         "service": "EifelLog",
         "database": MONGO_DB_NAME,
         "time": now_utc().isoformat() + "Z",
+        "trackerJobStartUrl": TRACKER_JOB_START_PUBLIC_URL,
         "trackerRoutes": [
             "/api/tracker/login", "/api/tracker/session", "/api/tracker/profile",
             "/api/tracker/state", "/api/tracker/telemetry/live",
             "/api/tracker/driver-card", "/api/tracker/driver-card/upload",
             "/api/tracker/work-session", "/api/tracker/jobs/start",
+            TRACKER_JOB_START_PUBLIC_URL,
             "/api/tracker/tour/submit", "/api/tracker/job/complete", "/api/tracker/logout",
             "/webhook", "/api/tracker/webhook", "/api/tracker/discord/webhook"
         ]
