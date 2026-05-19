@@ -9400,6 +9400,490 @@ def personalabteilung():
     )
 
 
+# ==========================================
+# PERSONALABTEILUNG / FAHRERKARTEN-DATEN API
+# ==========================================
+# Diese Endpunkte werden vom Tab "Fahrerkarten Daten" in Personalabteilung.html
+# aufgerufen. Sie geben IMMER JSON zurück. Dadurch erscheint im Frontend nicht mehr
+# "Server hat keine gültige JSON-Antwort gesendet", wenn ein Endpoint fehlt oder
+# ein Beleg nicht erzeugt werden kann.
+
+FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER = env_first(
+    "FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER",
+    "DRIVER_CARD_REPORT_FOLDER",
+    default=os.path.join("static", "downloads", "personalabteilung", "fahrerkarten_daten")
+)
+
+
+def personalabteilung_json_error(message, status=400, **extra):
+    payload = {"success": False, "message": safe_str(message, "Aktion fehlgeschlagen.")}
+    payload.update(extra)
+    return jsonify(payload), status
+
+
+def find_driver_for_personalabteilung(driver_id):
+    driver_id = safe_str(driver_id)
+    if not driver_id:
+        return None
+
+    lookup_items = [
+        {"discord_id": driver_id},
+        {"user_id": driver_id},
+        {"id": driver_id},
+        {"username": {"$regex": f"^{re.escape(driver_id)}$", "$options": "i"}},
+        {"username_lc": driver_id.lower()},
+    ]
+    object_id = object_id_or_none(driver_id)
+    if object_id:
+        lookup_items.append({"_id": object_id})
+
+    return users_collection.find_one({"$or": lookup_items})
+
+
+def get_driver_card_doc_for_personalabteilung(user_doc, create_if_missing=True):
+    user_doc = user_doc or {}
+    discord_id = safe_str(user_doc.get("discord_id"))
+    query = {
+        "$or": [
+            {"discord_id": discord_id},
+            {"user_id": discord_id},
+            {"source_user_mongo_id": safe_str(user_doc.get("_id"))},
+        ],
+        "archived": {"$ne": True},
+    }
+
+    card_doc = tracker_driver_cards_collection.find_one(query, sort=[("updated_at", DESCENDING), ("created_at", DESCENDING)])
+    if card_doc or not create_if_missing:
+        return card_doc
+
+    latest_request = tracker_latest_issued_fahrerkarte_request(user_doc) if "tracker_latest_issued_fahrerkarte_request" in globals() else get_latest_fahrerkarte_request_for_user(discord_id)
+    if latest_request:
+        extra = {
+            "status": "Aktiv" if normalize_fahrerkarte_status(latest_request.get("status")) == "issued" else "Vorbereitet",
+            "cardId": latest_request.get("card_id") or generate_fahrerkarte_card_id(discord_id, latest_request.get("request_id")),
+            "downloadUrl": latest_request.get("download_url") or servicecenter_fahrerkarte_download_url(latest_request.get("request_id")),
+            "fileName": latest_request.get("pdf_filename") or "",
+            "fileRelativePath": latest_request.get("pdf_relative_path") or "",
+        }
+    else:
+        extra = {
+            "status": "Vorbereitet",
+            "cardId": generate_fahrerkarte_card_id(discord_id),
+        }
+
+    if "tracker_build_driver_card_doc" in globals():
+        card_doc = tracker_build_driver_card_doc(user_doc, source_request=latest_request or {}, source="personalabteilung_query", extra=extra)
+    else:
+        now = now_utc()
+        card_doc = {
+            "card_id": extra.get("cardId"),
+            "discord_id": discord_id,
+            "user_id": discord_id,
+            "display_name": user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username") or "EifelLog Fahrer",
+            "username": user_doc.get("username") or user_doc.get("discord_username") or "driver",
+            "status": extra.get("status"),
+            "active": True,
+            "created_at": now,
+            "updated_at": now,
+            "source": "personalabteilung_query",
+        }
+
+    card_doc["last_query_at"] = now_utc()
+    card_doc["compliance_status"] = card_doc.get("compliance_status") or "unknown"
+    card_doc["compliance_label"] = card_doc.get("compliance_label") or "Prüfung offen"
+    card_doc["compliance_summary"] = card_doc.get("compliance_summary") or "Noch keine Lenk-/Ruhezeit-Prüfung gespeichert."
+
+    tracker_driver_cards_collection.update_one(
+        {"discord_id": discord_id, "card_id": card_doc.get("card_id")},
+        mongo_upsert_set_preserve_created_at(card_doc),
+        upsert=True,
+    )
+    return tracker_driver_cards_collection.find_one({"discord_id": discord_id, "card_id": card_doc.get("card_id")})
+
+
+def driver_card_json_payload(user_doc, card_doc=None, **extra):
+    user_doc = user_doc or {}
+    card_doc = card_doc or {}
+    now_text = format_datetime_for_template(card_doc.get("last_query_at") or card_doc.get("updated_at") or now_utc())
+    card_id = safe_str(card_doc.get("card_id") or card_doc.get("cardId") or card_doc.get("fahrerkarte_card_id"))
+    if not card_id:
+        card_id = generate_fahrerkarte_card_id(user_doc.get("discord_id"))
+
+    compliance_status = safe_str(
+        extra.get("complianceStatus")
+        or card_doc.get("compliance_status")
+        or card_doc.get("driving_time_status")
+        or "unknown"
+    ).lower()
+    if compliance_status not in {"ok", "warning", "violation", "unknown"}:
+        compliance_status = "unknown"
+
+    default_labels = {
+        "ok": "Eingehalten",
+        "warning": "Prüfen",
+        "violation": "Verstoß",
+        "unknown": "Prüfung offen",
+    }
+    default_summaries = {
+        "ok": "Keine Auffälligkeiten in den gespeicherten Fahrerkarten-Daten.",
+        "warning": "Daten vorhanden, bitte Zeitraum manuell prüfen.",
+        "violation": "Möglicher Verstoß erkannt oder markiert.",
+        "unknown": "Noch keine Lenk-/Ruhezeit-Prüfung gespeichert.",
+    }
+
+    payload = {
+        "success": True,
+        "driverId": safe_str(user_doc.get("discord_id") or user_doc.get("_id")),
+        "driverName": user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username") or "EifelLog Fahrer",
+        "cardId": card_id,
+        "card_id": card_id,
+        "driverCardId": card_id,
+        "cardStatus": safe_str(card_doc.get("status") or "queried"),
+        "lastQuery": now_text,
+        "last_query": now_text,
+        "queriedAt": now_text,
+        "complianceStatus": compliance_status,
+        "compliance_status": compliance_status,
+        "complianceLabel": safe_str(extra.get("complianceLabel") or card_doc.get("compliance_label") or default_labels[compliance_status]),
+        "complianceSummary": safe_str(extra.get("complianceSummary") or card_doc.get("compliance_summary") or default_summaries[compliance_status]),
+    }
+    payload.update(extra)
+    return payload
+
+
+def write_simple_pdf_file(title, lines, filename_prefix):
+    """Erzeugt einen einfachen, gültigen PDF-Beleg ohne externe Pflicht-Abhängigkeit."""
+    os.makedirs(os.path.join(BASE_DIR, FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER), exist_ok=True)
+    filename = f"{filename_prefix}_{now_utc().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.pdf"
+    relative_path = os.path.join(FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER, filename).replace("\\", "/")
+    absolute_path = os.path.join(BASE_DIR, relative_path)
+
+    safe_lines = [safe_str(title)] + [safe_str(line) for line in (lines or [])]
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfgen import canvas
+        buffer = BytesIO()
+        pdf = canvas.Canvas(buffer, pagesize=A4)
+        width, height = A4
+        y = height - 56
+        pdf.setTitle(title)
+        pdf.setFont("Helvetica-Bold", 16)
+        pdf.drawString(48, y, safe_lines[0][:90])
+        y -= 30
+        pdf.setFont("Helvetica", 10)
+        for line in safe_lines[1:]:
+            for chunk in [line[i:i+105] for i in range(0, len(line), 105)] or [""]:
+                if y < 54:
+                    pdf.showPage()
+                    pdf.setFont("Helvetica", 10)
+                    y = height - 56
+                pdf.drawString(48, y, chunk)
+                y -= 15
+        pdf.save()
+        pdf_bytes = buffer.getvalue()
+    except Exception:
+        # Minimal-PDF-Fallback: ASCII-kompatibel, reicht für Download/Archivierung.
+        text_lines = []
+        for line in safe_lines:
+            cleaned = line.encode("latin-1", "replace").decode("latin-1").replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+            text_lines.append(cleaned[:110])
+        content = "BT /F1 12 Tf 48 790 Td 14 TL " + " ".join(f"({line}) Tj T*" for line in text_lines) + " ET"
+        objects = [
+            "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+            "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+            "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj",
+            "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+            f"5 0 obj << /Length {len(content.encode('latin-1'))} >> stream\n{content}\nendstream endobj",
+        ]
+        pdf = "%PDF-1.4\n"
+        offsets = [0]
+        for obj in objects:
+            offsets.append(len(pdf.encode("latin-1")))
+            pdf += obj + "\n"
+        xref = len(pdf.encode("latin-1"))
+        pdf += f"xref\n0 {len(objects)+1}\n0000000000 65535 f \n"
+        for off in offsets[1:]:
+            pdf += f"{off:010d} 00000 n \n"
+        pdf += f"trailer << /Size {len(objects)+1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF"
+        pdf_bytes = pdf.encode("latin-1")
+
+    with open(absolute_path, "wb") as file:
+        file.write(pdf_bytes)
+    return filename, relative_path, make_external_url(url_for("static", filename=relative_path.replace("static/", "", 1)))
+
+
+def create_driver_card_beleg(user_doc, card_doc, document_type="driver_card_data_pdf", date_from="", date_to="", note=""):
+    user_doc = user_doc or {}
+    card_doc = card_doc or {}
+    is_compliance = document_type == "driving_time_compliance_pdf"
+    card_id = safe_str(card_doc.get("card_id") or card_doc.get("cardId") or generate_fahrerkarte_card_id(user_doc.get("discord_id")))
+    driver_name = user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username") or "EifelLog Fahrer"
+    title = "EifelLog Lenk-/Ruhezeiten Prüfbeleg" if is_compliance else "EifelLog Fahrerkarten-Daten Beleg"
+    reference = f"EL-FKD-{now_utc().strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
+    period = f"{safe_str(date_from, 'nicht gesetzt')} bis {safe_str(date_to, 'nicht gesetzt')}"
+    compliance_status = "warning" if is_compliance else safe_str(card_doc.get("compliance_status") or "unknown")
+    compliance_label = "Manuelle Prüfung erforderlich" if is_compliance else safe_str(card_doc.get("compliance_label") or "Prüfung offen")
+    compliance_summary = "Für den gewählten Zeitraum wurde ein Prüfbeleg erstellt. Bitte Tachodaten/Lenkzeiten fachlich prüfen." if is_compliance else safe_str(card_doc.get("compliance_summary") or "Fahrerkarten-Daten wurden abgefragt und als Beleg exportiert.")
+
+    lines = [
+        f"Referenz: {reference}",
+        f"Erstellt am: {format_datetime_for_template(now_utc())}",
+        f"Fahrer: {driver_name}",
+        f"Discord-ID: {safe_str(user_doc.get('discord_id'))}",
+        f"Karten-ID: {card_id}",
+        f"Dokumenttyp: {document_type}",
+        f"Zeitraum: {period}",
+        f"Prüfstatus: {compliance_label}",
+        f"Zusammenfassung: {compliance_summary}",
+        f"Notiz: {safe_str(note, '-')}",
+        "Hinweis: Dieser Beleg ist ein interner EifelLog-Systemnachweis und kein amtliches Dokument.",
+    ]
+    prefix = "lenk_ruhezeiten" if is_compliance else "fahrerkarte_daten"
+    filename, relative_path, download_url = write_simple_pdf_file(title, lines, prefix)
+
+    now = now_utc()
+    report_doc = {
+        "beleg_id": reference,
+        "reference": reference,
+        "discord_id": safe_str(user_doc.get("discord_id")),
+        "driver_name": driver_name,
+        "card_id": card_id,
+        "document_type": document_type,
+        "date_from": safe_str(date_from),
+        "date_to": safe_str(date_to),
+        "note": safe_str(note),
+        "pdf_filename": filename,
+        "pdf_relative_path": relative_path,
+        "download_url": download_url,
+        "compliance_status": compliance_status,
+        "compliance_label": compliance_label,
+        "compliance_summary": compliance_summary,
+        "created_at": now,
+        "created_by": current_staff_identity(),
+        "source": "personalabteilung_fahrerkarten_daten",
+    }
+    system_documents_collection.insert_one({
+        "document_id": reference,
+        "discord_id": safe_str(user_doc.get("discord_id")),
+        "title": title,
+        "sender": "Personalabteilung",
+        "date": format_datetime_for_template(now),
+        "content": f"<p>{title} wurde erstellt.</p><p><strong>Referenz:</strong> {reference}</p><p><strong>Karten-ID:</strong> {card_id}</p><p>{compliance_summary}</p>",
+        "type": document_type,
+        "needs_signature": False,
+        "created_at": now,
+        "read": False,
+        "hidden": True,
+        "download_url": download_url,
+        "download_label": "PDF herunterladen",
+        "download_filename": filename,
+        "pdf_relative_path": relative_path,
+        "source": "personalabteilung_fahrerkarten_daten_archive",
+    })
+    return report_doc
+
+
+@app.route("/api/personalabteilung/fahrerkarte/data/query", methods=["POST", "OPTIONS"])
+def api_personalabteilung_fahrerkarte_data_query():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
+
+    try:
+        data = request.get_json(silent=True) or {}
+        driver_id = safe_str(data.get("driverId") or data.get("driver_id") or data.get("discordId") or data.get("discord_id"))
+        if not driver_id:
+            return personalabteilung_json_error("Fahrer-ID fehlt.", 400)
+        user_doc = find_driver_for_personalabteilung(driver_id)
+        if not user_doc:
+            return personalabteilung_json_error("Fahrer wurde nicht gefunden.", 404)
+
+        card_doc = get_driver_card_doc_for_personalabteilung(user_doc, create_if_missing=True)
+        now = now_utc()
+        tracker_driver_cards_collection.update_one(
+            {"_id": card_doc["_id"]},
+            {"$set": {"last_query_at": now, "updated_at": now, "queried_by": current_staff_identity()}},
+        )
+        card_doc = tracker_driver_cards_collection.find_one({"_id": card_doc["_id"]})
+        return jsonify(driver_card_json_payload(
+            user_doc,
+            card_doc,
+            message="Fahrerkarten-Daten wurden erfolgreich aus der Datenbank abgefragt.",
+        ))
+    except Exception as error:
+        app.logger.exception("Fahrerkarten-Datenabfrage fehlgeschlagen")
+        return personalabteilung_json_error(f"Fahrerkarten-Daten konnten nicht abgefragt werden: {error}", 500)
+
+
+@app.route("/api/personalabteilung/fahrerkarte/pdf/create", methods=["POST", "OPTIONS"])
+def api_personalabteilung_fahrerkarte_pdf_create():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
+
+    try:
+        data = request.get_json(silent=True) or {}
+        driver_id = safe_str(data.get("driverId") or data.get("driver_id"))
+        if not driver_id:
+            return personalabteilung_json_error("Fahrer-ID fehlt.", 400)
+        user_doc = find_driver_for_personalabteilung(driver_id)
+        if not user_doc:
+            return personalabteilung_json_error("Fahrer wurde nicht gefunden.", 404)
+        card_doc = get_driver_card_doc_for_personalabteilung(user_doc, create_if_missing=True)
+        report_doc = create_driver_card_beleg(
+            user_doc,
+            card_doc,
+            document_type="driver_card_data_pdf",
+            date_from=data.get("dateFrom") or data.get("date_from") or "",
+            date_to=data.get("dateTo") or data.get("date_to") or "",
+            note=data.get("note") or "",
+        )
+        payload = driver_card_json_payload(user_doc, card_doc, message="Fahrerkarten-PDF-Beleg wurde erstellt.")
+        payload.update({
+            "downloadUrl": report_doc["download_url"],
+            "download_url": report_doc["download_url"],
+            "downloadFilename": report_doc["pdf_filename"],
+            "download_filename": report_doc["pdf_filename"],
+            "reference": report_doc["reference"],
+            "belegId": report_doc["beleg_id"],
+        })
+        return jsonify(payload)
+    except Exception as error:
+        app.logger.exception("Fahrerkarten-PDF-Erstellung fehlgeschlagen")
+        return personalabteilung_json_error(f"PDF-Beleg konnte nicht erstellt werden: {error}", 500)
+
+
+@app.route("/api/personalabteilung/fahrerkarte/pdf/send", methods=["POST", "OPTIONS"])
+def api_personalabteilung_fahrerkarte_pdf_send():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
+
+    try:
+        data = request.get_json(silent=True) or {}
+        driver_id = safe_str(data.get("driverId") or data.get("driver_id"))
+        if not driver_id:
+            return personalabteilung_json_error("Fahrer-ID fehlt.", 400)
+        user_doc = find_driver_for_personalabteilung(driver_id)
+        if not user_doc:
+            return personalabteilung_json_error("Fahrer wurde nicht gefunden.", 404)
+        card_doc = get_driver_card_doc_for_personalabteilung(user_doc, create_if_missing=True)
+        report_doc = create_driver_card_beleg(
+            user_doc,
+            card_doc,
+            document_type="driver_card_data_pdf",
+            date_from=data.get("dateFrom") or data.get("date_from") or "",
+            date_to=data.get("dateTo") or data.get("date_to") or "",
+            note=data.get("note") or "",
+        )
+        create_system_document_for_user(
+            user_doc.get("discord_id"),
+            "Fahrerkarten-Daten PDF-Beleg",
+            "Personalabteilung",
+            f"<p>Dein Fahrerkarten-Daten-Beleg wurde erstellt.</p><p><strong>Referenz:</strong> {report_doc['reference']}</p><p><strong>Karten-ID:</strong> {report_doc['card_id']}</p>",
+            doc_type="driver_card_data_pdf",
+            needs_signature=False,
+            extra={
+                "important": True,
+                "download_url": report_doc["download_url"],
+                "download_label": "PDF-Beleg herunterladen",
+                "download_filename": report_doc["pdf_filename"],
+                "pdf_relative_path": report_doc["pdf_relative_path"],
+                "contains_driver_card": True,
+            },
+        )
+        payload = driver_card_json_payload(user_doc, card_doc, message="Fahrerkarten-PDF-Beleg wurde erstellt und an den User gesendet.")
+        payload.update({
+            "downloadUrl": report_doc["download_url"],
+            "downloadFilename": report_doc["pdf_filename"],
+            "reference": report_doc["reference"],
+            "belegId": report_doc["beleg_id"],
+            "sentToUser": True,
+        })
+        return jsonify(payload)
+    except Exception as error:
+        app.logger.exception("Fahrerkarten-PDF-Versand fehlgeschlagen")
+        return personalabteilung_json_error(f"PDF-Beleg konnte nicht gesendet werden: {error}", 500)
+
+
+@app.route("/api/personalabteilung/fahrerkarte/lenk-ruhe/pdf", methods=["POST", "OPTIONS"])
+def api_personalabteilung_fahrerkarte_lenk_ruhe_pdf():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    permission_response = require_personalabteilung_api_permission()
+    if permission_response:
+        return permission_response
+
+    try:
+        data = request.get_json(silent=True) or {}
+        driver_id = safe_str(data.get("driverId") or data.get("driver_id"))
+        if not driver_id:
+            return personalabteilung_json_error("Fahrer-ID fehlt.", 400)
+        user_doc = find_driver_for_personalabteilung(driver_id)
+        if not user_doc:
+            return personalabteilung_json_error("Fahrer wurde nicht gefunden.", 404)
+        card_doc = get_driver_card_doc_for_personalabteilung(user_doc, create_if_missing=True)
+        report_doc = create_driver_card_beleg(
+            user_doc,
+            card_doc,
+            document_type="driving_time_compliance_pdf",
+            date_from=data.get("dateFrom") or data.get("date_from") or "",
+            date_to=data.get("dateTo") or data.get("date_to") or "",
+            note=data.get("note") or "",
+        )
+        if bool_from_payload(data.get("sendToUser") or data.get("send_to_user"), fallback=False):
+            create_system_document_for_user(
+                user_doc.get("discord_id"),
+                "Lenk-/Ruhezeiten Prüfbeleg",
+                "Personalabteilung",
+                f"<p>Dein Lenk-/Ruhezeiten-Prüfbeleg wurde erstellt.</p><p><strong>Referenz:</strong> {report_doc['reference']}</p>",
+                doc_type="driving_time_compliance_pdf",
+                needs_signature=False,
+                extra={
+                    "important": True,
+                    "download_url": report_doc["download_url"],
+                    "download_label": "PDF-Beleg herunterladen",
+                    "download_filename": report_doc["pdf_filename"],
+                    "pdf_relative_path": report_doc["pdf_relative_path"],
+                },
+            )
+        tracker_driver_cards_collection.update_one(
+            {"_id": card_doc["_id"]},
+            {"$set": {
+                "compliance_status": report_doc["compliance_status"],
+                "compliance_label": report_doc["compliance_label"],
+                "compliance_summary": report_doc["compliance_summary"],
+                "last_compliance_report_at": now_utc(),
+                "updated_at": now_utc(),
+            }},
+        )
+        card_doc = tracker_driver_cards_collection.find_one({"_id": card_doc["_id"]})
+        payload = driver_card_json_payload(
+            user_doc,
+            card_doc,
+            message="Lenk-/Ruhezeiten-PDF-Beleg wurde erstellt.",
+            complianceStatus=report_doc["compliance_status"],
+            complianceLabel=report_doc["compliance_label"],
+            complianceSummary=report_doc["compliance_summary"],
+        )
+        payload.update({
+            "downloadUrl": report_doc["download_url"],
+            "downloadFilename": report_doc["pdf_filename"],
+            "reference": report_doc["reference"],
+            "belegId": report_doc["beleg_id"],
+        })
+        return jsonify(payload)
+    except Exception as error:
+        app.logger.exception("Lenk-/Ruhezeiten-PDF-Erstellung fehlgeschlagen")
+        return personalabteilung_json_error(f"Lenk-/Ruhezeiten-Beleg konnte nicht erstellt werden: {error}", 500)
+
+
 FAHRERKARTE_WEB_ADMIN_TEMPLATE = r"""
 <!doctype html>
 <html lang="de">
