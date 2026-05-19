@@ -3215,23 +3215,23 @@
                     <small>Fahrerkarten Daten abfragen</small>
                     <h2>PDF-Belege pro User erstellen und versenden</h2>
                     <p>
-                        Kompakte Übersicht für Fahrerkarten-Daten und Lenk-/Ruhezeiten. Die Aktionen erzeugen den Beleg vollständig lokal im Browser:
-                        Notizen, Zeiträume und Fahrerbezug werden geprüft, danach startet ein Frontend-only PDF-Download ohne Backend-Hook oder API-Call.
+                        Kompakte Übersicht für Fahrerkarten-Daten und Lenk-/Ruhezeiten. Die Aktionen nutzen jetzt die Backend-Endpunkte der Personalabteilung:
+                        Datenabfrage, PDF-Erstellung, Download und optionaler Versand werden serverseitig verarbeitet und mit echten Daten zurückgegeben.
                     </p>
                 </div>
 
                 <div class="driver-card-flow">
                     <div class="service-flow-step">
                         <strong>01 · Daten prüfen</strong>
-                        <span>Filtert und aktualisiert die Ansicht direkt im Frontend.</span>
+                        <span>Ruft die aktuellen Fahrerkarten-Daten per Backend-Endpoint ab und aktualisiert die Zeile.</span>
                     </div>
                     <div class="service-flow-step">
                         <strong>02 · PDF erzeugen</strong>
-                        <span>Öffnet ein kompaktes Formular und generiert den Beleg lokal als PDF.</span>
+                        <span>Öffnet ein kompaktes Formular und lässt den PDF-Beleg serverseitig erzeugen.</span>
                     </div>
                     <div class="service-flow-step">
-                        <strong>03 · Frontend-only</strong>
-                        <span>Kein API-Call; der Download wird aus einem Browser-Blob ausgelöst.</span>
+                        <strong>03 · API-Download</strong>
+                        <span>Der Download kommt aus dem Backend-Beleg; optional wird der Beleg im User-Postfach hinterlegt.</span>
                     </div>
                 </div>
             </section>
@@ -3262,7 +3262,7 @@ Ansicht aktualisieren
                 <div class="table-head">
                     <div>
                         <h2>Fahrerkarten Datenbank</h2>
-                        <span>Aktionen: <strong>Ansicht prüfen · Beleg vorbereiten · Lenk-/Ruhezeiten notieren</strong></span>
+                        <span>Aktionen: <strong>Daten abfragen · PDF erstellen · PDF senden · Lenk-/Ruhezeiten prüfen</strong></span>
                     </div>
                 </div>
 
@@ -3358,7 +3358,7 @@ Ansicht aktualisieren
                                                 data-driver-id="{{ discord_id }}"
                                                 data-driver-name="{{ display_name|e }}"
                                             >
-Prüfen
+Daten holen
                                             </button>
 
                                             <button
@@ -3378,7 +3378,7 @@ Beleg
                                                 data-driver-id="{{ discord_id }}"
                                                 data-driver-name="{{ display_name|e }}"
                                             >
-Senden vorbereiten
+PDF senden
                                             </button>
 
                                             <button
@@ -3974,7 +3974,7 @@ Lenk/Ruhe
 
             <div class="modal-info">
                 <span>Fahrer: <strong id="driverCardDriverName">-</strong></span>
-                <span id="driverCardModeHelp">Der Beleg wird vollständig lokal im Browser als PDF erzeugt. Es wird kein Backend-Hook aufgerufen.</span>
+                <span id="driverCardModeHelp">Der Beleg wird über den Backend-Endpoint erzeugt. Die Antwort liefert echte Karten-/Statusdaten und eine Download-URL.</span>
             </div>
 
             <div class="modal-grid-two">
@@ -3997,7 +3997,7 @@ Lenk/Ruhe
 
             <label class="modal-check-row">
                 <input type="checkbox" id="driverCardSendToUser" />
-                <span>Versandvermerk im Beleg setzen. Frontend-only: kein echter Backend-Versand.</span>
+                <span>PDF zusätzlich im User-Postfach hinterlegen. Bei Fahrerkarten-Belegen wird dafür der Versand-Endpunkt genutzt.</span>
             </label>
 
             <label class="modal-check-row">
@@ -4067,6 +4067,11 @@ Lenk/Ruhe
         
         // NEUER ENDPUNKT HINZUGEFÜGT
         const CREATE_TASK_URL = "/api/personalabteilung/task/create";
+
+        const DRIVER_CARD_QUERY_URL = {{ ((driver_card_actions|default(fahrerkarte_data_actions|default({}, true), true)).get('query', '/api/personalabteilung/fahrerkarte/data/query'))|tojson }};
+        const DRIVER_CARD_PDF_CREATE_URL = {{ ((driver_card_actions|default(fahrerkarte_data_actions|default({}, true), true)).get('pdfCreate', '/api/personalabteilung/fahrerkarte/pdf/create'))|tojson }};
+        const DRIVER_CARD_PDF_SEND_URL = {{ ((driver_card_actions|default(fahrerkarte_data_actions|default({}, true), true)).get('pdfSend', '/api/personalabteilung/fahrerkarte/pdf/send'))|tojson }};
+        const DRIVER_CARD_LENK_RUHE_PDF_URL = {{ ((driver_card_actions|default(fahrerkarte_data_actions|default({}, true), true)).get('lenkRuhePdf', '/api/personalabteilung/fahrerkarte/lenk-ruhe/pdf'))|tojson }};
 
         const searchInput = document.getElementById("driverSearch");
         const tokenFilter = document.getElementById("tokenFilter");
@@ -4917,12 +4922,12 @@ Lenk/Ruhe
 
             if (normalizedMode === "driving_time_compliance_pdf") {
                 driverCardModalTitle.textContent = "Lenk-/Ruhezeit-Beleg erstellen";
-                driverCardModeHelp.textContent = "Erstellt den Lenk-/Ruhezeit-Prüfbeleg vollständig lokal im Browser und startet optional den PDF-Download.";
+                driverCardModeHelp.textContent = "Erstellt den Lenk-/Ruhezeit-Prüfbeleg über den Backend-Endpoint und startet optional den PDF-Download.";
                 driverCardSubmitButton.textContent = sendToUser ? "Prüfbeleg senden" : "Prüfbeleg erstellen";
                 driverCardNote.placeholder = "Hinweis zur Lenk-/Ruhezeit-Prüfung, z.B. Prüfmonat oder auffällige Tage...";
             } else {
                 driverCardModalTitle.textContent = "Fahrerkarten-PDF-Beleg erstellen";
-                driverCardModeHelp.textContent = "Erstellt einen PDF-Beleg mit den aktuellen Fahrerkarten-Daten vollständig lokal im Browser.";
+                driverCardModeHelp.textContent = "Erstellt einen PDF-Beleg mit den aktuellen Fahrerkarten-Daten über den Backend-Endpoint.";
                 driverCardSubmitButton.textContent = sendToUser ? "PDF an User senden" : "PDF erstellen";
                 driverCardNote.placeholder = "Hinweis zum Fahrerkarten-Beleg, z.B. Abfragegrund oder Aktennotiz...";
             }
@@ -5332,7 +5337,7 @@ Lenk/Ruhe
                     `(${escapePdfLiteral(normalizedTitle)}) Tj`,
                     "/F1 9 Tf",
                     `0 -20 Td`,
-                    `(EifelLog Personalabteilung - Frontend-only PDF-Beleg) Tj`,
+                    `(EifelLog Personalabteilung - PDF-Beleg) Tj`,
                     `0 -18 Td`,
                     "------------------------------------------------------------ Tj",
                     `0 -${lineHeight} Td`
@@ -5357,7 +5362,7 @@ Lenk/Ruhe
                 objects[contentId] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
             });
 
-            let pdf = "%PDF-1.4\n% Frontend-only EifelLog receipt\n";
+            let pdf = "%PDF-1.4\n% EifelLog receipt fallback\n";
             const offsets = [0];
 
             for (let id = 1; id <= maxObjectId; id += 1) {
@@ -5384,7 +5389,7 @@ Lenk/Ruhe
             const label = isCompliance ? "Lenk-/Ruhezeit-Beleg" : "Fahrerkarten-Beleg";
             const driverName = currentDriverCardContext.driverName || row?.dataset.driverCardName || "Fahrer";
             const username = row?.dataset.driverCardUsername || "-";
-            const cardId = driverCardCardId.value || currentDriverCardContext.cardId || row?.dataset.driverCardCardId || "Frontend-Beleg";
+            const cardId = driverCardCardId.value || currentDriverCardContext.cardId || row?.dataset.driverCardCardId || "Keine Fahrerkarte gefunden";
             const aktenzeichen = getDriverCardCellText(row, "td:nth-child(2) .aktenzeichen-mono", "Nicht vergeben");
             const lastQuery = row?.dataset.driverCardLastQuery || getDriverCardCellText(row, "[data-driver-card-last-query-text]", "-");
             const complianceRaw = isCompliance ? "review" : (row?.dataset.driverCardCompliance || "unknown");
@@ -5392,13 +5397,13 @@ Lenk/Ruhe
             const complianceLabel = isCompliance ? "Prüfung erstellt" : (getDriverCardCellText(row, "[data-driver-card-compliance-label]", compliance.label));
             const complianceSummary = getDriverCardCellText(row, "[data-driver-card-compliance-summary]", "Keine Zusammenfassung hinterlegt.");
             const sendNotice = sendToUser
-                ? "Versandvermerk: Im Beleg markiert. Frontend-only bedeutet: Es wurde keine Nachricht an den User versendet."
+                ? "Versandvermerk: Im Beleg markiert. Versand wird nur über den Backend-Endpunkt ausgeführt."
                 : "Versandvermerk: Kein Versand angefordert.";
 
             const lines = [
                 `Dokument: ${label}`,
                 `Erstellt am: ${createdAt}`,
-                `Referenz: FRONTEND-ONLY-${isoDate.replace(/-/g, "")}`,
+                `Referenz: LOCAL-FALLBACK-${isoDate.replace(/-/g, "")}`,
                 "",
                 "Fahrer",
                 `Name: ${driverName}`,
@@ -5424,8 +5429,8 @@ Lenk/Ruhe
                 sendNotice,
                 "",
                 "Technischer Nachweis",
-                "Dieser PDF-Beleg wurde vollständig im Browser erzeugt.",
-                "Es wurde kein Backend-Hook, kein API-Call und kein serverseitiger PDF-Generator verwendet."
+                "Dieser Fallback-PDF-Beleg wurde lokal im Browser erzeugt.",
+                "Hinweis: Diese Fallback-Funktion wird nur genutzt, wenn kein Backend-Endpunkt angebunden ist."
             ];
 
             return {
@@ -5444,6 +5449,19 @@ Lenk/Ruhe
             const opened = window.open(url, "_blank", "noopener");
             setTimeout(() => URL.revokeObjectURL(url), opened ? 30000 : 4000);
             return Boolean(opened);
+        }
+
+        function getDriverCardDownloadUrl(result = {}) {
+            return result.downloadUrl || result.download_url || result.pdfUrl || result.pdf_url || result.fileUrl || result.file_url || "";
+        }
+
+        function getDriverCardDownloadFilename(result = {}, fallback = "EifelLog_Fahrerkarten_Beleg.pdf") {
+            return result.downloadFilename || result.download_filename || result.pdfFilename || result.pdf_filename || result.filename || fallback;
+        }
+
+        function getDriverCardEndpoint(mode, sendToUser) {
+            if (mode === "driving_time_compliance_pdf") return DRIVER_CARD_LENK_RUHE_PDF_URL;
+            return sendToUser ? DRIVER_CARD_PDF_SEND_URL : DRIVER_CARD_PDF_CREATE_URL;
         }
 
         driverCardForm?.addEventListener("submit", async (event) => {
@@ -5470,43 +5488,65 @@ Lenk/Ruhe
 
             const submitButton = driverCardSubmitButton || driverCardForm.querySelector("button[type='submit']");
             const oldText = submitButton?.textContent?.trim() || "PDF erstellen";
+            const isCompliance = mode === "driving_time_compliance_pdf";
+            const endpoint = getDriverCardEndpoint(mode, sendToUser);
 
             if (submitButton) {
                 submitButton.disabled = true;
-                submitButton.textContent = "Erzeuge PDF...";
+                submitButton.textContent = sendToUser ? "Sende PDF..." : "Erzeuge PDF...";
             }
 
             try {
-                const receipt = buildDriverCardReceipt({ driverId, mode, note, dateFrom, dateTo, sendToUser, row });
-                const pdfBlob = createSimplePdfBlob(receipt.title, receipt.lines);
-                const now = new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
-
-                if (autoDownload) {
-                    const url = URL.createObjectURL(pdfBlob);
-                    downloadFromUrl(url, receipt.filename);
-                    setTimeout(() => URL.revokeObjectURL(url), 4000);
-                } else if (!openBlobInNewTab(pdfBlob)) {
-                    const fallbackUrl = URL.createObjectURL(pdfBlob);
-                    downloadFromUrl(fallbackUrl, receipt.filename);
-                    setTimeout(() => URL.revokeObjectURL(fallbackUrl), 4000);
-                }
-
-                const result = {
-                    cardId: receipt.cardId,
-                    cardStatus: autoDownload ? "pdf_downloaded" : "pdf_previewed",
-                    complianceStatus: mode === "driving_time_compliance_pdf" ? "review" : receipt.complianceStatus,
-                    complianceLabel: receipt.complianceLabel,
-                    complianceSummary: `${receipt.label} lokal als PDF erzeugt${autoDownload ? " · Download gestartet" : " · Vorschau geöffnet"}${sendToUser ? " · Versandvermerk lokal gesetzt" : ""}${note ? " · Hinweis: " + note : ""}`,
-                    lastQuery: now,
-                    message: `${receipt.label} wurde lokal als PDF erzeugt${autoDownload ? " und der Download wurde gestartet" : " und zur Vorschau geöffnet"}. Kein Backend-Hook, kein API-Call.`,
-                    reference: receipt.filename
-                };
+                const result = await postJson(endpoint, {
+                    driverId,
+                    driver_id: driverId,
+                    type: mode,
+                    documentType: mode,
+                    document_type: mode,
+                    dateFrom,
+                    date_from: dateFrom,
+                    dateTo,
+                    date_to: dateTo,
+                    note,
+                    sendToUser,
+                    send_to_user: sendToUser,
+                    autoDownload,
+                    auto_download: autoDownload
+                });
 
                 updateDriverCardRow(row, result);
-                showToast(sendToUser ? "PDF mit Versandvermerk erstellt" : "PDF erstellt", result.message, "success", result.reference);
+
+                const downloadUrl = getDriverCardDownloadUrl(result);
+                const filename = getDriverCardDownloadFilename(
+                    result,
+                    isCompliance ? "EifelLog_Lenk_Ruhezeiten_Beleg.pdf" : "EifelLog_Fahrerkarten_Beleg.pdf"
+                );
+
+                if (downloadUrl && autoDownload) {
+                    downloadFromUrl(downloadUrl, filename);
+                } else if (downloadUrl) {
+                    window.open(downloadUrl, "_blank", "noopener");
+                }
+
+                const title = isCompliance
+                    ? (sendToUser ? "Prüfbeleg gesendet" : "Prüfbeleg erstellt")
+                    : (sendToUser ? "Fahrerkarten-Beleg gesendet" : "Fahrerkarten-Beleg erstellt");
+
+                const message = result.message
+                    || (sendToUser
+                        ? "Der PDF-Beleg wurde serverseitig erstellt und im User-Postfach hinterlegt."
+                        : "Der PDF-Beleg wurde serverseitig erstellt und steht zum Download bereit.");
+
+                showToast(
+                    title,
+                    `${message}${downloadUrl && autoDownload ? " Download wurde gestartet." : ""}`,
+                    "success",
+                    result.reference || result.belegId || result.beleg_id || result.cardId || null
+                );
+
                 closeDriverCardModal();
             } catch (error) {
-                showToast("Fehler", error.message || "Der PDF-Beleg konnte nicht lokal erstellt werden.", "error");
+                showToast("Fehler", error.message || "Der PDF-Beleg konnte nicht über den Backend-Endpunkt erstellt werden.", "error");
             } finally {
                 if (submitButton) {
                     submitButton.disabled = false;
@@ -5591,18 +5631,42 @@ Lenk/Ruhe
 
             if (action === "query-driver-card-data") {
                 const row = button.closest("[data-driver-card-row]");
+                const driverId = button.dataset.driverId || row?.dataset.driverId || row?.dataset.driverCardDiscordId || "";
                 const driverName = button.dataset.driverName || row?.dataset.driverCardName || "Fahrer";
 
-                if (row) {
-                    const now = new Date().toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
-                    row.dataset.driverCardLastQuery = now;
-
-                    const lastQueryText = row.querySelector("[data-driver-card-last-query-text]");
-                    if (lastQueryText) lastQueryText.textContent = now;
+                if (!row) {
+                    showToast("Fehler", "Der Fahrer wurde in der Fahrerkarten-Tabelle nicht gefunden.", "error");
+                    return;
                 }
 
-                showToast("Ansicht geprüft", `Die Fahrerkarten-Zeile für ${driverName} wurde lokal aktualisiert. Es wurde kein Backend-Hook aufgerufen.`, "success");
-                updateStats();
+                if (!driverId) {
+                    showToast("Fehler", "Fahrer-ID fehlt. Daten können nicht abgefragt werden.", "error");
+                    return;
+                }
+
+                const oldText = button.textContent.trim();
+                button.disabled = true;
+                button.textContent = "Lade...";
+
+                try {
+                    const result = await postJson(DRIVER_CARD_QUERY_URL, {
+                        driverId,
+                        driver_id: driverId
+                    });
+
+                    updateDriverCardRow(row, result);
+                    showToast(
+                        "Fahrerkarten-Daten aktualisiert",
+                        result.message || `Die Fahrerkarten-Daten für ${driverName} wurden aus der Datenbank abgefragt.`,
+                        "success",
+                        result.cardId || result.card_id || null
+                    );
+                } catch (error) {
+                    showToast("Fehler", error.message || "Fahrerkarten-Daten konnten nicht abgefragt werden.", "error");
+                } finally {
+                    button.disabled = false;
+                    button.textContent = oldText;
+                }
                 return;
             }
 
