@@ -12,12 +12,24 @@ import requests
 from io import BytesIO
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import urlparse, parse_qs
 
 from flask import Flask, render_template, render_template_string, redirect, request, session, url_for, flash, jsonify, abort, send_file
 from dotenv import load_dotenv
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from bson.objectid import ObjectId
 from werkzeug.utils import secure_filename
+
+try:
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    from googleapiclient.errors import HttpError
+    GOOGLE_SHEETS_AVAILABLE = True
+except Exception:
+    service_account = None
+    build = None
+    HttpError = Exception
+    GOOGLE_SHEETS_AVAILABLE = False
 
 try:
     from PIL import Image, ImageOps
@@ -93,6 +105,35 @@ def env_float(*names, default=0.0):
         return float(default)
 
 
+# ==========================================
+# GOOGLE SHEETS API AUS .ENV
+# ==========================================
+
+GOOGLE_SHEETS_URL = env_first("GOOGLE_SHEETS_URL", "SHEETS_URL", default="")
+GOOGLE_SHEETS_CREDENTIALS_FILE = env_first(
+    "GOOGLE_SHEETS_CREDENTIALS_FILE",
+    "GOOGLE_SERVICE_ACCOUNT_FILE",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    default=os.path.join(BASE_DIR, "google-service-account.json")
+)
+GOOGLE_SHEETS_CREDENTIALS_JSON = env_first(
+    "GOOGLE_SHEETS_CREDENTIALS_JSON",
+    "GOOGLE_SERVICE_ACCOUNT_JSON",
+    default=""
+)
+GOOGLE_SHEETS_API_KEY = env_first(
+    "GOOGLE_SHEETS_API_KEY",
+    "SHEETS_API_KEY",
+    default=""
+)
+GOOGLE_SHEETS_DEFAULT_RANGE = env_first(
+    "GOOGLE_SHEETS_DEFAULT_RANGE",
+    "SHEETS_DEFAULT_RANGE",
+    default="A:Z"
+)
+GOOGLE_SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+
 DISCORD_BOT_TOKEN = env_first("DISCORD_BOT_TOKEN", "BOT_TOKEN", "DISCORD_TOKEN", default="")
 TOUR_CHANNEL_ID = env_first(
     "TOUR_CHANNEL_ID",
@@ -161,7 +202,8 @@ TRACKER_JOB_START_PUBLIC_URL = env_first(
 def add_tracker_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = (
-        "Content-Type, Authorization, X-Tracker-Token, X-Tracker-Code, X-Tracker-Api-Key, X-Requested-With"
+        "Content-Type, Authorization, X-Tracker-Token, X-Tracker-Code, "
+        "X-Tracker-Api-Key, X-Sheets-Api-Key, X-Requested-With"
     )
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
     return response
@@ -833,6 +875,224 @@ def parse_int(value, fallback=0):
         return int(round(parse_number(value, fallback)))
     except Exception:
         return fallback
+
+
+# ==========================================
+# GOOGLE SHEETS API HILFSFUNKTIONEN
+# ==========================================
+
+def require_google_sheets_api_key():
+    """
+    Optionaler API-Key-Schutz für /api/google-sheets/*.
+    Wenn GOOGLE_SHEETS_API_KEY leer ist, wird kein Key verlangt.
+    Empfehlung für Produktion: GOOGLE_SHEETS_API_KEY immer in .env setzen.
+    """
+    if not GOOGLE_SHEETS_API_KEY:
+        return None
+
+    provided_key = (
+        request.headers.get("X-Sheets-Api-Key")
+        or request.headers.get("X-Tracker-Api-Key")
+        or request.args.get("api_key")
+        or ""
+    )
+
+    if not hmac.compare_digest(str(provided_key), str(GOOGLE_SHEETS_API_KEY)):
+        return jsonify({
+            "success": False,
+            "message": "Google-Sheets API-Key fehlt oder ist ungültig."
+        }), 401
+
+    return None
+
+
+def google_sheets_json_error(message, status=400, **extra):
+    payload = {
+        "success": False,
+        "message": safe_str(message, "Google-Sheets Aktion fehlgeschlagen.")
+    }
+    payload.update(extra)
+    return jsonify(payload), status
+
+
+def get_google_sheets_credentials():
+    if not GOOGLE_SHEETS_AVAILABLE:
+        raise RuntimeError(
+            "Google-Sheets Python-Pakete fehlen. Installiere: "
+            "pip install google-api-python-client google-auth"
+        )
+
+    if GOOGLE_SHEETS_CREDENTIALS_JSON:
+        credentials_info = json.loads(GOOGLE_SHEETS_CREDENTIALS_JSON)
+
+        private_key = credentials_info.get("private_key")
+        if isinstance(private_key, str):
+            credentials_info["private_key"] = private_key.replace("\\n", "\n")
+
+        return service_account.Credentials.from_service_account_info(
+            credentials_info,
+            scopes=GOOGLE_SHEETS_SCOPES
+        )
+
+    if not GOOGLE_SHEETS_CREDENTIALS_FILE or not os.path.exists(GOOGLE_SHEETS_CREDENTIALS_FILE):
+        raise RuntimeError(
+            "Google-Sheets Credentials fehlen. Setze GOOGLE_SHEETS_CREDENTIALS_FILE "
+            "oder GOOGLE_SHEETS_CREDENTIALS_JSON in deiner .env."
+        )
+
+    return service_account.Credentials.from_service_account_file(
+        GOOGLE_SHEETS_CREDENTIALS_FILE,
+        scopes=GOOGLE_SHEETS_SCOPES
+    )
+
+
+def get_google_sheets_service():
+    credentials = get_google_sheets_credentials()
+    return build("sheets", "v4", credentials=credentials, cache_discovery=False)
+
+
+def parse_google_sheet_url(sheet_url):
+    """
+    Unterstützt:
+    - komplette Google-Sheets-URL:
+      https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit?gid=SHEET_ID#gid=SHEET_ID
+    - reine Spreadsheet-ID
+    """
+    sheet_url = safe_str(sheet_url)
+
+    if not sheet_url:
+        raise ValueError("Spreadsheet-URL oder Spreadsheet-ID fehlt.")
+
+    spreadsheet_match = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", sheet_url)
+    spreadsheet_id = spreadsheet_match.group(1) if spreadsheet_match else sheet_url
+
+    parsed = urlparse(sheet_url)
+    query_gid = parse_qs(parsed.query).get("gid", [""])[0]
+
+    fragment_gid = ""
+    fragment_match = re.search(r"gid=([0-9]+)", parsed.fragment or "")
+    if fragment_match:
+        fragment_gid = fragment_match.group(1)
+
+    gid = safe_str(query_gid or fragment_gid)
+    spreadsheet_id = safe_str(spreadsheet_id).split("/")[0].split("?")[0].split("#")[0]
+
+    if not spreadsheet_id:
+        raise ValueError("Spreadsheet-ID konnte nicht erkannt werden.")
+
+    return spreadsheet_id, gid
+
+
+def get_google_sheet_title_from_gid(service, spreadsheet_id, gid=""):
+    metadata = service.spreadsheets().get(
+        spreadsheetId=spreadsheet_id,
+        fields="sheets(properties(sheetId,title))"
+    ).execute()
+
+    sheets = metadata.get("sheets", [])
+    if not sheets:
+        raise ValueError("Keine Tabellenblätter im Google Sheet gefunden.")
+
+    gid = safe_str(gid)
+    if gid == "":
+        return sheets[0]["properties"]["title"]
+
+    try:
+        gid_int = int(gid)
+    except Exception:
+        raise ValueError(f"Ungültige gid: {gid}")
+
+    for sheet in sheets:
+        properties = sheet.get("properties", {})
+        if int(properties.get("sheetId", -1)) == gid_int:
+            return properties.get("title")
+
+    raise ValueError(f"Kein Tabellenblatt mit gid={gid} gefunden.")
+
+
+def build_google_sheets_range(sheet_title, a1_range=None):
+    """
+    Die Sheets API schreibt nicht direkt über gid, sondern über A1-Notation.
+    Beispiel: 'Tabelle1'!A:Z
+    """
+    a1_range = safe_str(a1_range, GOOGLE_SHEETS_DEFAULT_RANGE)
+
+    if not a1_range:
+        a1_range = "A:Z"
+
+    if "!" in a1_range:
+        return a1_range
+
+    escaped_title = str(sheet_title).replace("'", "''")
+    return f"'{escaped_title}'!{a1_range}"
+
+
+def normalize_google_sheets_rows(data):
+    """
+    Akzeptierte Payloads:
+    {"row": ["A", "B"]}
+    {"values": ["A", "B"]}
+    {"rows": [["A", "B"], ["C", "D"]]}
+    {"row": {"name": "Max", "km": 120}, "columns": ["name", "km"]}
+    {"rows": [{"name": "Max", "km": 120}], "columns": ["name", "km"]}
+    """
+    data = data or {}
+    rows = data.get("rows")
+
+    if rows is None:
+        row = data.get("row")
+        if row is None:
+            row = data.get("values")
+
+        if row is None:
+            return []
+
+        if isinstance(row, dict):
+            columns = data.get("columns") or list(row.keys())
+            return [[row.get(column, "") for column in columns]]
+
+        if isinstance(row, list) and row and isinstance(row[0], list):
+            return row
+
+        if isinstance(row, list):
+            return [row]
+
+        return [[row]]
+
+    if isinstance(rows, list):
+        normalized_rows = []
+        for item in rows:
+            if isinstance(item, dict):
+                columns = data.get("columns") or list(item.keys())
+                normalized_rows.append([item.get(column, "") for column in columns])
+            elif isinstance(item, list):
+                normalized_rows.append(item)
+            else:
+                normalized_rows.append([item])
+        return normalized_rows
+
+    return []
+
+
+def append_rows_to_google_sheet(sheet_url, rows, a1_range=None):
+    service = get_google_sheets_service()
+    spreadsheet_id, gid = parse_google_sheet_url(sheet_url)
+    sheet_title = get_google_sheet_title_from_gid(service, spreadsheet_id, gid)
+    range_name = build_google_sheets_range(sheet_title, a1_range)
+
+    body = {
+        "values": rows
+    }
+
+    result = service.spreadsheets().values().append(
+        spreadsheetId=spreadsheet_id,
+        range=range_name,
+        valueInputOption="USER_ENTERED",
+        insertDataOption="INSERT_ROWS",
+        body=body
+    ).execute()
+
+    return result
 
 
 # ==========================================
@@ -12669,6 +12929,98 @@ def health_check():
             "/webhook", "/api/tracker/webhook", "/api/tracker/discord/webhook"
         ]
     })
+
+
+# ==========================================
+# GOOGLE SHEETS API ROUTEN
+# ==========================================
+
+@app.route("/api/google-sheets/status", methods=["GET", "OPTIONS"])
+def api_google_sheets_status():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    auth_error = require_google_sheets_api_key()
+    if auth_error:
+        return auth_error
+
+    configured = bool(GOOGLE_SHEETS_URL)
+    credentials_configured = bool(GOOGLE_SHEETS_CREDENTIALS_JSON) or bool(
+        GOOGLE_SHEETS_CREDENTIALS_FILE and os.path.exists(GOOGLE_SHEETS_CREDENTIALS_FILE)
+    )
+
+    return jsonify({
+        "success": True,
+        "googleSheetsAvailable": GOOGLE_SHEETS_AVAILABLE,
+        "sheetUrlConfigured": configured,
+        "credentialsConfigured": credentials_configured,
+        "defaultRange": GOOGLE_SHEETS_DEFAULT_RANGE,
+        "apiKeyProtected": bool(GOOGLE_SHEETS_API_KEY),
+    })
+
+
+@app.route("/api/google-sheets/append", methods=["POST", "OPTIONS"])
+def api_google_sheets_append():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    auth_error = require_google_sheets_api_key()
+    if auth_error:
+        return auth_error
+
+    data = request.get_json(silent=True) or {}
+
+    sheet_url = safe_str(
+        data.get("sheetUrl")
+        or data.get("sheet_url")
+        or data.get("url")
+        or GOOGLE_SHEETS_URL
+    )
+
+    if not sheet_url:
+        return google_sheets_json_error(
+            "Google-Sheets-URL fehlt. Sende sheetUrl oder setze GOOGLE_SHEETS_URL in der .env.",
+            400
+        )
+
+    rows = normalize_google_sheets_rows(data)
+    if not rows:
+        return google_sheets_json_error(
+            "Keine gültigen Zeilen erhalten. Nutze row, rows oder values.",
+            400
+        )
+
+    a1_range = data.get("range") or data.get("a1Range") or GOOGLE_SHEETS_DEFAULT_RANGE
+
+    try:
+        result = append_rows_to_google_sheet(sheet_url, rows, a1_range=a1_range)
+        updates = result.get("updates", {})
+
+        return jsonify({
+            "success": True,
+            "message": "Daten wurden zu Google Sheets hinzugefügt.",
+            "spreadsheetId": result.get("spreadsheetId"),
+            "tableRange": result.get("tableRange"),
+            "updatedRange": updates.get("updatedRange"),
+            "updatedRows": updates.get("updatedRows"),
+            "updatedColumns": updates.get("updatedColumns"),
+            "updatedCells": updates.get("updatedCells"),
+            "updates": updates,
+        }), 201
+
+    except HttpError as error:
+        return google_sheets_json_error(
+            "Google Sheets API Fehler.",
+            502,
+            error=str(error)
+        )
+
+    except Exception as error:
+        return google_sheets_json_error(
+            "Google Sheets Verarbeitung fehlgeschlagen.",
+            500,
+            error=str(error)
+        )
 
 
 # ==========================================
