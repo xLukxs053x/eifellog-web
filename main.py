@@ -1585,12 +1585,13 @@ def mirror_fahrerkarte_request_for_discord_plugin(request_doc, user_doc=None):
     if ObjectId.is_valid(request_id):
         lookup_items.append({"_id": ObjectId(request_id)})
 
+    # MongoDB erlaubt denselben Feldpfad nicht gleichzeitig in $set und $setOnInsert.
+    # created_at wird bereits ueber mirror_doc gesetzt und ist dadurch auch bei Upserts vorhanden.
     fahrerkarte_beantragungen_collection.update_one(
         {"$or": lookup_items},
         {
             "$set": mirror_doc,
             "$setOnInsert": {
-                "created_at": created_at,
                 "imported_at": now_utc(),
             },
         },
