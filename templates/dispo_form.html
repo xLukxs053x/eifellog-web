@@ -521,8 +521,8 @@
     }
 
     /* Dokumentenmodal aus „Eingereichte Dokumente“ > Aktion „Dokument“
-       komplett auf 80% herausgezoomt, damit Papieransicht und Aktionsspalte
-       wie im Screenshot gemeinsam kleiner und vollständig sichtbar sind. */
+       komplett auf 80% herausgezoomt. Zusätzlich wird die Papierfläche
+       selbst auf 80% gesetzt, damit sie links vollständig sichtbar bleibt. */
     @media (min-width: 1025px) {
         .document-modal-backdrop {
             padding: 0;
@@ -539,7 +539,7 @@
         }
 
         .document-paper-wrap {
-            --document-paper-zoom: 1;
+            --document-paper-zoom: 0.80;
         }
     }
 
