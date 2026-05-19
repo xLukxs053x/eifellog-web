@@ -2,20 +2,16 @@
 
 {#
     EifelLog ServiceCenter - Beantragung personalisierte Fahrerkarte
-    Erwartete optionale Variablen:
-    primary_role_name, personalisierte_fahrerkarte_status, fahrerkarte_name,
-    fahrerkarte_role, fahrerkarte_handler, fahrerkarte_requested_at,
-    fahrerkarte_issued_at, fahrerkarte_card_id, fahrerkarte_note,
-    fahrerkarte_submit_url, fahrerkarte_download_url, fahrerkarte_pdf_filename,
-    fahrerkarte_admin_url, can_manage_fahrerkarte, servicecenter_messages
 #}
 
 {% set primary_role_display = primary_role_name|default('User', true) %}
 {% set current_username = current_user.username|default('User', true) %}
 {% set current_user_id = current_user.id|default('-', true) %}
 {% set current_avatar_url = current_user.avatar_url|default(current_user.profile_avatar_url|default(current_user.profile_image|default(current_user.avatar_path|default('', true), true), true), true) %}
-{% set fahrerkarte_staff_roles = ['Personalmanagement', 'Personalabteilung', 'HR-Controlling', 'Geschäftsleitung', 'Geschäftsführung', 'Projektleitung'] %}
-{% set can_manage_fahrerkarte = can_manage_fahrerkarte|default(primary_role_display in fahrerkarte_staff_roles, true) %}
+
+{# Strikte Rollenprüfung für den Admin-Bereich #}
+{% set fahrerkarte_admin_roles = ['Personalabteilung', 'HR-Controlling', 'Personalmanagement', 'Geschäftsleitung', 'Geschäftsführung', 'Projektleitung', 'Admin', 'Inhaber'] %}
+{% set is_fahrerkarte_admin = primary_role_display in fahrerkarte_admin_roles %}
 
 {% set fahrerkarte_status_raw = (personalisierte_fahrerkarte_status|default('none', true))|lower %}
 {% if fahrerkarte_status_raw == 'open' %}
@@ -589,13 +585,10 @@
         height: 6.9rem;
         border-radius: 0.45rem;
         border: 1px solid rgba(83, 124, 165, 0.58);
-        background: linear-gradient(135deg, rgba(255,255,255,0.85), rgba(202,224,240,0.88));
+        background: linear-gradient(135deg, #17345f, #244878);
         display: grid;
         place-items: center;
-        color: rgba(23,52,95,0.44);
-        font-family: Orbitron, Inter, system-ui, sans-serif;
-        font-weight: 900;
-        font-size: 1.5rem;
+        box-shadow: 0 8px 18px rgba(23, 52, 95, 0.12);
     }
 
     .fahrerkarte-id-fields {
@@ -762,9 +755,13 @@
             <div class="w-16 h-16 rounded-full border-2 border-[var(--brand-green)] overflow-hidden shadow-[0_0_15px_rgba(137,190,50,0.3)] shrink-0">
                 {% if current_avatar_url %}
                     <img src="{{ current_avatar_url }}" alt="User Avatar" class="w-full h-full object-cover" onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden');">
-                    <div class="hidden w-full h-full bg-black/50 flex items-center justify-center text-white font-orbitron font-bold">{{ fahrerkarte_name[:1]|upper }}</div>
+                    <div class="hidden w-full h-full bg-black/50 flex items-center justify-center text-white">
+                        <svg class="w-8 h-8 text-white/50" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                    </div>
                 {% else %}
-                    <div class="w-full h-full bg-black/50 flex items-center justify-center text-white font-orbitron font-bold">{{ fahrerkarte_name[:1]|upper }}</div>
+                    <div class="w-full h-full bg-black/50 flex items-center justify-center text-white">
+                        <svg class="w-8 h-8 text-white/50" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                    </div>
                 {% endif %}
             </div>
 
@@ -992,9 +989,11 @@
                             </div>
                             <div class="fahrerkarte-id-body">
                                 {% if current_avatar_url %}
-                                    <img class="fahrerkarte-id-avatar" src="{{ current_avatar_url }}" alt="User Avatar" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'fahrerkarte-id-avatar-fallback',textContent:'{{ fahrerkarte_name[:1]|upper|e }}'}));">
+                                    <img class="fahrerkarte-id-avatar" src="{{ current_avatar_url }}" alt="User Avatar" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'fahrerkarte-id-avatar-fallback',innerHTML:'<svg class=\'w-10 h-10 text-white\' fill=\'currentColor\' viewBox=\'0 0 24 24\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\'/></svg>'}));">
                                 {% else %}
-                                    <div class="fahrerkarte-id-avatar-fallback">{{ fahrerkarte_name[:1]|upper }}</div>
+                                    <div class="fahrerkarte-id-avatar-fallback">
+                                        <svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                                    </div>
                                 {% endif %}
                                 <div class="fahrerkarte-id-fields">
                                     <strong>{{ fahrerkarte_name }}</strong>
@@ -1184,42 +1183,6 @@
         </div>
 
         <aside class="flex flex-col gap-6 h-full">
-            <div class="glass-card p-6">
-                <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Live-Vorschau</h2>
-
-                <div class="fahrerkarte-id-card">
-                    <div class="fahrerkarte-id-head">
-                        <div class="fahrerkarte-id-logo">EL</div>
-                        <div class="fahrerkarte-id-title">
-                            <strong>FAHRERKARTE</strong>
-                            <span>Bundesrepublik EifelLog</span>
-                        </div>
-                        <span id="preview-status" class="fahrerkarte-id-badge">Entwurf</span>
-                    </div>
-                    <div class="fahrerkarte-id-body">
-                        {% if current_avatar_url %}
-                            <img class="fahrerkarte-id-avatar" src="{{ current_avatar_url }}" alt="User Avatar" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'fahrerkarte-id-avatar-fallback',textContent:'{{ fahrerkarte_name[:1]|upper|e }}'}));">
-                        {% else %}
-                            <div class="fahrerkarte-id-avatar-fallback">{{ fahrerkarte_name[:1]|upper }}</div>
-                        {% endif %}
-                        <div class="fahrerkarte-id-fields">
-                            <strong id="preview-name">{{ fahrerkarte_name }}</strong>
-                            <p><b>1.</b> <span id="preview-role">{{ fahrerkarte_role }}</span></p>
-                            <p><b>2.</b> <span id="preview-system-id">{{ current_user_id }}</span></p>
-                            <p><b>3.</b> <span id="preview-date">Nach Freigabe</span></p>
-                            <p><b>4a.</b> Web-ServiceCenter</p>
-                            <p><b>4b.</b> <span id="preview-reason">Noch nicht ausgewählt</span></p>
-                            <p><b>5a.</b> {{ fahrerkarte_card_id }}</p>
-                            <p><b>5b.</b> Digitale Ausgabe</p>
-                            <div class="fahrerkarte-id-signature">Sachbearbeitung</div>
-                        </div>
-                    </div>
-                    <div class="fahrerkarte-id-foot">
-                        <span>Interne digitale Fahrerkarte</span>
-                        <span>Kein amtliches Dokument</span>
-                    </div>
-                </div>
-            </div>
 
             <div class="glass-card p-6">
                 <h2 class="font-orbitron font-bold text-lg text-white tracking-wide mb-4">Ablauf</h2>
@@ -1256,7 +1219,7 @@
                 </div>
             </div>
 
-            {% if can_manage_fahrerkarte %}
+            {% if is_fahrerkarte_admin %}
             <div class="glass-card p-6 service-admin-card">
                 <div class="relative z-10">
                     <span class="font-orbitron text-[10px] font-bold text-[var(--brand-green)] tracking-[0.22em] uppercase">Sachbearbeitung</span>
@@ -1391,16 +1354,9 @@
     const displayNameInput = document.getElementById('fahrerkarte-display-name');
     const roleInput = document.getElementById('fahrerkarte-role');
     const systemIdInput = document.getElementById('fahrerkarte-system-id');
-    const reasonSelect = document.getElementById('fahrerkarte-reason');
     const submitButton = document.getElementById('fahrerkarte-submit');
     const resetButton = document.getElementById('fahrerkarte-reset');
     const errorBox = document.getElementById('fahrerkarte-error');
-
-    const previewName = document.getElementById('preview-name');
-    const previewRole = document.getElementById('preview-role');
-    const previewSystemId = document.getElementById('preview-system-id');
-    const previewReason = document.getElementById('preview-reason');
-    const previewDate = document.getElementById('preview-date');
 
     const modal = document.getElementById('fahrerkarte-confirm-modal');
     const confirmSubmit = document.getElementById('fahrerkarte-confirm-submit');
@@ -1408,41 +1364,6 @@
 
     let shouldSubmitDirectly = false;
     let scrollYBeforeLock = 0;
-
-    const reasonLabels = {
-        new_issue: 'Erstausstellung',
-        update: 'Datenänderung / Aktualisierung',
-        replacement: 'Ersatzkarte',
-        role_change: 'Rollenwechsel'
-    };
-
-    function getFormattedDate() {
-        const now = new Date();
-        const day = String(now.getDate()).padStart(2, '0');
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const year = now.getFullYear();
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        return `${day}.${month}.${year} ${hours}:${minutes}`;
-    }
-
-    function updatePreview() {
-        if (previewName && displayNameInput) {
-            previewName.textContent = displayNameInput.value.trim() || fullNameInput.value.trim() || 'Noch kein Name';
-        }
-        if (previewRole && roleInput) {
-            previewRole.textContent = roleInput.value.trim() || 'Rolle nicht gesetzt';
-        }
-        if (previewSystemId && systemIdInput) {
-            previewSystemId.textContent = systemIdInput.value.trim() || '-';
-        }
-        if (previewReason && reasonSelect) {
-            previewReason.textContent = reasonLabels[reasonSelect.value] || 'Noch nicht ausgewählt';
-        }
-        if (previewDate) {
-            previewDate.textContent = reasonSelect && reasonSelect.value ? `Beantragt am ${getFormattedDate()}` : 'Nach Freigabe';
-        }
-    }
 
     function isFormValid() {
         const requiredFields = Array.from(form.querySelectorAll('[required]')).filter((field) => !field.disabled);
@@ -1496,17 +1417,14 @@
     }
 
     if (locked) {
-        updatePreview();
         return;
     }
 
     form.addEventListener('input', () => {
-        updatePreview();
         updateSubmitState();
     });
 
     form.addEventListener('change', () => {
-        updatePreview();
         updateSubmitState();
     });
 
@@ -1547,7 +1465,6 @@
             if (displayNameInput) displayNameInput.value = '{{ fahrerkarte_name|e }}';
             if (roleInput) roleInput.value = '{{ fahrerkarte_role|e }}';
             if (systemIdInput) systemIdInput.value = '{{ current_user_id|e }}';
-            updatePreview();
             updateSubmitState();
             if (errorBox) errorBox.classList.add('hidden');
         });
@@ -1557,7 +1474,6 @@
         if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) closeModal();
     });
 
-    updatePreview();
     updateSubmitState();
 })();
 </script>
