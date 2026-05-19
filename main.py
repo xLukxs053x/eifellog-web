@@ -134,6 +134,12 @@ DISPO_FORM_UPLOAD_FOLDER = env_first(
     default=os.path.join("static", "uploads", "dispo_form")
 )
 ALLOWED_DISPO_FORM_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "webp"}
+TRACKER_DRIVER_CARD_UPLOAD_FOLDER = env_first(
+    "TRACKER_DRIVER_CARD_UPLOAD_FOLDER",
+    "FAHRERKARTE_TRACKER_UPLOAD_FOLDER",
+    default=os.path.join("static", "uploads", "tracker_driver_cards")
+)
+ALLOWED_TRACKER_DRIVER_CARD_EXTENSIONS = {"pdf"}
 TOUR_RECEIPT_PUBLIC_BASE_URL = env_first("TOUR_RECEIPT_PUBLIC_BASE_URL", "PUBLIC_BASE_URL", default="")
 TOUR_RECEIPT_COMPANY_NAME = env_first("TOUR_RECEIPT_COMPANY_NAME", "COMPANY_NAME", default="Eifel LOG")
 TOUR_RECEIPT_CURRENCY = env_first("TOUR_RECEIPT_CURRENCY", "DEFAULT_CURRENCY", default="EUR")
@@ -209,6 +215,10 @@ fahrerkarte_beantragungen_collection = db[env_first(
     "FAHRERKARTE_BEANTRAGUNGEN_COLLECTION",
     default="FahrerkarteBeantragungen"
 )]
+
+tracker_driver_cards_collection = db["tracker_driver_cards"]
+tracker_work_sessions_collection = db["tracker_work_sessions"]
+tracker_job_starts_collection = db["tracker_job_starts"]
 
 
 def ensure_indexes():
@@ -308,6 +318,22 @@ def ensure_indexes():
         fahrerkarte_beantragungen_collection.create_index([("source_user_mongo_id", ASCENDING)], unique=False)
         fahrerkarte_beantragungen_collection.create_index([("created_at", DESCENDING)], unique=False)
         fahrerkarte_beantragungen_collection.create_index([("updated_at", DESCENDING)], unique=False)
+
+        tracker_driver_cards_collection.create_index([("discord_id", ASCENDING)], unique=False)
+        tracker_driver_cards_collection.create_index([("user_id", ASCENDING)], unique=False)
+        tracker_driver_cards_collection.create_index([("card_id", ASCENDING)], unique=False)
+        tracker_driver_cards_collection.create_index([("created_at", DESCENDING)], unique=False)
+        tracker_driver_cards_collection.create_index([("updated_at", DESCENDING)], unique=False)
+        tracker_driver_cards_collection.create_index([("archived", ASCENDING)], unique=False)
+
+        tracker_work_sessions_collection.create_index([("discord_id", ASCENDING)], unique=False)
+        tracker_work_sessions_collection.create_index([("status", ASCENDING)], unique=False)
+        tracker_work_sessions_collection.create_index([("updated_at", DESCENDING)], unique=False)
+
+        tracker_job_starts_collection.create_index([("discord_id", ASCENDING)], unique=False)
+        tracker_job_starts_collection.create_index([("job_id", ASCENDING)], unique=False)
+        tracker_job_starts_collection.create_index([("status", ASCENDING)], unique=False)
+        tracker_job_starts_collection.create_index([("created_at", DESCENDING)], unique=False)
     except Exception as error:
         print(f"MongoDB Index-Erstellung fehlgeschlagen: {error}")
 
@@ -3810,6 +3836,441 @@ def user_has_tracker_access(user_doc):
     if user_doc.get("tracker_enabled") is False: return False
     return user_registration_is_approved(user_doc.get("discord_id"), user_doc=user_doc)
 
+def tracker_auth_user_from_payload(data=None):
+    data = data or {}
+    client_token = get_client_token_from_request(data)
+    if not client_token:
+        return None, None, (jsonify({"success": False, "error": "Tracker-Token fehlt."}), 401)
+
+    user_doc = find_tracker_user_by_client_token(client_token)
+    if not user_doc:
+        return None, client_token, (jsonify({"success": False, "error": "Tracker-Token ist ungültig."}), 401)
+
+    if not user_has_tracker_access(user_doc):
+        return None, client_token, (jsonify({"success": False, "error": "Tracker-Zugriff ist deaktiviert oder Fahrer-Registrierung ist nicht freigegeben."}), 403)
+
+    return user_doc, client_token, None
+
+
+def tracker_allowed_driver_card_file(filename):
+    filename = safe_str(filename).lower()
+    return "." in filename and filename.rsplit(".", 1)[1] in ALLOWED_TRACKER_DRIVER_CARD_EXTENSIONS
+
+
+def tracker_driver_card_upload_relative_path(filename):
+    filename = safe_str(filename)
+    return os.path.join(TRACKER_DRIVER_CARD_UPLOAD_FOLDER, filename).replace("\\", "/")
+
+
+def tracker_public_file_url(relative_path):
+    relative_path = safe_str(relative_path).replace("\\", "/")
+    if not relative_path:
+        return ""
+    if relative_path.startswith("http://") or relative_path.startswith("https://"):
+        return relative_path
+    return make_external_url(relative_path)
+
+
+def tracker_first_user_value(user_doc, *keys, fallback=""):
+    user_doc = user_doc or {}
+    for key in keys:
+        value = safe_str(user_doc.get(key))
+        if value:
+            return value
+    return fallback
+
+
+def tracker_latest_issued_fahrerkarte_request(user_doc):
+    user_doc = user_doc or {}
+    discord_id = safe_str(user_doc.get("discord_id"))
+    if not discord_id:
+        return None
+
+    request_doc = get_latest_fahrerkarte_request_for_user(discord_id)
+    if not request_doc:
+        return None
+
+    status = normalize_fahrerkarte_status(request_doc.get("status"))
+    if status not in {"approved", "issued"}:
+        return None
+
+    return request_doc
+
+
+def tracker_build_driver_card_doc(user_doc, source_request=None, source="tracker_upload", extra=None):
+    user_doc = user_doc or {}
+    source_request = source_request or {}
+    extra = extra or {}
+
+    now = now_utc()
+    discord_id = safe_str(user_doc.get("discord_id") or user_doc.get("user_id") or user_doc.get("id"))
+    display_name = (
+        safe_str(extra.get("driverName"))
+        or safe_str(source_request.get("display_name") or source_request.get("full_name") or source_request.get("name"))
+        or safe_str(user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username"))
+        or "EifelLog Fahrer"
+    )
+    role_name = (
+        safe_str(extra.get("role"))
+        or safe_str(source_request.get("role") or source_request.get("role_name"))
+        or get_primary_role_name(user_doc.get("roles", []))
+        or "Fahrer"
+    )
+    personal_number = (
+        safe_str(extra.get("personalNumber"))
+        or safe_str(source_request.get("driver_number") or source_request.get("system_id"))
+        or tracker_first_user_value(user_doc, "driver_number", "fahrernummer", "employee_number", "personal_number", "discord_id", fallback="-")
+    )
+    birth_date = (
+        safe_str(extra.get("birthDate"))
+        or tracker_first_user_value(user_doc, "birth_date", "birthDate", "date_of_birth", "dob", fallback="")
+    )
+    if not birth_date:
+        created_at = user_doc.get("created_at")
+        birth_date = created_at.strftime("%d.%m.%Y") if isinstance(created_at, datetime) else now.strftime("%d.%m.%Y")
+
+    card_id = (
+        safe_str(extra.get("cardId") or extra.get("card_id"))
+        or safe_str(source_request.get("card_id") or source_request.get("fahrerkarte_card_id"))
+        or tracker_first_user_value(user_doc, "fahrerkarte_card_id", "personalisierte_fahrerkarte_card_id", "driver_card_id", "card_id", fallback="")
+    )
+    if not card_id:
+        card_id = generate_fahrerkarte_card_id(discord_id, safe_str(source_request.get("request_id")))
+
+    file_relative_path = safe_str(
+        extra.get("fileRelativePath")
+        or extra.get("file_relative_path")
+        or source_request.get("pdf_relative_path")
+        or source_request.get("pdf_path")
+    )
+    file_name = safe_str(
+        extra.get("fileName")
+        or extra.get("filename")
+        or source_request.get("pdf_filename")
+        or "fahrerkarte.pdf"
+    )
+    download_url = (
+        safe_str(extra.get("downloadUrl") or extra.get("download_url"))
+        or (servicecenter_fahrerkarte_download_url(source_request.get("request_id")) if source_request.get("request_id") else "")
+        or tracker_public_file_url(file_relative_path)
+    )
+
+    request_id = safe_str(source_request.get("request_id") or source_request.get("_id"))
+    doc = {
+        "card_id": card_id,
+        "discord_id": discord_id,
+        "user_id": discord_id,
+        "user_mongo_id": safe_str(user_doc.get("_id")),
+        "username": user_doc.get("username") or user_doc.get("discord_username"),
+        "discord_username": user_doc.get("discord_username") or user_doc.get("username"),
+        "driver_name": display_name,
+        "display_name": display_name,
+        "name": display_name,
+        "role": role_name,
+        "role_name": role_name,
+        "personal_number": personal_number,
+        "driver_number": personal_number,
+        "birth_date": birth_date,
+        "department": safe_str(extra.get("department") or source_request.get("department"), "Web-ServiceCenter"),
+        "status": safe_str(extra.get("status") or source_request.get("status"), "Aktiv"),
+        "state": "Aktiv",
+        "card_number": card_id,
+        "card_type": safe_str(extra.get("cardType") or extra.get("type"), "Digitale Ausgabe"),
+        "signature": safe_str(extra.get("signature") or display_name),
+        "tag": safe_str(extra.get("tag"), "INTERN"),
+        "file_name": file_name,
+        "original_filename": safe_str(extra.get("originalFilename") or file_name),
+        "file_relative_path": file_relative_path,
+        "pdf_relative_path": file_relative_path,
+        "download_url": download_url,
+        "source": source,
+        "source_request_id": request_id,
+        "synced": True,
+        "active": True,
+        "archived": False,
+        "uploaded_at": extra.get("uploadedAt") if isinstance(extra.get("uploadedAt"), datetime) else now,
+        "created_at": extra.get("createdAt") if isinstance(extra.get("createdAt"), datetime) else now,
+        "updated_at": now,
+    }
+
+    return doc
+
+
+def tracker_prepare_driver_card_payload(card_doc=None, user_doc=None):
+    if not card_doc:
+        return None
+
+    card_id = safe_str(card_doc.get("card_id") or card_doc.get("cardId") or card_doc.get("card_number"))
+    driver_name = safe_str(card_doc.get("driver_name") or card_doc.get("display_name") or card_doc.get("name"), "EifelLog Fahrer")
+    file_relative_path = safe_str(card_doc.get("file_relative_path") or card_doc.get("pdf_relative_path") or card_doc.get("pdf_path"))
+    download_url = safe_str(card_doc.get("download_url")) or tracker_public_file_url(file_relative_path)
+    created_at = card_doc.get("created_at") or card_doc.get("uploaded_at")
+    updated_at = card_doc.get("updated_at") or created_at
+
+    return {
+        "id": safe_str(card_doc.get("_id")) or card_id,
+        "_id": safe_str(card_doc.get("_id")) or card_id,
+        "cardId": card_id,
+        "card_id": card_id,
+        "driverCardId": card_id,
+        "driverName": driver_name,
+        "name": driver_name,
+        "displayName": driver_name,
+        "username": card_doc.get("username") or (user_doc or {}).get("username"),
+        "role": safe_str(card_doc.get("role") or card_doc.get("role_name"), "Fahrer"),
+        "position": safe_str(card_doc.get("role") or card_doc.get("role_name"), "Fahrer"),
+        "personalNumber": safe_str(card_doc.get("personal_number") or card_doc.get("driver_number"), "-"),
+        "driverNumber": safe_str(card_doc.get("driver_number") or card_doc.get("personal_number"), "-"),
+        "employeeNumber": safe_str(card_doc.get("personal_number") or card_doc.get("driver_number"), "-"),
+        "birthDate": safe_str(card_doc.get("birth_date"), "-"),
+        "dateOfBirth": safe_str(card_doc.get("birth_date"), "-"),
+        "department": safe_str(card_doc.get("department"), "Web-ServiceCenter"),
+        "issueDepartment": safe_str(card_doc.get("department"), "Web-ServiceCenter"),
+        "status": "Aktiv" if safe_str(card_doc.get("status")).lower() in {"issued", "approved", "aktiv", "active"} else safe_str(card_doc.get("status"), "Aktiv"),
+        "state": "Aktiv",
+        "cardNumber": safe_str(card_doc.get("card_number") or card_id, card_id),
+        "licenseNumber": safe_str(card_doc.get("card_number") or card_id, card_id),
+        "driverCardNumber": safe_str(card_doc.get("card_number") or card_id, card_id),
+        "cardType": safe_str(card_doc.get("card_type"), "Digitale Ausgabe"),
+        "type": safe_str(card_doc.get("card_type"), "Digitale Ausgabe"),
+        "signature": safe_str(card_doc.get("signature"), driver_name),
+        "tag": safe_str(card_doc.get("tag"), "INTERN"),
+        "fileName": safe_str(card_doc.get("file_name") or card_doc.get("original_filename"), "fahrerkarte.pdf"),
+        "filename": safe_str(card_doc.get("file_name") or card_doc.get("original_filename"), "fahrerkarte.pdf"),
+        "downloadUrl": download_url,
+        "download_url": download_url,
+        "uploadedAt": datetime_to_iso(card_doc.get("uploaded_at") or created_at),
+        "createdAt": datetime_to_iso(created_at),
+        "updatedAt": datetime_to_iso(updated_at),
+        "synced": True,
+    }
+
+
+def tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True):
+    user_doc = user_doc or {}
+    discord_id = safe_str(user_doc.get("discord_id"))
+    if not discord_id:
+        return None
+
+    card_doc = tracker_driver_cards_collection.find_one(
+        {"discord_id": discord_id, "archived": {"$ne": True}},
+        sort=[("updated_at", DESCENDING), ("created_at", DESCENDING)]
+    )
+    if card_doc:
+        return card_doc
+
+    if not create_from_servicecenter:
+        return None
+
+    source_request = tracker_latest_issued_fahrerkarte_request(user_doc)
+    if not source_request:
+        return None
+
+    card_doc = tracker_build_driver_card_doc(user_doc, source_request=source_request, source="servicecenter_issue")
+    tracker_driver_cards_collection.update_one(
+        {"discord_id": discord_id, "card_id": card_doc["card_id"]},
+        {"$set": card_doc, "$setOnInsert": {"created_at": card_doc["created_at"]}},
+        upsert=True
+    )
+    return tracker_driver_cards_collection.find_one({"discord_id": discord_id, "card_id": card_doc["card_id"]})
+
+
+def tracker_default_work_session():
+    now_ms = int(now_utc().timestamp() * 1000)
+    return {
+        "status": "offDuty",
+        "workMs": 0,
+        "driveMs": 0,
+        "breakMs": 0,
+        "restMs": 11 * 60 * 60 * 1000,
+        "weeklyRestMs": 45 * 60 * 60 * 1000,
+        "continuousDriveMs": 0,
+        "currentBreakMs": 0,
+        "splitBreakFirstMs": 0,
+        "reducedDailyRestUsed": 0,
+        "weeklyRestDue": False,
+        "shiftStartedAt": None,
+        "lastShiftEndedAt": now_ms,
+        "updatedAt": now_ms,
+    }
+
+
+def tracker_ms(value, fallback=0):
+    try:
+        number = float(value)
+        if number < 0:
+            return fallback
+        return int(number)
+    except Exception:
+        return fallback
+
+
+def tracker_normalize_work_session(raw=None, previous=None):
+    previous = previous or tracker_default_work_session()
+    raw = raw or {}
+
+    status = safe_str(raw.get("status") or previous.get("status"), "offDuty")
+    if status not in {"working", "pause", "offDuty"}:
+        status = "offDuty"
+
+    normalized = dict(previous)
+    normalized.update({
+        "status": status,
+        "workMs": tracker_ms(raw.get("workMs"), tracker_ms(previous.get("workMs"), 0)),
+        "driveMs": tracker_ms(raw.get("driveMs"), tracker_ms(previous.get("driveMs"), 0)),
+        "breakMs": tracker_ms(raw.get("breakMs"), tracker_ms(previous.get("breakMs"), 0)),
+        "restMs": tracker_ms(raw.get("restMs"), tracker_ms(previous.get("restMs"), 0)),
+        "weeklyRestMs": tracker_ms(raw.get("weeklyRestMs"), tracker_ms(previous.get("weeklyRestMs"), 0)),
+        "continuousDriveMs": tracker_ms(raw.get("continuousDriveMs"), tracker_ms(previous.get("continuousDriveMs"), 0)),
+        "currentBreakMs": tracker_ms(raw.get("currentBreakMs"), tracker_ms(previous.get("currentBreakMs"), 0)),
+        "splitBreakFirstMs": tracker_ms(raw.get("splitBreakFirstMs"), tracker_ms(previous.get("splitBreakFirstMs"), 0)),
+        "reducedDailyRestUsed": tracker_ms(raw.get("reducedDailyRestUsed"), tracker_ms(previous.get("reducedDailyRestUsed"), 0)),
+        "weeklyRestDue": bool_from_payload(raw.get("weeklyRestDue"), fallback=bool(previous.get("weeklyRestDue", False))),
+        "shiftStartedAt": raw.get("shiftStartedAt") if raw.get("shiftStartedAt") not in ["", None] else previous.get("shiftStartedAt"),
+        "lastShiftEndedAt": raw.get("lastShiftEndedAt") if raw.get("lastShiftEndedAt") not in ["", None] else previous.get("lastShiftEndedAt"),
+        "updatedAt": tracker_ms(raw.get("updatedAt"), int(now_utc().timestamp() * 1000)),
+    })
+
+    return normalized
+
+
+def tracker_get_latest_work_session_doc(user_doc):
+    user_doc = user_doc or {}
+    discord_id = safe_str(user_doc.get("discord_id"))
+    if not discord_id:
+        return None
+    return tracker_work_sessions_collection.find_one(
+        {"discord_id": discord_id},
+        sort=[("updated_at", DESCENDING), ("created_at", DESCENDING)]
+    )
+
+
+def tracker_prepare_work_session_payload(session_doc_or_raw=None):
+    if not session_doc_or_raw:
+        return tracker_default_work_session()
+    if "work_session" in session_doc_or_raw:
+        return tracker_normalize_work_session(session_doc_or_raw.get("work_session") or {})
+    return tracker_normalize_work_session(session_doc_or_raw)
+
+
+def tracker_save_work_session(user_doc, raw_session, driver_card_id=""):
+    user_doc = user_doc or {}
+    discord_id = safe_str(user_doc.get("discord_id"))
+    previous_doc = tracker_get_latest_work_session_doc(user_doc)
+    previous_session = tracker_prepare_work_session_payload(previous_doc) if previous_doc else tracker_default_work_session()
+    work_session = tracker_normalize_work_session(raw_session, previous_session)
+    now = now_utc()
+
+    doc = {
+        "discord_id": discord_id,
+        "user_id": discord_id,
+        "user_mongo_id": safe_str(user_doc.get("_id")),
+        "username": user_doc.get("username") or user_doc.get("discord_username"),
+        "display_name": user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username"),
+        "driver_card_id": safe_str(driver_card_id),
+        "status": work_session.get("status"),
+        "work_session": work_session,
+        "updated_at": now,
+    }
+
+    tracker_work_sessions_collection.update_one(
+        {"discord_id": discord_id},
+        {"$set": doc, "$setOnInsert": {"created_at": now}},
+        upsert=True
+    )
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {"$set": {
+            "tracker_work_session": work_session,
+            "tracker_work_session_updated_at": now,
+            "tracker_work_status": work_session.get("status"),
+        }}
+    )
+
+    return tracker_work_sessions_collection.find_one({"discord_id": discord_id})
+
+
+def tracker_effective_break_ms(work_session):
+    work_session = work_session or {}
+    current_break = tracker_ms(work_session.get("currentBreakMs"), 0) if work_session.get("status") == "pause" else 0
+    split_first = tracker_ms(work_session.get("splitBreakFirstMs"), 0)
+
+    if current_break >= 45 * 60 * 1000:
+        return current_break
+
+    if split_first >= 15 * 60 * 1000 and current_break >= 30 * 60 * 1000:
+        return split_first + current_break
+
+    return max(current_break, split_first)
+
+
+def tracker_validate_job_requirements(user_doc, driver_card_doc, work_session):
+    work_session = tracker_normalize_work_session(work_session)
+    issues = []
+
+    daily_drive_limit_ms = 8 * 60 * 60 * 1000
+    continuous_drive_limit_ms = int(4.5 * 60 * 60 * 1000)
+    daily_rest_ms = 11 * 60 * 60 * 1000
+    reduced_daily_rest_ms = 9 * 60 * 60 * 1000
+    weekly_rest_ms = 45 * 60 * 60 * 1000
+    effective_break_ms = tracker_effective_break_ms(work_session)
+
+    if not driver_card_doc:
+        issues.append("Fahrerkarte fehlt oder wurde nicht aus der Datenbank geladen.")
+    elif not bool(driver_card_doc.get("active", True)) or safe_str(driver_card_doc.get("status")).lower() in {"inactive", "gesperrt", "blocked", "archived"}:
+        issues.append("Fahrerkarte ist nicht aktiv.")
+
+    if work_session.get("status") != "working":
+        issues.append("Arbeitszeit ist nicht aktiv.")
+
+    if tracker_ms(work_session.get("driveMs"), 0) >= daily_drive_limit_ms:
+        issues.append("8 Stunden Lenkzeit sind erreicht.")
+
+    if tracker_ms(work_session.get("continuousDriveMs"), 0) >= continuous_drive_limit_ms and effective_break_ms < 45 * 60 * 1000:
+        issues.append("Nach 4,5 Stunden Lenkzeit muss eine Pause von mindestens 45 Minuten eingelegt werden. Diese kann in 15 + 30 Minuten aufgeteilt werden.")
+
+    if tracker_ms(work_session.get("restMs"), 0) < daily_rest_ms:
+        reduced_ok = (
+            tracker_ms(work_session.get("restMs"), 0) >= reduced_daily_rest_ms
+            and tracker_ms(work_session.get("reducedDailyRestUsed"), 0) < 3
+        )
+        new_shift_after_rest = bool(work_session.get("lastShiftEndedAt")) and work_session.get("status") == "working" and tracker_ms(work_session.get("workMs"), 0) < 60000
+        if not reduced_ok and new_shift_after_rest:
+            issues.append("Tägliche Ruhezeit von mindestens 11 Stunden ist nicht erfüllt. Dreimal pro Woche sind 9 Stunden zulässig.")
+
+    if bool(work_session.get("weeklyRestDue", False)) and tracker_ms(work_session.get("weeklyRestMs"), 0) < weekly_rest_ms:
+        issues.append("Wöchentliche Ruhezeit von regulär 45 Stunden ist fällig und nicht erfüllt.")
+
+    return {
+        "allowed": len(issues) == 0,
+        "issues": issues,
+        "remainingDriveMs": max(0, daily_drive_limit_ms - tracker_ms(work_session.get("driveMs"), 0)),
+        "nextBreakInMs": max(0, continuous_drive_limit_ms - tracker_ms(work_session.get("continuousDriveMs"), 0)),
+        "effectiveBreakMs": effective_break_ms,
+        "limits": {
+            "dailyDriveMs": daily_drive_limit_ms,
+            "continuousDriveMs": continuous_drive_limit_ms,
+            "dailyRestMs": daily_rest_ms,
+            "reducedDailyRestMs": reduced_daily_rest_ms,
+            "weeklyRestMs": weekly_rest_ms,
+        },
+    }
+
+
+def tracker_job_id_from_payload(payload, telemetry=None):
+    payload = payload or {}
+    telemetry = telemetry or {}
+    job_id = (
+        safe_str(payload.get("jobId") or payload.get("job_id"))
+        or safe_str(telemetry.get("jobId") or telemetry.get("job_id") or telemetry.get("deliveryId") or telemetry.get("delivery_id"))
+    )
+    if not job_id:
+        seed = f"{safe_str(telemetry.get('sourceCity'))}|{safe_str(telemetry.get('destinationCity'))}|{safe_str(telemetry.get('cargo'))}|{now_utc().isoformat()}|{uuid.uuid4().hex}"
+        job_id = "EL-JOB-" + hashlib.sha256(seed.encode("utf-8")).hexdigest()[:12].upper()
+    return job_id
+
+
 def tracker_profile_payload(user_doc):
     profile = prepare_profile_data(user_doc)
     stats = get_profile_stats(user_doc)
@@ -5998,6 +6459,256 @@ def tracker_telemetry_live():
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
 
     return jsonify(tracker_state_payload(fresh_user))
+
+@app.route("/api/tracker/driver-card", methods=["GET", "POST", "OPTIONS"])
+def tracker_driver_card():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    data = request.get_json(silent=True) or {}
+    user_doc, client_token, error_response = tracker_auth_user_from_payload(data)
+    if error_response:
+        return error_response
+
+    if request.method == "POST":
+        incoming = data.get("driverCard") or data.get("driver_card") or data.get("card") or {}
+        latest_request = tracker_latest_issued_fahrerkarte_request(user_doc)
+        card_doc = tracker_build_driver_card_doc(user_doc, source_request=latest_request or {}, source="tracker_manual_sync", extra=incoming)
+        tracker_driver_cards_collection.update_one(
+            {"discord_id": user_doc.get("discord_id"), "card_id": card_doc["card_id"]},
+            {"$set": card_doc, "$setOnInsert": {"created_at": card_doc["created_at"]}},
+            upsert=True
+        )
+        card_doc = tracker_driver_cards_collection.find_one({"discord_id": user_doc.get("discord_id"), "card_id": card_doc["card_id"]})
+    else:
+        card_doc = tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
+
+    if not card_doc:
+        return jsonify({
+            "success": False,
+            "error": "Keine Fahrerkarte in der Datenbank gefunden. Bitte zuerst eine Fahrerkarte-PDF hochladen.",
+            "driverCard": None,
+            "profile": tracker_profile_payload(user_doc),
+        }), 404
+
+    driver_card_payload = tracker_prepare_driver_card_payload(card_doc, user_doc=user_doc)
+    return jsonify({
+        "success": True,
+        "driverCard": driver_card_payload,
+        "driver_card": driver_card_payload,
+        "digitalDriverCard": driver_card_payload,
+        "fahrerkarte": driver_card_payload,
+        "profile": tracker_profile_payload(user_doc),
+    })
+
+
+@app.route("/api/tracker/driver-card/upload", methods=["POST", "OPTIONS"])
+def tracker_driver_card_upload():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    form_payload = request.form or {}
+    user_doc, client_token, error_response = tracker_auth_user_from_payload(form_payload)
+    if error_response:
+        return error_response
+
+    upload = request.files.get("file") or request.files.get("pdf") or request.files.get("driverCardPdf")
+    if not upload or not upload.filename:
+        return jsonify({"success": False, "error": "Keine PDF-Datei erhalten."}), 400
+
+    if not tracker_allowed_driver_card_file(upload.filename):
+        return jsonify({"success": False, "error": "Nur PDF-Dateien sind als Fahrerkarte erlaubt."}), 400
+
+    os.makedirs(TRACKER_DRIVER_CARD_UPLOAD_FOLDER, exist_ok=True)
+
+    original_filename = secure_filename(upload.filename) or "fahrerkarte.pdf"
+    extension = original_filename.rsplit(".", 1)[1].lower()
+    discord_id = safe_str(user_doc.get("discord_id"))
+    unique_filename = f"{discord_id or 'driver'}_{now_utc().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:10]}.{extension}"
+    relative_path = tracker_driver_card_upload_relative_path(unique_filename)
+    absolute_path = os.path.join(BASE_DIR, relative_path)
+    os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
+    upload.save(absolute_path)
+
+    latest_request = tracker_latest_issued_fahrerkarte_request(user_doc)
+    extra = {
+        "fileName": unique_filename,
+        "originalFilename": original_filename,
+        "fileRelativePath": relative_path,
+        "downloadUrl": tracker_public_file_url(relative_path),
+        "uploadedAt": now_utc(),
+        "status": "Aktiv",
+    }
+    card_doc = tracker_build_driver_card_doc(user_doc, source_request=latest_request or {}, source="tracker_pdf_upload", extra=extra)
+
+    tracker_driver_cards_collection.update_many(
+        {"discord_id": discord_id, "archived": {"$ne": True}},
+        {"$set": {"archived": True, "archived_at": now_utc(), "active": False}}
+    )
+    tracker_driver_cards_collection.update_one(
+        {"discord_id": discord_id, "card_id": card_doc["card_id"], "file_relative_path": relative_path},
+        {"$set": card_doc, "$setOnInsert": {"created_at": card_doc["created_at"]}},
+        upsert=True
+    )
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {"$set": {
+            "fahrerkarte_card_id": card_doc["card_id"],
+            "personalisierte_fahrerkarte_card_id": card_doc["card_id"],
+            "driver_card_id": card_doc["card_id"],
+            "fahrerkarte_pdf_relative_path": relative_path,
+            "fahrerkarte_pdf_filename": unique_filename,
+            "fahrerkarte_download_url": card_doc.get("download_url"),
+            "tracker_driver_card_uploaded_at": now_utc(),
+            "tracker_driver_card_active": True,
+        }}
+    )
+
+    fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
+    fresh_card = tracker_driver_cards_collection.find_one(
+        {"discord_id": discord_id, "card_id": card_doc["card_id"], "archived": {"$ne": True}},
+        sort=[("updated_at", DESCENDING)]
+    ) or tracker_driver_cards_collection.find_one({"discord_id": discord_id, "card_id": card_doc["card_id"]})
+    driver_card_payload = tracker_prepare_driver_card_payload(fresh_card, user_doc=fresh_user)
+
+    return jsonify({
+        "success": True,
+        "message": "Fahrerkarte-PDF wurde gespeichert und als digitale Fahrerkarte in der Datenbank hinterlegt.",
+        "driverCard": driver_card_payload,
+        "driver_card": driver_card_payload,
+        "digitalDriverCard": driver_card_payload,
+        "fahrerkarte": driver_card_payload,
+        "profile": tracker_profile_payload(fresh_user),
+    })
+
+
+@app.route("/api/tracker/work-session", methods=["GET", "POST", "OPTIONS"])
+def tracker_work_session():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    data = request.get_json(silent=True) or {}
+    user_doc, client_token, error_response = tracker_auth_user_from_payload(data)
+    if error_response:
+        return error_response
+
+    if request.method == "POST":
+        incoming_session = data.get("workSession") or data.get("work_session") or data.get("driverWorkSession") or data.get("tachograph") or {}
+        driver_card_id = safe_str(data.get("driverCardId") or data.get("driver_card_id"))
+        session_doc = tracker_save_work_session(user_doc, incoming_session, driver_card_id=driver_card_id)
+    else:
+        session_doc = tracker_get_latest_work_session_doc(user_doc)
+
+    work_session = tracker_prepare_work_session_payload(session_doc)
+    driver_card_doc = tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
+    eligibility = tracker_validate_job_requirements(user_doc, driver_card_doc, work_session)
+
+    return jsonify({
+        "success": True,
+        "workSession": work_session,
+        "work_session": work_session,
+        "eligibility": eligibility,
+        "driverCard": tracker_prepare_driver_card_payload(driver_card_doc, user_doc=user_doc) if driver_card_doc else None,
+        "profile": tracker_profile_payload(user_doc),
+    })
+
+
+@app.route("/api/tracker/jobs/start", methods=["POST", "OPTIONS"])
+def tracker_jobs_start():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    data = request.get_json(silent=True) or {}
+    user_doc, client_token, error_response = tracker_auth_user_from_payload(data)
+    if error_response:
+        return error_response
+
+    driver_card_doc = tracker_get_latest_driver_card_doc(user_doc, create_from_servicecenter=True)
+    incoming_session = data.get("workSession") or data.get("work_session") or {}
+    if incoming_session:
+        session_doc = tracker_save_work_session(
+            user_doc,
+            incoming_session,
+            driver_card_id=(driver_card_doc or {}).get("card_id") or safe_str(data.get("driverCardId"))
+        )
+    else:
+        session_doc = tracker_get_latest_work_session_doc(user_doc)
+
+    work_session = tracker_prepare_work_session_payload(session_doc)
+    eligibility = tracker_validate_job_requirements(user_doc, driver_card_doc, work_session)
+
+    if not eligibility.get("allowed"):
+        return jsonify({
+            "success": False,
+            "error": "Auftrag kann nicht gestartet werden: " + " ".join(eligibility.get("issues") or []),
+            "issues": eligibility.get("issues") or [],
+            "eligibility": eligibility,
+            "workSession": work_session,
+            "driverCard": tracker_prepare_driver_card_payload(driver_card_doc, user_doc=user_doc) if driver_card_doc else None,
+        }), 409
+
+    telemetry_raw = data.get("telemetry") or data.get("snapshot") or user_doc.get("tracker_live") or {}
+    telemetry = normalize_telemetry_payload(telemetry_raw) if telemetry_raw else {}
+    job_id = tracker_job_id_from_payload(data, telemetry)
+    current_job = current_job_from_live(telemetry) if telemetry else None
+    now = now_utc()
+
+    job_doc = {
+        "job_id": job_id,
+        "discord_id": safe_str(user_doc.get("discord_id")),
+        "user_id": safe_str(user_doc.get("discord_id")),
+        "user_mongo_id": safe_str(user_doc.get("_id")),
+        "username": user_doc.get("username") or user_doc.get("discord_username"),
+        "display_name": user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username"),
+        "driver_card_id": (driver_card_doc or {}).get("card_id"),
+        "driver_card": tracker_prepare_driver_card_payload(driver_card_doc, user_doc=user_doc),
+        "work_session": work_session,
+        "eligibility": eligibility,
+        "telemetry": telemetry,
+        "current_job": current_job,
+        "status": "started",
+        "checked_at": safe_str(data.get("checkedAt")),
+        "created_at": now,
+        "updated_at": now,
+    }
+    tracker_job_starts_collection.insert_one(job_doc)
+
+    set_payload = {
+        "tracker_last_job_start_id": job_id,
+        "tracker_last_job_started_at": now,
+        "tracker_current_driver_card_id": (driver_card_doc or {}).get("card_id"),
+        "tracker_work_session": work_session,
+        "tracker_work_session_updated_at": now,
+    }
+    if telemetry:
+        set_payload.update({
+            "tracker_live": telemetry,
+            "tracker_live_updated_at": now,
+            "tracker_online": bool(telemetry.get("isConnected") or telemetry.get("gameProcessDetected") or telemetry.get("telemetryConnected")),
+        })
+    if current_job:
+        set_payload["tracker_current_job"] = current_job
+        set_payload["tracker_current_job_key"] = tracker_current_job_key(telemetry, user_doc)
+
+    users_collection.update_one({"_id": user_doc["_id"]}, {"$set": set_payload})
+    fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
+
+    response_payload = tracker_state_payload(fresh_user)
+    response_payload.update({
+        "message": "Auftrag gestartet. Voraussetzungen wurden serverseitig geprüft.",
+        "jobStart": {
+            "jobId": job_id,
+            "status": "started",
+            "startedAt": datetime_to_iso(now),
+        },
+        "eligibility": eligibility,
+        "workSession": work_session,
+        "driverCard": tracker_prepare_driver_card_payload(driver_card_doc, user_doc=fresh_user),
+    })
+    return jsonify(response_payload)
+
+
 
 @app.route("/api/tracker/tour/submit", methods=["GET", "POST", "OPTIONS"])
 def tracker_tour_submit():
@@ -10208,6 +10919,8 @@ def health_check():
         "trackerRoutes": [
             "/api/tracker/login", "/api/tracker/session", "/api/tracker/profile",
             "/api/tracker/state", "/api/tracker/telemetry/live",
+            "/api/tracker/driver-card", "/api/tracker/driver-card/upload",
+            "/api/tracker/work-session", "/api/tracker/jobs/start",
             "/api/tracker/tour/submit", "/api/tracker/job/complete", "/api/tracker/logout",
             "/webhook", "/api/tracker/webhook", "/api/tracker/discord/webhook"
         ]
