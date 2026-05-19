@@ -301,12 +301,29 @@
     }
 
     .document-paper-wrap {
+        --document-paper-zoom: 0.78;
         padding: clamp(0.8rem, 1.4vw, 1.2rem);
-        overflow-y: auto;
-        overflow-x: hidden;
+        overflow: auto;
         height: 100%;
         min-height: 0;
         scrollbar-gutter: stable;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+    }
+
+    .document-paper-zoom-stage {
+        width: min(920px, 100%);
+        margin: 0 auto;
+        zoom: var(--document-paper-zoom);
+    }
+
+    @supports not (zoom: 1) {
+        .document-paper-zoom-stage {
+            width: calc(min(920px, 100%) / var(--document-paper-zoom));
+            transform: scale(var(--document-paper-zoom));
+            transform-origin: top center;
+        }
     }
 
     .document-paper {
@@ -503,28 +520,23 @@
         }
     }
 
-    /* Dokumentenansicht bewusst herausgezoomt: nur das Prüfmodal wird kleiner dargestellt,
-       damit es wie im gewünschten Screenshot vollständig sichtbar ist und kein manuelles
-       Browser-Zoom mehr nötig ist. */
-    @media (min-width: 1025px) {
-        .document-modal-backdrop {
-            padding: 0;
-        }
-
-        .document-modal-shell {
-            --document-modal-zoom: 0.68;
-            width: 1210px;
-            height: 860px;
-            max-height: 860px;
-            transform: scale(var(--document-modal-zoom));
-            transform-origin: center center;
-            will-change: transform;
+    /* Dokumentenansicht bewusst herausgezoomt: nur die Papier-/Dokumentfläche
+       aus „Eingereichte Dokumente“ > Aktion „Dokument“ wird kleiner dargestellt.
+       Die rechte Aktionsspalte bleibt normal groß und bedienbar. */
+    @media (max-width: 1024px) {
+        .document-paper-wrap {
+            --document-paper-zoom: 0.72;
         }
     }
 
-    @media (min-width: 1025px) and (max-height: 620px) {
-        .document-modal-shell {
-            --document-modal-zoom: 0.62;
+    @media (max-width: 640px) {
+        .document-paper-wrap {
+            --document-paper-zoom: 0.62;
+            padding: 0.85rem;
+        }
+
+        .document-paper-inner {
+            padding: 1.35rem;
         }
     }
 
@@ -1030,7 +1042,8 @@
     <div class="document-modal-shell">
         <div class="document-modal-grid">
             <div class="document-paper-wrap dispo-form-scrollbar">
-                <div class="document-paper">
+                <div class="document-paper-zoom-stage">
+                    <div class="document-paper">
                     <div class="document-paper-inner">
                         <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-5 border-b border-black/10 pb-6 mb-6">
                             <div>
@@ -1092,6 +1105,7 @@
                                 <div id="modal-paper-signature" class="document-signature-line mt-3">Nicht signiert</div>
                             </div>
                         </div>
+                    </div>
                     </div>
                 </div>
             </div>
