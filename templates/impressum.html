@@ -93,21 +93,148 @@
                 </div>
             </div>
 
-            <!-- Kontakt -->
+            <!-- Kontakt Info -->
             <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
                 <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
                     Kontakt
                 </p>
 
                 <p class="text-[var(--muted)] text-sm md:text-base leading-8">
-                    Kontaktaufnahme ist über die auf der Webseite bereitgestellten Community-,
-                    Bewerbungs- oder Driver-Hub-Funktionen möglich.
+                    Für Fragen zum Projekt, zur Community oder zu Eifel LOG kann das Kontaktformular
+                    auf dieser Seite verwendet werden.
                 </p>
 
-                <p class="text-[var(--muted)] text-sm md:text-base leading-8 mt-3">
-                    Falls du hier eine direkte Kontaktadresse anzeigen möchtest, kannst du diesen Abschnitt
-                    später durch deine gewünschte E-Mail-Adresse ersetzen.
-                </p>
+                <div class="mt-5">
+                    <label class="block font-orbitron text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--muted)] mb-2">
+                        Kontakt E-Mail
+                    </label>
+
+                    <div class="w-full rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-[var(--muted)] opacity-60 cursor-not-allowed select-none">
+                        info@eifelllog.de
+                    </div>
+
+                    <p class="text-[11px] text-[var(--muted)] mt-2 leading-6">
+                        Diese E-Mail-Adresse ist aktuell noch nicht verfügbar. Bitte nutze vorerst das Kontaktformular.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Kontaktformular -->
+            <div class="bg-[rgba(137,190,50,0.055)] border border-[rgba(137,190,50,0.22)] rounded-[24px] p-5 md:p-7">
+                <div class="mb-6">
+                    <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                        Direkt kommunizieren
+                    </p>
+
+                    <h3 class="font-orbitron text-xl md:text-2xl font-bold uppercase tracking-wider text-[var(--text)] mb-3">
+                        Kontaktformular
+                    </h3>
+
+                    <p class="text-[var(--muted)] text-sm md:text-base leading-8">
+                        Sende deine Nachricht direkt über das Formular. Nach dem Absenden wird die Nachricht
+                        an das System übergeben.
+                    </p>
+                </div>
+
+                <form action="/kontakt" method="POST" class="space-y-5">
+                    <!-- Honeypot gegen einfache Spam-Bots -->
+                    <input type="text" name="website" class="hidden" tabindex="-1" autocomplete="off">
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                            <label for="name" class="block font-orbitron text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-2">
+                                Dein Name
+                            </label>
+
+                            <input
+                                type="text"
+                                id="name"
+                                name="name"
+                                required
+                                maxlength="80"
+                                placeholder="Name eingeben"
+                                class="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-[var(--text)] placeholder:text-[var(--muted)]/50 outline-none transition-all focus:border-[var(--brand-green)]/60 focus:bg-black/45 focus:shadow-[0_0_20px_rgba(137,190,50,0.12)]"
+                            >
+                        </div>
+
+                        <div>
+                            <label for="email" class="block font-orbitron text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-2">
+                                Deine E-Mail
+                            </label>
+
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                required
+                                maxlength="120"
+                                placeholder="deine@email.de"
+                                class="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-[var(--text)] placeholder:text-[var(--muted)]/50 outline-none transition-all focus:border-[var(--brand-green)]/60 focus:bg-black/45 focus:shadow-[0_0_20px_rgba(137,190,50,0.12)]"
+                            >
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="betreff" class="block font-orbitron text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-2">
+                            Betreff
+                        </label>
+
+                        <input
+                            type="text"
+                            id="betreff"
+                            name="betreff"
+                            required
+                            maxlength="120"
+                            placeholder="Worum geht es?"
+                            class="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-[var(--text)] placeholder:text-[var(--muted)]/50 outline-none transition-all focus:border-[var(--brand-green)]/60 focus:bg-black/45 focus:shadow-[0_0_20px_rgba(137,190,50,0.12)]"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="nachricht" class="block font-orbitron text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-2">
+                            Nachricht
+                        </label>
+
+                        <textarea
+                            id="nachricht"
+                            name="nachricht"
+                            required
+                            maxlength="2000"
+                            rows="7"
+                            placeholder="Schreibe deine Nachricht an Eifel LOG..."
+                            class="w-full resize-none rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-[var(--text)] placeholder:text-[var(--muted)]/50 outline-none transition-all focus:border-[var(--brand-green)]/60 focus:bg-black/45 focus:shadow-[0_0_20px_rgba(137,190,50,0.12)]"
+                        ></textarea>
+
+                        <p class="text-[11px] text-[var(--muted)] mt-2 leading-6">
+                            Maximal 2000 Zeichen.
+                        </p>
+                    </div>
+
+                    <div class="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/20 p-4">
+                        <input
+                            type="checkbox"
+                            id="datenschutz"
+                            name="datenschutz"
+                            required
+                            class="mt-1 h-4 w-4 rounded border-white/20 bg-black/40 accent-[var(--brand-green)]"
+                        >
+
+                        <label for="datenschutz" class="text-[var(--muted)] text-sm leading-7">
+                            Ich bestätige, dass meine Angaben zur Bearbeitung meiner Anfrage verwendet werden dürfen.
+                            Diese Webseite ist ein privates Hobby-Projekt.
+                        </label>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                        <button type="submit" class="btn-primary">
+                            Nachricht senden
+                        </button>
+
+                        <button type="reset" class="btn-secondary">
+                            Formular leeren
+                        </button>
+                    </div>
+                </form>
             </div>
 
             <!-- Haftung -->
