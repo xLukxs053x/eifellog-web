@@ -10196,6 +10196,83 @@ def refresh_driver_card_snapshot_for_personalabteilung(user_doc, card_doc=None, 
 
     return card_doc
 
+@app.route("/api/hr/driver-card/pdf/<user_id>/<date_str>")
+def generate_driver_card_pdf(user_id, date_str):
+    """ Generiert ein PDF-Fahrtenbuch für einen Fahrer an einem bestimmten Datum (Format: YYYY-MM-DD) """
+    
+    # Alle Logs für diesen Fahrer an diesem Tag abrufen, sortiert nach Startzeit
+    logs = list(driver_logs_collection.find({
+        "user_id": str(user_id), 
+        "date_str": date_str
+    }).sort("start_time", ASCENDING))
+    
+    if not logs:
+        return jsonify({"success": False, "error": f"Keine Fahrerkarten-Einträge für den {date_str} gefunden."}), 404
+        
+    # PDF Setup
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    
+    # Header
+    pdf.cell(190, 10, txt=f"Fahrerkarte Tagesauszug", ln=True, align="C")
+    pdf.set_font("Arial", '', 12)
+    pdf.cell(190, 10, txt=f"Datum: {date_str} | Fahrer-ID: {user_id}", ln=True, align="C")
+    pdf.ln(10)
+    
+    # Tabellenkopf
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(50, 10, "Aktivitaet", border=1)
+    pdf.cell(40, 10, "Startzeit", border=1)
+    pdf.cell(40, 10, "Endzeit", border=1)
+    pdf.cell(40, 10, "Dauer (Std:Min:Sek)", border=1)
+    pdf.ln()
+    
+    pdf.set_font("Arial", '', 10)
+    feierabend_registered = False
+    
+    # Datenreihen
+    for log in logs:
+        start_str = log["start_time"].strftime("%H:%M:%S")
+        end_str = log["end_time"].strftime("%H:%M:%S") if log.get("end_time") else "Laufend..."
+        
+        # Dauer berechnen
+        if log.get("end_time"):
+            duration = log["end_time"] - log["start_time"]
+            duration_str = str(duration).split('.')[0] # Entfernt Millisekunden
+        else:
+            duration_str = "-"
+            
+        if log["state"] == "Feierabend":
+            feierabend_registered = True
+            
+        pdf.cell(50, 10, log["state"], border=1)
+        pdf.cell(40, 10, start_str, border=1)
+        pdf.cell(40, 10, end_str, border=1)
+        pdf.cell(40, 10, duration_str, border=1)
+        pdf.ln()
+        
+    pdf.ln(10)
+    
+    # Feierabend & Ruhezeit Kontrolle
+    pdf.set_font("Arial", 'B', 12)
+    if feierabend_registered:
+        # Hinweis in Grün, dass die 11h Ruhezeit eingehalten/begonnen wurde
+        pdf.set_text_color(0, 128, 0)
+        pdf.cell(190, 10, txt="INFO: Feierabend registriert. Die 11 Stunden Tagesruhezeit haben begonnen.", ln=True)
+    else:
+        # Warnung in Rot, falls kein Feierabend gestempelt wurde
+        pdf.set_text_color(255, 0, 0)
+        pdf.cell(190, 10, txt="ACHTUNG: Kein Feierabend fuer diesen Tag registriert (Verdacht auf Verstoß)!", ln=True)
+        
+    # PDF als Datei-Download zurückgeben
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f"Fahrerkarte_Auszug_{date_str}.pdf"
+    )
 
 def prepare_driver_card_fields_for_personalabteilung(user_doc):
     """Felder, die Personalabteilung.html im Fahrerkarten-Tab direkt aus driver liest."""
@@ -11177,6 +11254,45 @@ FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER = env_first(
     "DRIVER_CARD_REPORT_FOLDER",
     default=os.path.join("static", "downloads", "personalabteilung", "fahrerkarten_daten")
 )
+
+# Neue Collection für das genaue Fahrtenbuch
+driver_logs_collection = db["driver_logs"] 
+
+@app.route("/api/tracker/state", methods=["POST"])
+def update_driver_state():
+    # Holt die ID des aktuellen Discord-Nutzers
+    user_id = str(session.get("user", {}).get("id"))
+    data = request.json
+    new_state = data.get("state") # z.B. 'Fahrzeit', 'Arbeitszeit', 'Pause', 'Feierabend'
+    now = datetime.utcnow()
+    
+    if not user_id or not new_state:
+        return jsonify({"success": False, "error": "Fehlende Daten"}), 400
+
+    # 1. Vorherigen, noch offenen Status beenden
+    driver_logs_collection.update_one(
+        {"user_id": user_id, "end_time": None},
+        {"$set": {"end_time": now}}
+    )
+    
+    # 2. Neuen Status in die Datenbank eintragen
+    driver_logs_collection.insert_one({
+        "user_id": user_id,
+        "state": new_state,
+        "start_time": now,
+        "end_time": None,
+        "date_str": now.strftime("%Y-%m-%d") # Speichert das Datum extra für leichteres Suchen
+    })
+    
+    # 3. Feierabend-Logik: 11 Stunden Pflicht-Ruhezeit hinterlegen
+    if new_state == "Feierabend":
+        next_allowed_start = now + timedelta(hours=11)
+        users_collection.update_one(
+            {"discord_id": user_id},
+            {"$set": {"next_allowed_shift": next_allowed_start}}
+        )
+        
+    return jsonify({"success": True})
 
 # Ordner automatisch erstellen, falls sie nicht existieren
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
