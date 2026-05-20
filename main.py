@@ -7568,14 +7568,17 @@ def tracker_feierabend():
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+    description = ("Wir sind Eifel LOG – eine Gemeinschaft virtueller Trucker. Kein Zwang, keine unrealistischen Pflichtkilometer. Nur die reine Leidenschaft für den Asphalt im Euro Truck Simulator 2 und ein starkes Miteinander.")
+    return render_template("index.html", description=description)
 
 @app.route("/about")
 def about():
-    return render_template("about.html")
+    description = ("Wir setzen auf ein möglichst realistisches Erlebnis und eine klare Struktur innerhalb der VTC. Uns ist aufgefallen, dass es vielen VTCs an Organisation und Beständigkeit fehlt – genau hier setzen wir an. Mit der EifelLog möchten wir eine gut durchdachte, realitätsnahe Firma aufbauen und anderen die Möglichkeit geben, Teil eines strukturierten und verlässlichen Teams zu sein.")
+    return render_template("about.html", description=description)
 
 @app.route('/changelog')
 def changelog():
+    description = ("Hier findest du die neuesten Änderungen, Verbesserungen und geplanten Features für Eifel LOG. Wir arbeiten ständig daran, das beste Erlebnis für unsere Fahrer zu bieten!")
     # Pfad zur JSON-Datei (hier wird davon ausgegangen, dass sie im Hauptverzeichnis liegt)
     # Falls sie im static-Ordner liegt, nutze: os.path.join(app.root_path, 'static', 'changelog.json')
     json_path = os.path.join(app.root_path, 'changelog.json')
@@ -8798,16 +8801,26 @@ def tutorial():
 
 @app.route("/downloads")
 def downloads():
+    description = (
+        "In unserem Download-Bereich findest du nützliche Dateien, Formulare und Ressourcen,
     if "user" not in session: return redirect(url_for("login"))
     return render_template("download.html")
 
 @app.route("/fuhrpark")
 def fuhrpark():
+    description = (
+        "In unserem Fuhrpark findest du eine Übersicht über alle verfügbaren Fahrzeuge, "
     return render_template("fuhrpark.html")
 
 @app.route("/impressum")
 def impressum():
-    return render_template("impressum.html")
+    description = (
+        "Im Impressum findest du alle wichtigen Informationen über Eifel LOG, "
+        "Kontaktdaten und rechtliche Hinweise. Schau gerne vorbei, wenn du mehr "
+        "über uns erfahren möchtest oder Fragen hast!"
+    )
+
+    return render_template("impressum.html", description=description)
 
 
 # ==========================================
