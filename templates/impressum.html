@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Impressum - Eifel LOG{% endblock %}
+
+{% block content %}
+<section class="w-full max-w-5xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8 md:mb-10">
+        <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--brand-green)]/25 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[9px] font-bold uppercase tracking-[0.18em] mb-6">
+            <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] shadow-[0_0_18px_rgba(137,190,50,0.8)] animate-pulse"></span>
+            Legal Node Online
+        </div>
+
+        <p class="font-orbitron text-[10px] font-bold tracking-[0.32em] uppercase text-[var(--brand-yellow)] mb-4">
+            Eifel LOG / Projektinformationen
+        </p>
+
+        <h1 class="font-orbitron text-[clamp(2.2rem,6vw,5rem)] font-extrabold leading-none tracking-[0.04em] uppercase text-[var(--text)] mb-6">
+            Impress<span class="text-[var(--brand-green)]">um</span>
+        </h1>
+
+        <p class="text-[var(--muted)] text-base leading-8 max-w-3xl">
+            Informationen zum Betreiber dieser Webseite. Eifel LOG ist ein privates Hobby-Projekt
+            rund um virtuelle Spedition, Community, Simulation und digitale Trucking-Organisation.
+        </p>
+    </div>
+
+    <!-- Impressum Card -->
+    <div class="glass-card p-6 md:p-9 lg:p-10 relative overflow-hidden">
+        <!-- Decorative Glow -->
+        <div class="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-[var(--brand-green)]/10 blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-[var(--brand-yellow)]/5 blur-3xl pointer-events-none"></div>
+
+        <div class="relative z-10 space-y-8">
+
+            <!-- Projekt Intro -->
+            <div>
+                <p class="font-orbitron text-[10px] font-bold tracking-[0.28em] uppercase text-[var(--brand-yellow)] mb-3">
+                    Angaben zum Projekt
+                </p>
+
+                <h2 class="font-orbitron text-2xl md:text-3xl font-bold uppercase tracking-wider text-[var(--text)] mb-4">
+                    Eifel LOG
+                </h2>
+
+                <p class="text-[var(--muted)] text-sm md:text-base leading-8 max-w-3xl">
+                    Diese Webseite dient der Darstellung eines nicht-kommerziellen Hobby-Projekts.
+                    Eifel LOG ist keine echte Spedition, kein offizielles Transportunternehmen und
+                    kein gewerbliches Logistikangebot. Das Projekt bezieht sich auf virtuelle Inhalte,
+                    Simulation, Community-Aktivitäten und freiwillige Organisation.
+                </p>
+            </div>
+
+            <!-- Divider -->
+            <div class="h-px w-full bg-gradient-to-r from-transparent via-[rgba(137,190,50,0.65)] to-transparent"></div>
+
+            <!-- Daten Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+                    <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                        Betreiber
+                    </p>
+                    <p class="text-[var(--text)] text-base leading-7">
+                        LukxsDE
+                    </p>
+                </div>
+
+                <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+                    <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                        Projektart
+                    </p>
+                    <p class="text-[var(--text)] text-base leading-7">
+                        Privates Hobby-Projekt / virtuelle Spedition
+                    </p>
+                </div>
+
+                <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+                    <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                        Projektname
+                    </p>
+                    <p class="text-[var(--text)] text-base leading-7">
+                        Eifel LOG
+                    </p>
+                </div>
+
+                <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+                    <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                        Status
+                    </p>
+                    <p class="text-[var(--text)] text-base leading-7">
+                        Nicht kommerziell betrieben
+                    </p>
+                </div>
+            </div>
+
+            <!-- Kontakt -->
+            <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+                <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                    Kontakt
+                </p>
+
+                <p class="text-[var(--muted)] text-sm md:text-base leading-8">
+                    Kontaktaufnahme ist über die auf der Webseite bereitgestellten Community-,
+                    Bewerbungs- oder Driver-Hub-Funktionen möglich.
+                </p>
+
+                <p class="text-[var(--muted)] text-sm md:text-base leading-8 mt-3">
+                    Falls du hier eine direkte Kontaktadresse anzeigen möchtest, kannst du diesen Abschnitt
+                    später durch deine gewünschte E-Mail-Adresse ersetzen.
+                </p>
+            </div>
+
+            <!-- Haftung -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+                    <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                        Haftung für Inhalte
+                    </p>
+
+                    <p class="text-[var(--muted)] text-sm md:text-base leading-8">
+                        Die Inhalte dieser Webseite wurden mit größter Sorgfalt erstellt.
+                        Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte wird jedoch
+                        keine Gewähr übernommen. Als Betreiber bin ich für eigene Inhalte auf diesen
+                        Seiten verantwortlich.
+                    </p>
+                </div>
+
+                <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+                    <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                        Haftung für Links
+                    </p>
+
+                    <p class="text-[var(--muted)] text-sm md:text-base leading-8">
+                        Diese Webseite kann Links zu externen Webseiten enthalten.
+                        Auf deren Inhalte habe ich keinen Einfluss. Für externe Inhalte sind
+                        ausschließlich die jeweiligen Anbieter oder Betreiber verantwortlich.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Urheberrecht -->
+            <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+                <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                    Urheberrecht
+                </p>
+
+                <p class="text-[var(--muted)] text-sm md:text-base leading-8">
+                    Die durch den Seitenbetreiber erstellten Inhalte und Werke auf dieser Webseite
+                    unterliegen dem deutschen Urheberrecht. Beiträge Dritter werden, soweit vorhanden,
+                    entsprechend gekennzeichnet. Eine Vervielfältigung, Bearbeitung oder Verbreitung
+                    außerhalb der Grenzen des Urheberrechts bedarf der Zustimmung des jeweiligen
+                    Rechteinhabers.
+                </p>
+            </div>
+
+            <!-- Hobby-Projekt Hinweis -->
+            <div class="bg-[rgba(137,190,50,0.055)] border border-[rgba(137,190,50,0.22)] rounded-[20px] p-5">
+                <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                    Kennzeichnung als Hobby-Projekt
+                </p>
+
+                <p class="text-[var(--muted)] text-sm md:text-base leading-8">
+                    Eifel LOG ist ein freiwillig betriebenes Hobby-Projekt. Es besteht keine Verbindung
+                    zu einer realen Spedition, einem offiziellen Frachtunternehmen oder einem
+                    gewerblichen Transportdienstleister. Alle dargestellten Inhalte dienen ausschließlich
+                    der Community, Präsentation und Organisation innerhalb eines virtuellen Umfelds.
+                </p>
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                <a href="/" class="btn-primary">
+                    Zurück zur Startseite
+                </a>
+
+                <a href="/hub" class="btn-secondary">
+                    Zum Driver Hub
+                </a>
+            </div>
+
+        </div>
+    </div>
+</section>
+{% endblock %}
