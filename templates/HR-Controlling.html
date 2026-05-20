@@ -51,7 +51,8 @@
     .hr-metric-label,
     .hr-table th,
     .hr-badge,
-    .hr-small-label {
+    .hr-small-label,
+    .hr-mode-tab {
         font-family: 'Orbitron', sans-serif;
         text-transform: uppercase;
     }
@@ -104,7 +105,7 @@
     }
 
     .hr-subtitle {
-        max-width: 55rem;
+        max-width: 58rem;
         margin-top: 1rem;
         color: var(--muted);
         line-height: 1.8;
@@ -117,7 +118,7 @@
         justify-content: flex-end;
         gap: 0.75rem;
         flex-wrap: wrap;
-        min-width: 18rem;
+        min-width: 19rem;
     }
 
     .hr-grid {
@@ -155,6 +156,7 @@
     .hr-span-3 { grid-column: span 3; }
     .hr-span-4 { grid-column: span 4; }
     .hr-span-5 { grid-column: span 5; }
+    .hr-span-6 { grid-column: span 6; }
     .hr-span-7 { grid-column: span 7; }
     .hr-span-8 { grid-column: span 8; }
     .hr-span-12 { grid-column: span 12; }
@@ -206,6 +208,7 @@
         color: var(--brand-green);
         font-size: 0.78rem;
         font-weight: 700;
+        line-height: 1.55;
     }
 
     .hr-status-pill {
@@ -242,6 +245,48 @@
         color: var(--danger);
         border-color: rgba(255, 159, 159, 0.28);
         background: rgba(255, 159, 159, 0.10);
+    }
+
+    .hr-mode-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .hr-mode-tab {
+        width: 100%;
+        min-height: 4.2rem;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(0, 0, 0, 0.24);
+        color: var(--muted);
+        text-align: left;
+        padding: 0.9rem;
+        cursor: pointer;
+        transition: all 0.24s ease;
+        letter-spacing: 0.1em;
+        font-weight: 800;
+        font-size: 0.66rem;
+    }
+
+    .hr-mode-tab span {
+        display: block;
+        margin-top: 0.35rem;
+        color: var(--muted);
+        font-family: 'Inter', sans-serif;
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 600;
+        line-height: 1.45;
+        font-size: 0.76rem;
+    }
+
+    .hr-mode-tab.active {
+        color: var(--brand-green);
+        border-color: rgba(var(--brand-green-rgb), 0.34);
+        background: rgba(var(--brand-green-rgb), 0.10);
+        box-shadow: 0 0 0 4px rgba(var(--brand-green-rgb), 0.06);
     }
 
     .hr-form-grid {
@@ -332,7 +377,7 @@
 
     .hr-table {
         width: 100%;
-        min-width: 820px;
+        min-width: 880px;
         border-collapse: collapse;
     }
 
@@ -382,6 +427,7 @@
         font-family: 'Orbitron', sans-serif;
         font-size: 0.75rem;
         font-weight: 800;
+        flex: 0 0 auto;
     }
 
     .hr-person-name {
@@ -625,10 +671,29 @@
         text-align: center;
     }
 
+    .hr-system-hint {
+        margin-top: 0.85rem;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.075);
+        background: rgba(0, 0, 0, 0.20);
+        color: var(--muted);
+        padding: 0.9rem;
+        font-size: 0.82rem;
+        line-height: 1.65;
+    }
+
+    .hr-code {
+        color: var(--brand-green);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 0.78rem;
+        word-break: break-word;
+    }
+
     @media (max-width: 1100px) {
         .hr-span-3,
         .hr-span-4,
         .hr-span-5,
+        .hr-span-6,
         .hr-span-7,
         .hr-span-8 {
             grid-column: span 6;
@@ -653,13 +718,15 @@
         .hr-span-3,
         .hr-span-4,
         .hr-span-5,
+        .hr-span-6,
         .hr-span-7,
         .hr-span-8,
         .hr-span-12 {
             grid-column: span 12;
         }
 
-        .hr-form-grid {
+        .hr-form-grid,
+        .hr-mode-tabs {
             grid-template-columns: 1fr;
         }
 
@@ -672,7 +739,9 @@
 
         .hr-search,
         .hr-toolbar .btn-primary,
-        .hr-toolbar .btn-secondary {
+        .hr-toolbar .btn-secondary,
+        .hr-hero-actions .btn-primary,
+        .hr-hero-actions .btn-secondary {
             width: 100%;
         }
 
@@ -694,7 +763,7 @@
                 <div>
                     <p class="hr-kicker">
                         <span class="hr-pulse"></span>
-                        HR Control Center / Google Sheets Connector
+                        HR Control Center / Dual Data Mode
                     </p>
 
                     <h1 class="hr-title">
@@ -702,7 +771,7 @@
                     </h1>
 
                     <p class="hr-subtitle">
-                        Zentrale Oberfläche für Personalakten, Onboarding, Offboarding und Checklisten. Die Google-Sheets-Verbindung ist vorbereitet und läuft später über sichere Backend-Endpunkte, damit keine API-Schlüssel im Browser landen.
+                        Zentrale Oberfläche für Personalakten, Onboarding, Offboarding und Checklisten. Du kannst wahlweise mit Google Sheets über dein Backend arbeiten oder das Modul als eigenes HR-System betreiben. API-Schlüssel und Service-Account-Daten bleiben immer serverseitig.
                     </p>
                 </div>
 
@@ -719,13 +788,12 @@
 
         <div id="hr-alert" class="hr-alert"></div>
 
-        <!-- KPI Cards -->
         <section class="hr-grid" aria-label="HR Kennzahlen">
             <article class="hr-panel hr-metric-card hr-span-3">
                 <div class="hr-panel-inner">
                     <p class="hr-metric-label">Personalakten</p>
                     <div id="metric-total" class="hr-metric-value">0</div>
-                    <p class="hr-metric-trend">Gesamtbestand aus Sheets/Backend</p>
+                    <p id="metric-source" class="hr-metric-trend">Datenquelle wird geladen</p>
                 </div>
             </article>
 
@@ -748,41 +816,51 @@
             <article class="hr-panel hr-metric-card hr-span-3">
                 <div class="hr-panel-inner">
                     <div class="flex items-start justify-between gap-3">
-                        <p class="hr-metric-label">Sheets Status</p>
-                        <span id="sheets-status-pill" class="hr-status-pill warning">Demo</span>
+                        <p class="hr-metric-label">Systemstatus</p>
+                        <span id="system-status-pill" class="hr-status-pill warning">Lokal</span>
                     </div>
                     <div id="metric-checklist" class="hr-metric-value">0%</div>
-                    <p id="sheets-last-sync" class="hr-metric-trend">Noch nicht synchronisiert</p>
+                    <p id="system-last-sync" class="hr-metric-trend">Noch nicht synchronisiert</p>
                 </div>
             </article>
         </section>
 
-        <!-- Sheets Connector + New Employee -->
-        <section class="hr-grid" aria-label="Google Sheets Integration und Schnellanlage">
+        <section class="hr-grid" aria-label="Datenquelle und Schnellanlage">
             <article class="hr-panel hr-span-5">
                 <div class="hr-panel-inner">
                     <div class="hr-panel-header">
                         <div>
-                            <h2 class="hr-panel-title">Google Sheets Integration</h2>
+                            <h2 class="hr-panel-title">Datenquelle</h2>
                             <p class="hr-panel-copy">
-                                Frontend-Konfiguration für deine spätere Flask/API-Route. Die sensiblen Zugangsdaten gehören ins Backend, nicht in dieses Template.
+                                Wähle, ob dieses HR-Modul Google Sheets als Datenbasis nutzt oder als eigenes System mit eigener Datenbank/API läuft.
                             </p>
                         </div>
-                        <span id="connector-mode" class="hr-status-pill warning">Frontend Hook</span>
+                        <span id="connector-mode" class="hr-status-pill warning">Lokal</span>
+                    </div>
+
+                    <div class="hr-mode-tabs" role="tablist" aria-label="Systemmodus wählen">
+                        <button id="mode-google" type="button" class="hr-mode-tab" onclick="hrSetSystemMode('google_sheets')">
+                            Google Sheets
+                            <span>Tabellen als Datenquelle, sichere Verbindung über Backend.</span>
+                        </button>
+                        <button id="mode-own" type="button" class="hr-mode-tab" onclick="hrSetSystemMode('own_system')">
+                            Eigenes System
+                            <span>Eigene DB/API oder lokaler Fallback ohne Google Sheets.</span>
+                        </button>
                     </div>
 
                     <div class="hr-form-grid">
-                        <label class="hr-field full">
+                        <label class="hr-field full" data-google-only>
                             <span class="hr-small-label">Spreadsheet ID</span>
                             <input id="sheet-id" class="hr-input" type="text" placeholder="z.B. 1AbC... aus deiner Google-Sheets-URL">
                         </label>
 
-                        <label class="hr-field">
+                        <label class="hr-field" data-google-only>
                             <span class="hr-small-label">Tab Personalakten</span>
                             <input id="sheet-personal-tab" class="hr-input" type="text" value="Personalakten">
                         </label>
 
-                        <label class="hr-field">
+                        <label class="hr-field" data-google-only>
                             <span class="hr-small-label">Tab Checklisten</span>
                             <input id="sheet-checklist-tab" class="hr-input" type="text" value="Checklisten">
                         </label>
@@ -793,9 +871,13 @@
                         </label>
                     </div>
 
+                    <div id="system-hint" class="hr-system-hint">
+                        Aktueller Modus wird geladen.
+                    </div>
+
                     <div class="flex flex-col sm:flex-row gap-3 mt-4">
-                        <button type="button" class="btn-primary" onclick="hrSaveSheetSettings()">Konfiguration speichern</button>
-                        <button type="button" class="btn-secondary" onclick="hrTestSheetsConnection()">Verbindung testen</button>
+                        <button type="button" class="btn-primary" onclick="hrSaveSystemSettings()">Konfiguration speichern</button>
+                        <button type="button" class="btn-secondary" onclick="hrTestSystemConnection()">Verbindung testen</button>
                     </div>
                 </div>
             </article>
@@ -806,7 +888,7 @@
                         <div>
                             <h2 class="hr-panel-title">Schnellanlage Personalakte</h2>
                             <p class="hr-panel-copy">
-                                Erstellt lokal eine Akte und sendet sie später per POST an dein Backend. Dein Prozessplan und deine Checkliste können danach ergänzt werden.
+                                Erstellt oder aktualisiert eine Akte. Bei erreichbarerer API wird gespeichert, sonst lokal im Browser als Fallback.
                             </p>
                         </div>
                         <span class="hr-status-pill online">Bereit</span>
@@ -829,7 +911,7 @@
                         </label>
 
                         <label class="hr-field">
-                            <span class="hr-small-label">Startdatum</span>
+                            <span class="hr-small-label">Startdatum / Austritt</span>
                             <input name="startDate" class="hr-input" type="date">
                         </label>
 
@@ -865,14 +947,13 @@
             </article>
         </section>
 
-        <!-- Personnel Records -->
         <section class="hr-panel hr-span-12" aria-label="Personalakten Tabelle">
             <div class="hr-panel-inner">
                 <div class="hr-toolbar">
                     <div>
                         <h2 class="hr-panel-title">Personalakten</h2>
                         <p class="hr-panel-copy">
-                            Übersicht der Fahrer und Teammitglieder. Bei aktivem Backend werden diese Daten aus Google Sheets geladen.
+                            Übersicht der Fahrer und Teammitglieder. Die Daten kommen je nach Modus aus Google Sheets, deinem eigenen Backend oder dem lokalen Fallback.
                         </p>
                     </div>
 
@@ -885,6 +966,7 @@
                             <option value="Offboarding">Offboarding</option>
                             <option value="Inaktiv">Inaktiv</option>
                         </select>
+                        <button type="button" class="btn-secondary" onclick="hrExportLocalJson()">JSON Export</button>
                     </div>
                 </div>
 
@@ -911,7 +993,6 @@
             </div>
         </section>
 
-        <!-- Process Plan + Checklist -->
         <section class="hr-grid" aria-label="Onboarding und Offboarding Prozess">
             <article class="hr-panel hr-span-7">
                 <div class="hr-panel-inner">
@@ -919,10 +1000,10 @@
                         <div>
                             <h2 class="hr-panel-title">Prozessplan</h2>
                             <p class="hr-panel-copy">
-                                Platzhalter-Struktur für deinen späteren On-/Offboarding-Prozessplan. Du kannst mir deinen Plan schicken, dann setze ich ihn exakt ein.
+                                Prozessschritte für Onboarding und Offboarding. Kann aus Google Sheets oder aus deinem eigenen System kommen.
                             </p>
                         </div>
-                        <span class="hr-status-pill warning">Template</span>
+                        <span id="process-source-pill" class="hr-status-pill warning">Template</span>
                     </div>
 
                     <div id="process-list" class="hr-process-list"></div>
@@ -935,7 +1016,7 @@
                         <div>
                             <h2 class="hr-panel-title">Checkliste</h2>
                             <p class="hr-panel-copy">
-                                Die Checkliste kann später aus Google Sheets geladen oder direkt über das Backend gespeichert werden.
+                                Checkpunkte können direkt geklickt und je nach Modus serverseitig oder lokal gespeichert werden.
                             </p>
                         </div>
                         <span id="checklist-progress-pill" class="hr-status-pill online">0%</span>
@@ -950,14 +1031,13 @@
             </article>
         </section>
 
-        <!-- Backend Contract -->
         <section class="hr-panel hr-span-12" aria-label="Backend API Vertrag">
             <div class="hr-panel-inner">
                 <div class="hr-panel-header">
                     <div>
-                        <h2 class="hr-panel-title">Backend-Vertrag für Google Sheets</h2>
+                        <h2 class="hr-panel-title">Backend-Vertrag</h2>
                         <p class="hr-panel-copy">
-                            Diese Routen erwartet das Template später. Du kannst sie in Flask mit Google Service Account oder OAuth anbinden.
+                            Diese Routen erwartet das Template. Dein Backend entscheidet über den Header <span class="hr-code">X-HR-System-Mode</span>, ob Google Sheets oder das eigene System genutzt wird.
                         </p>
                     </div>
                     <span class="hr-status-pill warning">Keine Secrets im HTML</span>
@@ -976,47 +1056,56 @@
                         <tbody>
                             <tr>
                                 <td><span class="hr-badge active">GET</span></td>
-                                <td>/api/hr-controlling/sheets/status</td>
-                                <td>Google-Sheets-Verbindung testen</td>
-                                <td>{ connected, lastSync, sheetName }</td>
+                                <td><span class="hr-code">/api/hr-controlling/system/status</span></td>
+                                <td>Systemstatus testen: Google Sheets oder eigenes System</td>
+                                <td><span class="hr-code">{ connected, mode, lastSync, sourceName }</span></td>
                             </tr>
                             <tr>
                                 <td><span class="hr-badge active">GET</span></td>
-                                <td>/api/hr-controlling/personalakten</td>
+                                <td><span class="hr-code">/api/hr-controlling/personalakten</span></td>
                                 <td>Personalakten laden</td>
-                                <td>{ employees: [...] }</td>
+                                <td><span class="hr-code">{ employees: [...] }</span></td>
                             </tr>
                             <tr>
                                 <td><span class="hr-badge onboarding">POST</span></td>
-                                <td>/api/hr-controlling/personalakten</td>
-                                <td>Neue Personalakte speichern</td>
-                                <td>{ success, employee }</td>
+                                <td><span class="hr-code">/api/hr-controlling/personalakten</span></td>
+                                <td>Neue Personalakte speichern oder bestehende aktualisieren</td>
+                                <td><span class="hr-code">{ success, employee }</span></td>
                             </tr>
                             <tr>
                                 <td><span class="hr-badge active">GET</span></td>
-                                <td>/api/hr-controlling/checkliste</td>
+                                <td><span class="hr-code">/api/hr-controlling/checkliste</span></td>
                                 <td>Checkliste und Prozessplan laden</td>
-                                <td>{ processPlan: [...], checklist: [...] }</td>
+                                <td><span class="hr-code">{ processPlan: [...], checklist: [...] }</span></td>
                             </tr>
                             <tr>
                                 <td><span class="hr-badge onboarding">POST</span></td>
-                                <td>/api/hr-controlling/sheets/sync</td>
+                                <td><span class="hr-code">/api/hr-controlling/checkliste</span></td>
+                                <td>Checklistenstatus speichern</td>
+                                <td><span class="hr-code">{ success, checklistItem }</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="hr-badge onboarding">POST</span></td>
+                                <td><span class="hr-code">/api/hr-controlling/system/sync</span></td>
                                 <td>Manuelle Synchronisation starten</td>
-                                <td>{ success, lastSync }</td>
+                                <td><span class="hr-code">{ success, lastSync }</span></td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+
+                <div class="hr-system-hint">
+                    Für Google Sheets sendet das Frontend zusätzlich die Header <span class="hr-code">X-HR-Spreadsheet-Id</span>, <span class="hr-code">X-HR-Personal-Tab</span> und <span class="hr-code">X-HR-Checklist-Tab</span>. Service-Account-JSON, OAuth-Client-Secrets oder API-Keys gehören ausschließlich in dein Backend.
+                </div>
             </div>
         </section>
 
-        <!-- Employee Modal -->
         <div id="employee-modal" class="hr-modal" aria-hidden="true">
             <div class="hr-modal-card">
                 <div class="hr-modal-head">
                     <div>
                         <h2 class="hr-panel-title">Personalakte bearbeiten</h2>
-                        <p class="hr-panel-copy">Details zur ausgewählten Person. Speichern sendet später an dein Backend.</p>
+                        <p class="hr-panel-copy">Details zur ausgewählten Person. Speichern nutzt den aktuellen Systemmodus.</p>
                     </div>
                     <button type="button" class="hr-close" onclick="hrCloseEmployeeModal()" aria-label="Modal schließen">✕</button>
                 </div>
@@ -1079,7 +1168,8 @@
         </div>
 
         <script>
-            const HR_STORAGE_KEY = 'eifellog_hr_sheets_config';
+            const HR_CONFIG_KEY = 'eifellog_hr_system_config_v2';
+            const HR_LOCAL_DB_KEY = 'eifellog_hr_local_database_v2';
 
             const hrDemoEmployees = [
                 {
@@ -1178,17 +1268,27 @@
                 }
             ];
 
+            const hrDefaultConfig = {
+                mode: 'own_system',
+                spreadsheetId: '',
+                personalTab: 'Personalakten',
+                checklistTab: 'Checklisten',
+                apiBase: '/api/hr-controlling'
+            };
+
             const hrState = {
-                apiBase: '/api/hr-controlling',
+                config: { ...hrDefaultConfig },
                 employees: [],
                 processPlan: [],
                 checklist: [],
-                demoMode: true,
-                lastSync: null
+                backendOnline: false,
+                localFallback: true,
+                lastSync: null,
+                sourceName: 'Lokaler Browser-Speicher'
             };
 
             document.addEventListener('DOMContentLoaded', () => {
-                hrLoadSheetSettings();
+                hrLoadSystemSettings();
                 hrBindForms();
                 hrRefreshAll();
             });
@@ -1196,6 +1296,72 @@
             function hrGetApiBase() {
                 const apiBaseInput = document.getElementById('sheet-api-base');
                 return (apiBaseInput?.value || '/api/hr-controlling').replace(/\/$/, '');
+            }
+
+            function hrReadCurrentConfig() {
+                return {
+                    mode: hrState.config.mode || 'own_system',
+                    spreadsheetId: document.getElementById('sheet-id')?.value.trim() || '',
+                    personalTab: document.getElementById('sheet-personal-tab')?.value.trim() || 'Personalakten',
+                    checklistTab: document.getElementById('sheet-checklist-tab')?.value.trim() || 'Checklisten',
+                    apiBase: hrGetApiBase()
+                };
+            }
+
+            function hrLoadSystemSettings() {
+                try {
+                    const saved = JSON.parse(localStorage.getItem(HR_CONFIG_KEY) || '{}');
+                    hrState.config = { ...hrDefaultConfig, ...saved };
+                } catch (error) {
+                    console.warn('HR settings could not be loaded', error);
+                    hrState.config = { ...hrDefaultConfig };
+                }
+
+                document.getElementById('sheet-id').value = hrState.config.spreadsheetId || '';
+                document.getElementById('sheet-personal-tab').value = hrState.config.personalTab || 'Personalakten';
+                document.getElementById('sheet-checklist-tab').value = hrState.config.checklistTab || 'Checklisten';
+                document.getElementById('sheet-api-base').value = hrState.config.apiBase || '/api/hr-controlling';
+
+                hrApplyModeUi();
+            }
+
+            function hrSaveSystemSettings(showMessage = true) {
+                hrState.config = hrReadCurrentConfig();
+                localStorage.setItem(HR_CONFIG_KEY, JSON.stringify(hrState.config));
+                hrApplyModeUi();
+
+                if (showMessage) {
+                    const modeName = hrState.config.mode === 'google_sheets' ? 'Google Sheets' : 'Eigenes System';
+                    hrShowAlert(`Konfiguration gespeichert. Aktiver Modus: ${modeName}.`, 'success');
+                }
+            }
+
+            function hrSetSystemMode(mode) {
+                hrState.config.mode = mode === 'google_sheets' ? 'google_sheets' : 'own_system';
+                hrSaveSystemSettings(false);
+                hrRefreshAll();
+            }
+
+            function hrApplyModeUi() {
+                const isGoogle = hrState.config.mode === 'google_sheets';
+                const googleButton = document.getElementById('mode-google');
+                const ownButton = document.getElementById('mode-own');
+                const hint = document.getElementById('system-hint');
+
+                googleButton?.classList.toggle('active', isGoogle);
+                ownButton?.classList.toggle('active', !isGoogle);
+
+                document.querySelectorAll('[data-google-only]').forEach(element => {
+                    element.style.display = isGoogle ? 'grid' : 'none';
+                });
+
+                if (hint) {
+                    hint.innerHTML = isGoogle
+                        ? 'Google-Sheets-Modus: Das Frontend sendet nur Spreadsheet-ID und Tab-Namen. Die echte Verbindung läuft über dein Backend, damit keine Secrets im HTML landen.'
+                        : 'Eigenes-System-Modus: Das Frontend nutzt dein eigenes Backend unter der Endpoint-Basis. Wenn kein Backend erreichbar ist, werden Daten lokal im Browser gespeichert.';
+                }
+
+                hrUpdateStatusUi();
             }
 
             function hrShowAlert(message, type = 'success') {
@@ -1211,38 +1377,21 @@
                 }, 5200);
             }
 
-            function hrLoadSheetSettings() {
-                try {
-                    const saved = JSON.parse(localStorage.getItem(HR_STORAGE_KEY) || '{}');
-
-                    document.getElementById('sheet-id').value = saved.spreadsheetId || '';
-                    document.getElementById('sheet-personal-tab').value = saved.personalTab || 'Personalakten';
-                    document.getElementById('sheet-checklist-tab').value = saved.checklistTab || 'Checklisten';
-                    document.getElementById('sheet-api-base').value = saved.apiBase || '/api/hr-controlling';
-                } catch (error) {
-                    console.warn('HR settings could not be loaded', error);
-                }
-            }
-
-            function hrSaveSheetSettings() {
-                const payload = {
-                    spreadsheetId: document.getElementById('sheet-id').value.trim(),
-                    personalTab: document.getElementById('sheet-personal-tab').value.trim() || 'Personalakten',
-                    checklistTab: document.getElementById('sheet-checklist-tab').value.trim() || 'Checklisten',
-                    apiBase: hrGetApiBase()
+            function hrGetRequestHeaders() {
+                const config = hrReadCurrentConfig();
+                return {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-HR-System-Mode': config.mode,
+                    'X-HR-Spreadsheet-Id': config.spreadsheetId,
+                    'X-HR-Personal-Tab': config.personalTab,
+                    'X-HR-Checklist-Tab': config.checklistTab
                 };
-
-                localStorage.setItem(HR_STORAGE_KEY, JSON.stringify(payload));
-                hrState.apiBase = payload.apiBase;
-                hrShowAlert('Konfiguration lokal gespeichert. Die echte Google-Sheets-Verbindung muss serverseitig über dein Backend laufen.', 'success');
             }
 
             async function hrFetchJson(path, options = {}) {
                 const response = await fetch(`${hrGetApiBase()}${path}`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
+                    headers: hrGetRequestHeaders(),
                     ...options
                 });
 
@@ -1254,10 +1403,12 @@
             }
 
             async function hrRefreshAll() {
+                hrSaveSystemSettings(false);
+
                 await Promise.allSettled([
                     hrLoadEmployees(),
                     hrLoadChecklist(),
-                    hrTestSheetsConnection(false)
+                    hrTestSystemConnection(false)
                 ]);
 
                 hrRenderAll();
@@ -1267,10 +1418,15 @@
                 try {
                     const data = await hrFetchJson('/personalakten');
                     hrState.employees = Array.isArray(data.employees) ? data.employees : [];
-                    hrState.demoMode = false;
+                    hrState.backendOnline = true;
+                    hrState.localFallback = false;
+                    hrState.sourceName = data.sourceName || hrGetModeName();
                 } catch (error) {
-                    hrState.employees = [...hrDemoEmployees];
-                    hrState.demoMode = true;
+                    const localDb = hrLoadLocalDatabase();
+                    hrState.employees = localDb.employees;
+                    hrState.localFallback = true;
+                    hrState.backendOnline = false;
+                    hrState.sourceName = 'Lokaler Browser-Speicher';
                 }
             }
 
@@ -1279,45 +1435,93 @@
                     const data = await hrFetchJson('/checkliste');
                     hrState.processPlan = Array.isArray(data.processPlan) ? data.processPlan : [];
                     hrState.checklist = Array.isArray(data.checklist) ? data.checklist : [];
-                    hrState.demoMode = false;
+                    hrState.backendOnline = true;
+                    hrState.localFallback = false;
                 } catch (error) {
-                    hrState.processPlan = [...hrDemoProcessPlan];
-                    hrState.checklist = [...hrDemoChecklist];
-                    hrState.demoMode = true;
+                    const localDb = hrLoadLocalDatabase();
+                    hrState.processPlan = localDb.processPlan;
+                    hrState.checklist = localDb.checklist;
+                    hrState.localFallback = true;
+                    hrState.backendOnline = false;
                 }
             }
 
-            async function hrTestSheetsConnection(showMessage = true) {
-                const statusPill = document.getElementById('sheets-status-pill');
-                const connectorMode = document.getElementById('connector-mode');
-                const lastSync = document.getElementById('sheets-last-sync');
-
+            async function hrTestSystemConnection(showMessage = true) {
                 try {
-                    const data = await hrFetchJson('/sheets/status');
-
+                    const data = await hrFetchJson('/system/status');
                     const connected = Boolean(data.connected);
-                    hrState.lastSync = data.lastSync || new Date().toISOString();
 
-                    statusPill.textContent = connected ? 'Online' : 'Nicht verbunden';
-                    statusPill.className = connected ? 'hr-status-pill online' : 'hr-status-pill warning';
-                    connectorMode.textContent = connected ? 'Backend aktiv' : 'Backend bereit';
-                    connectorMode.className = connected ? 'hr-status-pill online' : 'hr-status-pill warning';
-                    lastSync.textContent = data.lastSync ? `Letzter Sync: ${hrFormatDateTime(data.lastSync)}` : 'Backend erreichbar';
+                    hrState.backendOnline = connected;
+                    hrState.localFallback = !connected;
+                    hrState.lastSync = data.lastSync || new Date().toISOString();
+                    hrState.sourceName = data.sourceName || hrGetModeName();
 
                     if (showMessage) {
-                        hrShowAlert(connected ? 'Google-Sheets-Verbindung erfolgreich getestet.' : 'Backend erreichbar, aber Google Sheets ist noch nicht verbunden.', connected ? 'success' : 'warning');
+                        hrShowAlert(
+                            connected
+                                ? `${hrGetModeName()} ist verbunden.`
+                                : `Backend erreichbar, aber ${hrGetModeName()} ist noch nicht verbunden.`,
+                            connected ? 'success' : 'warning'
+                        );
                     }
                 } catch (error) {
-                    statusPill.textContent = 'Demo';
-                    statusPill.className = 'hr-status-pill warning';
-                    connectorMode.textContent = 'Frontend Hook';
-                    connectorMode.className = 'hr-status-pill warning';
-                    lastSync.textContent = 'Demo-Modus aktiv';
+                    hrState.backendOnline = false;
+                    hrState.localFallback = true;
+                    hrState.sourceName = 'Lokaler Browser-Speicher';
 
                     if (showMessage) {
-                        hrShowAlert('Noch kein Backend gefunden. Das Template läuft im Demo-Modus und ist bereit für deine Flask/API-Anbindung.', 'warning');
+                        hrShowAlert('Kein Backend erreichbar. Das HR-Modul läuft lokal im Browser-Fallback.', 'warning');
                     }
                 }
+
+                hrUpdateStatusUi();
+            }
+
+            async function hrSyncSystem() {
+                try {
+                    const data = await hrFetchJson('/system/sync', {
+                        method: 'POST',
+                        body: JSON.stringify({ config: hrReadCurrentConfig() })
+                    });
+
+                    hrState.lastSync = data.lastSync || new Date().toISOString();
+                    hrState.backendOnline = Boolean(data.success);
+                    hrState.localFallback = !data.success;
+                    hrShowAlert(data.success ? 'Synchronisation erfolgreich gestartet.' : 'Synchronisation konnte nicht bestätigt werden.', data.success ? 'success' : 'warning');
+                } catch (error) {
+                    hrState.backendOnline = false;
+                    hrState.localFallback = true;
+                    hrShowAlert('Synchronisation nicht möglich. Backend ist nicht erreichbar.', 'warning');
+                }
+
+                hrUpdateStatusUi();
+            }
+
+            function hrUpdateStatusUi() {
+                const statusPill = document.getElementById('system-status-pill');
+                const connectorMode = document.getElementById('connector-mode');
+                const lastSync = document.getElementById('system-last-sync');
+                const processSourcePill = document.getElementById('process-source-pill');
+                const modeName = hrGetModeName();
+
+                if (hrState.backendOnline && !hrState.localFallback) {
+                    statusPill.textContent = 'Online';
+                    statusPill.className = 'hr-status-pill online';
+                    connectorMode.textContent = modeName;
+                    connectorMode.className = 'hr-status-pill online';
+                    processSourcePill.textContent = 'Live';
+                    processSourcePill.className = 'hr-status-pill online';
+                    lastSync.textContent = hrState.lastSync ? `Letzter Sync: ${hrFormatDateTime(hrState.lastSync)}` : 'Backend verbunden';
+                    return;
+                }
+
+                statusPill.textContent = 'Lokal';
+                statusPill.className = 'hr-status-pill warning';
+                connectorMode.textContent = `${modeName} / Lokal`;
+                connectorMode.className = 'hr-status-pill warning';
+                processSourcePill.textContent = 'Lokal';
+                processSourcePill.className = 'hr-status-pill warning';
+                lastSync.textContent = 'Lokaler Fallback aktiv';
             }
 
             function hrRenderAll() {
@@ -1325,6 +1529,7 @@
                 hrRenderEmployees();
                 hrRenderProcessPlan();
                 hrRenderChecklist();
+                hrUpdateStatusUi();
             }
 
             function hrRenderMetrics() {
@@ -1339,6 +1544,7 @@
                 document.getElementById('metric-active').textContent = active;
                 document.getElementById('metric-onboarding').textContent = onboarding;
                 document.getElementById('metric-checklist').textContent = `${checklistProgress}%`;
+                document.getElementById('metric-source').textContent = hrState.sourceName || hrGetModeName();
             }
 
             function hrRenderEmployees() {
@@ -1456,28 +1662,32 @@
             }
 
             async function hrSubmitEmployeeForm(form, closeAfterSave = false) {
+                hrSaveSystemSettings(false);
+
                 const formData = new FormData(form);
                 const employee = Object.fromEntries(formData.entries());
 
                 employee.id = employee.id || `EL-HR-${Date.now()}`;
-                employee.progress = employee.status === 'Aktiv' ? 100 : employee.status === 'Onboarding' ? 25 : employee.status === 'Offboarding' ? 35 : 0;
+                employee.progress = hrCalculateProgress(employee);
+                employee.updatedAt = new Date().toISOString();
 
                 try {
                     const data = await hrFetchJson('/personalakten', {
                         method: 'POST',
-                        body: JSON.stringify(employee)
+                        body: JSON.stringify({ employee, config: hrReadCurrentConfig() })
                     });
 
-                    if (data.employee) {
-                        hrUpsertEmployee(data.employee);
-                    } else {
-                        hrUpsertEmployee(employee);
-                    }
-
+                    hrUpsertEmployee(data.employee || employee);
+                    hrState.backendOnline = true;
+                    hrState.localFallback = false;
+                    hrState.lastSync = new Date().toISOString();
                     hrShowAlert('Personalakte wurde über das Backend gespeichert.', 'success');
                 } catch (error) {
                     hrUpsertEmployee(employee);
-                    hrShowAlert('Kein Backend erreichbar. Personalakte wurde nur im Demo-Modus in der Oberfläche ergänzt.', 'warning');
+                    hrPersistLocalDatabase();
+                    hrState.backendOnline = false;
+                    hrState.localFallback = true;
+                    hrShowAlert('Kein Backend erreichbar. Personalakte wurde lokal im Browser gespeichert.', 'warning');
                 }
 
                 form.reset();
@@ -1533,17 +1743,89 @@
                 if (!item) return;
 
                 item.done = done;
+                item.updatedAt = new Date().toISOString();
                 hrRenderChecklist();
                 hrRenderMetrics();
 
                 try {
-                    await hrFetchJson('/checkliste', {
+                    const data = await hrFetchJson('/checkliste', {
                         method: 'POST',
-                        body: JSON.stringify({ id, done })
+                        body: JSON.stringify({ id, done, checklistItem: item, config: hrReadCurrentConfig() })
                     });
+
+                    if (data.checklistItem) {
+                        Object.assign(item, data.checklistItem);
+                    }
+
+                    hrState.backendOnline = true;
+                    hrState.localFallback = false;
                 } catch (error) {
-                    hrShowAlert('Checklistenstatus wurde lokal geändert. Backend-Speicherung ist noch nicht aktiv.', 'warning');
+                    hrPersistLocalDatabase();
+                    hrState.backendOnline = false;
+                    hrState.localFallback = true;
+                    hrShowAlert('Checklistenstatus wurde lokal geändert. Backend-Speicherung ist aktuell nicht aktiv.', 'warning');
                 }
+
+                hrUpdateStatusUi();
+            }
+
+            function hrLoadLocalDatabase() {
+                try {
+                    const saved = JSON.parse(localStorage.getItem(HR_LOCAL_DB_KEY) || '{}');
+                    return {
+                        employees: Array.isArray(saved.employees) && saved.employees.length ? saved.employees : [...hrDemoEmployees],
+                        processPlan: Array.isArray(saved.processPlan) && saved.processPlan.length ? saved.processPlan : [...hrDemoProcessPlan],
+                        checklist: Array.isArray(saved.checklist) && saved.checklist.length ? saved.checklist : [...hrDemoChecklist]
+                    };
+                } catch (error) {
+                    return {
+                        employees: [...hrDemoEmployees],
+                        processPlan: [...hrDemoProcessPlan],
+                        checklist: [...hrDemoChecklist]
+                    };
+                }
+            }
+
+            function hrPersistLocalDatabase() {
+                const payload = {
+                    employees: hrState.employees || [],
+                    processPlan: hrState.processPlan || [],
+                    checklist: hrState.checklist || [],
+                    updatedAt: new Date().toISOString()
+                };
+
+                localStorage.setItem(HR_LOCAL_DB_KEY, JSON.stringify(payload));
+            }
+
+            function hrExportLocalJson() {
+                const payload = {
+                    config: hrReadCurrentConfig(),
+                    employees: hrState.employees || [],
+                    processPlan: hrState.processPlan || [],
+                    checklist: hrState.checklist || [],
+                    exportedAt: new Date().toISOString()
+                };
+
+                const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `eifellog-hr-export-${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+            }
+
+            function hrCalculateProgress(employee) {
+                if (employee.status === 'Aktiv') return 100;
+                if (employee.status === 'Onboarding') return employee.progress || 25;
+                if (employee.status === 'Offboarding') return employee.progress || 35;
+                return employee.progress || 0;
+            }
+
+            function hrGetModeName() {
+                return hrState.config.mode === 'google_sheets' ? 'Google Sheets' : 'Eigenes System';
             }
 
             function hrGetInitials(name = '') {
@@ -1558,8 +1840,8 @@
             function hrGetStatusClass(status = '') {
                 const normalized = String(status).toLowerCase();
 
-                if (normalized.includes('aktiv') || normalized.includes('personalakte') || normalized.includes('done')) return 'active';
-                if (normalized.includes('onboarding') || normalized.includes('pending')) return 'onboarding';
+                if (normalized.includes('aktiv') || normalized.includes('personalakte') || normalized.includes('done') || normalized.includes('live')) return 'active';
+                if (normalized.includes('onboarding') || normalized.includes('pending') || normalized.includes('template')) return 'onboarding';
                 if (normalized.includes('offboarding') || normalized.includes('blocked') || normalized.includes('inaktiv')) return 'offboarding';
 
                 return '';
@@ -1609,7 +1891,7 @@
                 <h1 class="hr-title mt-4">HR <span>Controlling</span></h1>
 
                 <p class="hr-subtitle mx-auto">
-                    Dieser Bereich ist nur für eingeloggte Nutzer sichtbar. Melde dich über den Driver Hub an, um Personalakten, Checklisten und die Google-Sheets-Integration zu verwalten.
+                    Dieser Bereich ist nur für eingeloggte Nutzer sichtbar. Melde dich über den Driver Hub an, um Personalakten, Checklisten, Google Sheets oder dein eigenes HR-System zu verwalten.
                 </p>
 
                 <div class="mt-6 flex justify-center">
