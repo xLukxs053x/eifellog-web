@@ -946,6 +946,407 @@
         margin-left: auto;
     }
 
+
+    /* Tabellen-Builder: Menüs, Collapse, PDF-Vorschau und Wichtig-Markierungen */
+    .hr-sheet-builder-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1.25rem;
+        border-bottom: 1px solid var(--hr-border-light);
+        padding-bottom: 1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .hr-sheet-builder-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+
+    .hr-builder-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .hr-builder-toggle svg {
+        transition: transform 0.25s ease;
+    }
+
+    .hr-builder-toggle[aria-expanded="false"] svg {
+        transform: rotate(-90deg);
+    }
+
+    .hr-sheet-collapse-body {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .hr-sheet-collapse-body.collapsed {
+        display: none;
+    }
+
+    .hr-sheet-menu-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.15rem;
+        padding: 0.25rem 0.65rem 0.55rem;
+        background: #ffffff;
+        border-bottom: 1px solid #e5e7eb;
+        position: relative;
+        z-index: 20;
+    }
+
+    .hr-sheet-menu {
+        position: relative;
+    }
+
+    .hr-sheet-menu summary {
+        list-style: none;
+        padding: 0.42rem 0.7rem;
+        border-radius: 7px;
+        color: #3c4043;
+        font-size: 0.8rem;
+        font-weight: 700;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .hr-sheet-menu summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .hr-sheet-menu[open] summary,
+    .hr-sheet-menu summary:hover {
+        background: #e8f0fe;
+        color: #0b57d0;
+    }
+
+    .hr-sheet-menu-panel {
+        position: absolute;
+        top: calc(100% + 0.25rem);
+        left: 0;
+        min-width: 230px;
+        padding: 0.45rem;
+        border: 1px solid #dadce0;
+        border-radius: 12px;
+        background: #ffffff;
+        color: #202124;
+        box-shadow: 0 16px 34px rgba(60, 64, 67, 0.24);
+        z-index: 50;
+    }
+
+    .hr-sheet-menu-panel button,
+    .hr-sheet-menu-panel label {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.58rem 0.7rem;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: #202124;
+        font-size: 0.8rem;
+        font-weight: 650;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .hr-sheet-menu-panel button:hover,
+    .hr-sheet-menu-panel label:hover {
+        background: #f1f3f4;
+    }
+
+    .hr-sheet-menu-divider {
+        height: 1px;
+        background: #e5e7eb;
+        margin: 0.35rem 0;
+    }
+
+    .hr-sheet-menu-kbd {
+        color: #80868b;
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+    }
+
+    .hr-sheet-tool-button.orange {
+        background: #f9ab00;
+        border-color: #f9ab00;
+        color: #1f2937;
+    }
+
+    .hr-sheet-tool-button.dark {
+        background: #202124;
+        border-color: #202124;
+        color: #ffffff;
+    }
+
+    .hr-sheet-tool-button.ghost {
+        background: #f8f9fa;
+        border-color: #dadce0;
+        color: #3c4043;
+    }
+
+    .hr-sheet-cell.important {
+        background: #fff8d7;
+        box-shadow: inset 0 0 0 2px #f9ab00;
+        font-weight: 800;
+    }
+
+    .hr-sheet-cell.header-cell {
+        background: #e8f0fe;
+        color: #174ea6;
+        font-weight: 900;
+    }
+
+    .hr-sheet-cell.important.header-cell {
+        background: linear-gradient(135deg, #e8f0fe 0%, #fff8d7 100%);
+    }
+
+    .hr-sheet-cell.important::before {
+        content: "★ ";
+        color: #f29900;
+        font-weight: 900;
+    }
+
+    .hr-sheet-db-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.6rem;
+        border-radius: 999px;
+        background: #eef7ee;
+        color: #137333;
+        font-size: 0.72rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .hr-sheet-db-status.warning {
+        background: #fef7e0;
+        color: #b06000;
+    }
+
+    .hr-sheet-db-status.danger {
+        background: #fce8e6;
+        color: #c5221f;
+    }
+
+    .hr-sheet-preview-panel {
+        border-radius: 20px;
+        border: 1px solid rgba(var(--brand-green-rgb), 0.22);
+        background:
+            radial-gradient(circle at top left, rgba(var(--brand-green-rgb), 0.12), transparent 34%),
+            rgba(0, 0, 0, 0.28);
+        overflow: hidden;
+    }
+
+    .hr-sheet-preview-panel[hidden] {
+        display: none;
+    }
+
+    .hr-sheet-preview-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1.1rem 1.25rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .hr-sheet-preview-title {
+        color: #ffffff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.9rem;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+    }
+
+    .hr-sheet-preview-copy {
+        margin-top: 0.35rem;
+        color: var(--muted);
+        font-size: 0.82rem;
+    }
+
+    .hr-sheet-preview-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+    }
+
+    .hr-sheet-preview-body {
+        padding: 1.25rem;
+        background: #f8fafc;
+        color: #111827;
+    }
+
+    .hr-sheet-preview-document {
+        max-width: 1120px;
+        margin: 0 auto;
+        border-radius: 18px;
+        overflow: hidden;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 14px 34px rgba(17, 24, 39, 0.12);
+    }
+
+    .hr-sheet-preview-cover {
+        padding: 1.35rem 1.5rem;
+        background:
+            linear-gradient(135deg, #0a0f0c 0%, #152319 58%, #263508 100%);
+        color: #ffffff;
+    }
+
+    .hr-sheet-preview-cover h3 {
+        margin: 0;
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1.4rem, 2.4vw, 2.1rem);
+        font-weight: 900;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .hr-sheet-preview-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        margin-top: 0.85rem;
+    }
+
+    .hr-sheet-preview-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.38rem 0.65rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        color: #e5e7eb;
+        font-size: 0.72rem;
+        font-weight: 800;
+    }
+
+    .hr-sheet-preview-table-wrap {
+        width: 100%;
+        overflow: auto;
+    }
+
+    .hr-sheet-preview-table {
+        width: 100%;
+        min-width: 760px;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+    }
+
+    .hr-sheet-preview-table th,
+    .hr-sheet-preview-table td {
+        padding: 0.72rem 0.8rem;
+        border-bottom: 1px solid #edf0f2;
+        text-align: left;
+        vertical-align: top;
+    }
+
+    .hr-sheet-preview-table th {
+        background: #f1f5f9;
+        color: #334155;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.63rem;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    .hr-sheet-preview-table td.important,
+    .hr-sheet-preview-table th.important {
+        background: #fff8d7;
+        color: #7a4b00;
+        font-weight: 900;
+        border-left: 4px solid #f9ab00;
+    }
+
+    .hr-sheet-preview-table td.header-cell,
+    .hr-sheet-preview-table th.header-cell {
+        background: #e8f0fe;
+        color: #174ea6;
+        font-weight: 900;
+    }
+
+    .hr-sheet-preview-table .empty {
+        color: #94a3b8;
+    }
+
+    .hr-sheet-preview-footer {
+        padding: 0.9rem 1.5rem;
+        color: #64748b;
+        background: #f8fafc;
+        border-top: 1px solid #e5e7eb;
+        font-size: 0.75rem;
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .hr-sheet-preview-summary {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.75rem;
+        padding: 1rem 1.5rem;
+        background: #ffffff;
+    }
+
+    .hr-sheet-preview-summary-item {
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        padding: 0.85rem;
+        background: #f8fafc;
+    }
+
+    .hr-sheet-preview-summary-label {
+        color: #64748b;
+        font-size: 0.68rem;
+        font-weight: 900;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+    }
+
+    .hr-sheet-preview-summary-value {
+        margin-top: 0.35rem;
+        color: #111827;
+        font-size: 1.35rem;
+        font-weight: 900;
+    }
+
+    @media (max-width: 760px) {
+        .hr-sheet-builder-head {
+            flex-direction: column;
+        }
+
+        .hr-sheet-builder-actions {
+            width: 100%;
+            justify-content: flex-start;
+        }
+
+        .hr-sheet-preview-summary {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .hr-sheet-menu-panel {
+            position: fixed;
+            left: 1rem;
+            right: 1rem;
+            top: auto;
+            width: auto;
+        }
+    }
+
+
     @media (max-width: 1024px) {
         .hr-hero-content {
             flex-direction: column;
@@ -1166,75 +1567,177 @@
 
         <section class="hr-panel hr-span-12" aria-label="Tabellen Builder">
             <div class="hr-panel-inner">
-                <div class="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-4 border-b border-[var(--hr-border-light)] pb-4 mb-5">
+                <div class="hr-sheet-builder-head">
                     <div>
                         <h2 class="hr-panel-title">Tabellen-Builder</h2>
                         <p class="hr-panel-copy">
-                            Erstelle direkt im HR-Panel eine Google-Sheets-ähnliche Tabelle, fülle Zellen aus,
-                            nutze einfache Formeln und exportiere die Tabelle als CSV-Datei.
+                            Google-Sheets-ähnlicher Editor mit funktionierenden Menüs, DB-Speicherung, CSV-Export,
+                            PDF-Vorschau und PDF-Druckansicht. Wichtige Felder können sichtbar markiert werden.
                         </p>
                     </div>
 
-                    <div class="flex flex-wrap gap-3 w-full xl:w-auto">
-                        <button type="button" class="btn-primary" onclick="hrSheetLoadEmployees()">
-                            HR-Daten übernehmen
+                    <div class="hr-sheet-builder-actions">
+                        <button id="hr-builder-toggle" type="button" class="btn-secondary hr-builder-toggle" aria-expanded="true" onclick="hrSheetToggleBuilder()">
+                            <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9l6 6 6-6"></path>
+                            </svg>
+                            <span id="hr-builder-toggle-label">Builder zuklappen</span>
                         </button>
-                        <button type="button" class="btn-secondary" onclick="hrSheetExportCsv()">
-                            CSV exportieren
+
+                        <button type="button" class="btn-primary" onclick="hrSheetLoadEmployees()">
+                            HR-Daten übernehmen + DB speichern
+                        </button>
+
+                        <button type="button" class="btn-secondary" onclick="hrSheetRenderPreview(true)">
+                            PDF-Vorschau
                         </button>
                     </div>
                 </div>
 
-                <div class="hr-sheet-app" id="hr-sheet-builder">
-                    <div class="hr-sheet-topbar">
-                        <div class="hr-sheet-title-wrap">
-                            <div class="hr-sheet-icon" aria-hidden="true">
-                                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M6 2H15L20 7V22H6C4.9 22 4 21.1 4 20V4C4 2.9 4.9 2 6 2Z" fill="currentColor" opacity="0.92"></path>
-                                    <path d="M14 2V8H20" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round"></path>
-                                    <path d="M8 12H16M8 15H16M8 18H13" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"></path>
-                                </svg>
-                            </div>
-                            <div>
-                                <input id="sheet-title-input" class="hr-sheet-title-input" type="text" value="Unbenannte Tabelle" oninput="hrSheetRename(this.value)">
-                                <div class="hr-sheet-subnav" aria-hidden="true">
-                                    <span>Datei</span>
-                                    <span>Bearbeiten</span>
-                                    <span>Ansicht</span>
-                                    <span>Einfügen</span>
-                                    <span>Format</span>
-                                    <span>Daten</span>
-                                    <span>Tools</span>
+                <div id="hr-sheet-collapse-body" class="hr-sheet-collapse-body">
+                    <div class="hr-sheet-app" id="hr-sheet-builder">
+                        <div class="hr-sheet-topbar">
+                            <div class="hr-sheet-title-wrap">
+                                <div class="hr-sheet-icon" aria-hidden="true">
+                                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M6 2H15L20 7V22H6C4.9 22 4 21.1 4 20V4C4 2.9 4.9 2 6 2Z" fill="currentColor" opacity="0.92"></path>
+                                        <path d="M14 2V8H20" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round"></path>
+                                        <path d="M8 12H16M8 15H16M8 18H13" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"></path>
+                                    </svg>
                                 </div>
+                                <div>
+                                    <input id="sheet-title-input" class="hr-sheet-title-input" type="text" value="Unbenannte Tabelle" oninput="hrSheetRename(this.value)">
+                                    <div class="hr-sheet-subnav" aria-hidden="true">
+                                        <span>Live Editor</span>
+                                        <span>DB Sync</span>
+                                        <span>PDF Preview</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <span id="sheet-db-status" class="hr-sheet-db-status warning">DB: noch nicht gespeichert</span>
+                        </div>
+
+                        <div class="hr-sheet-menu-row" aria-label="Tabellen-Menüleiste">
+                            <details class="hr-sheet-menu">
+                                <summary>Datei</summary>
+                                <div class="hr-sheet-menu-panel">
+                                    <button type="button" onclick="hrSheetNewSheet()">Neue Tabelle <span class="hr-sheet-menu-kbd">Neu</span></button>
+                                    <button type="button" onclick="hrSheetSaveToDatabase(true, 'manual_menu')">In DB speichern <span class="hr-sheet-menu-kbd">DB</span></button>
+                                    <button type="button" onclick="hrSheetRenderPreview(true)">PDF-Vorschau <span class="hr-sheet-menu-kbd">Preview</span></button>
+                                    <button type="button" onclick="hrSheetExportPdf()">Als PDF exportieren <span class="hr-sheet-menu-kbd">Print</span></button>
+                                    <div class="hr-sheet-menu-divider"></div>
+                                    <button type="button" onclick="hrSheetExportCsv()">CSV exportieren <span class="hr-sheet-menu-kbd">CSV</span></button>
+                                    <button type="button" onclick="hrSheetImportCsvPick()">CSV importieren <span class="hr-sheet-menu-kbd">Import</span></button>
+                                </div>
+                            </details>
+
+                            <details class="hr-sheet-menu">
+                                <summary>Bearbeiten</summary>
+                                <div class="hr-sheet-menu-panel">
+                                    <button type="button" onclick="hrSheetCopySelected()">Zelle kopieren <span class="hr-sheet-menu-kbd">Copy</span></button>
+                                    <button type="button" onclick="hrSheetPasteClipboard()">Einfügen <span class="hr-sheet-menu-kbd">Paste</span></button>
+                                    <button type="button" onclick="hrSheetClearSelected()">Zelle leeren <span class="hr-sheet-menu-kbd">Del</span></button>
+                                    <button type="button" onclick="hrSheetFillDown()">Nach unten füllen <span class="hr-sheet-menu-kbd">Fill</span></button>
+                                </div>
+                            </details>
+
+                            <details class="hr-sheet-menu">
+                                <summary>Ansicht</summary>
+                                <div class="hr-sheet-menu-panel">
+                                    <button type="button" onclick="hrSheetToggleBuilder()">Builder auf-/zuklappen <span class="hr-sheet-menu-kbd">View</span></button>
+                                    <button type="button" onclick="hrSheetRenderPreview(true)">PDF-Vorschau anzeigen <span class="hr-sheet-menu-kbd">PDF</span></button>
+                                    <button type="button" onclick="hrSheetScrollToImportant()">Zu wichtigen Feldern <span class="hr-sheet-menu-kbd">★</span></button>
+                                </div>
+                            </details>
+
+                            <details class="hr-sheet-menu">
+                                <summary>Einfügen</summary>
+                                <div class="hr-sheet-menu-panel">
+                                    <button type="button" onclick="hrSheetLoadEmployees()">HR-Daten übernehmen <span class="hr-sheet-menu-kbd">DB</span></button>
+                                    <button type="button" onclick="hrSheetAddRow()">Zeile einfügen <span class="hr-sheet-menu-kbd">Row</span></button>
+                                    <button type="button" onclick="hrSheetAddColumn()">Spalte einfügen <span class="hr-sheet-menu-kbd">Col</span></button>
+                                    <button type="button" onclick="hrSheetInsertTimestamp()">Zeitstempel einfügen <span class="hr-sheet-menu-kbd">Now</span></button>
+                                </div>
+                            </details>
+
+                            <details class="hr-sheet-menu">
+                                <summary>Format</summary>
+                                <div class="hr-sheet-menu-panel">
+                                    <button type="button" onclick="hrSheetToggleImportant()">Wichtig markieren <span class="hr-sheet-menu-kbd">★</span></button>
+                                    <button type="button" onclick="hrSheetToggleHeader()">Als Header markieren <span class="hr-sheet-menu-kbd">H</span></button>
+                                    <button type="button" onclick="hrSheetClearFormatting()">Format entfernen <span class="hr-sheet-menu-kbd">Clean</span></button>
+                                </div>
+                            </details>
+
+                            <details class="hr-sheet-menu">
+                                <summary>Daten</summary>
+                                <div class="hr-sheet-menu-panel">
+                                    <button type="button" onclick="hrSheetSortBySelectedColumn()">Nach aktiver Spalte sortieren <span class="hr-sheet-menu-kbd">Sort</span></button>
+                                    <button type="button" onclick="hrSheetRecalculate()">Formeln neu berechnen <span class="hr-sheet-menu-kbd">fx</span></button>
+                                    <button type="button" onclick="hrSheetValidate()">Tabelle prüfen <span class="hr-sheet-menu-kbd">Check</span></button>
+                                </div>
+                            </details>
+
+                            <details class="hr-sheet-menu">
+                                <summary>Tools</summary>
+                                <div class="hr-sheet-menu-panel">
+                                    <button type="button" onclick="hrTestSystemConnection()">Backend testen <span class="hr-sheet-menu-kbd">API</span></button>
+                                    <button type="button" onclick="hrSheetSaveDraft(true)">Lokal speichern <span class="hr-sheet-menu-kbd">Local</span></button>
+                                    <button type="button" onclick="hrSheetSaveToDatabase(true, 'manual_tools')">DB speichern <span class="hr-sheet-menu-kbd">DB</span></button>
+                                    <label>
+                                        <span>DB-Autosave nach Übernahme</span>
+                                        <input id="sheet-autosave-db" type="checkbox" checked onchange="hrSheetSetAutosaveDb(this.checked)">
+                                    </label>
+                                </div>
+                            </details>
+                        </div>
+
+                        <div class="hr-sheet-toolbar" aria-label="Tabellen Werkzeugleiste">
+                            <button type="button" class="hr-sheet-tool-button primary" onclick="hrSheetNewSheet()">Neue Tabelle</button>
+                            <button type="button" class="hr-sheet-tool-button" onclick="hrSheetAddRow()">+ Zeile</button>
+                            <button type="button" class="hr-sheet-tool-button" onclick="hrSheetAddColumn()">+ Spalte</button>
+                            <button type="button" class="hr-sheet-tool-button" onclick="hrSheetApplyHrTemplate()">HR-Vorlage</button>
+                            <button type="button" class="hr-sheet-tool-button orange" onclick="hrSheetToggleImportant()">Wichtig</button>
+                            <button type="button" class="hr-sheet-tool-button" onclick="hrSheetClearSelected()">Zelle leeren</button>
+                            <button type="button" class="hr-sheet-tool-button green" onclick="hrSheetSaveToDatabase(true, 'manual_toolbar')">DB speichern</button>
+                            <button type="button" class="hr-sheet-tool-button ghost" onclick="hrSheetExportCsv()">CSV</button>
+                            <button type="button" class="hr-sheet-tool-button dark" onclick="hrSheetExportPdf()">PDF</button>
+                        </div>
+
+                        <div class="hr-sheet-formula-row">
+                            <input id="sheet-name-box" class="hr-sheet-name-box" type="text" value="A1" readonly aria-label="Aktive Zelle">
+                            <span class="hr-sheet-formula-label">fx</span>
+                            <input id="sheet-formula-input" class="hr-sheet-formula-input" type="text" placeholder="Wert oder Formel eingeben, z. B. =SUM(A1:A5)" oninput="hrSheetUpdateActiveFromFormula(this.value)">
+                        </div>
+
+                        <div class="hr-sheet-grid-wrap" id="sheet-grid-wrap">
+                            <table id="sheet-builder-table" class="hr-sheet-table" aria-label="Editierbare Tabelle"></table>
+                        </div>
+
+                        <div class="hr-sheet-footer">
+                            <button type="button" class="hr-sheet-add-tab" onclick="hrSheetNewSheet()" aria-label="Neues Tabellenblatt">+</button>
+                            <span id="sheet-tab-label" class="hr-sheet-tab">Tabellenblatt1</span>
+                            <span class="hr-sheet-hint">Enter springt nach unten, Tab nach rechts. Formeln: SUM, AVG, MIN, MAX, COUNT. ★ markiert wichtige Felder.</span>
+                        </div>
+                    </div>
+
+                    <input id="sheet-csv-input" type="file" accept=".csv,text/csv" hidden onchange="hrSheetImportCsvFile(event)">
+
+                    <div id="hr-sheet-preview-panel" class="hr-sheet-preview-panel" hidden>
+                        <div class="hr-sheet-preview-head">
+                            <div>
+                                <h3 class="hr-sheet-preview-title">PDF-Vorschau</h3>
+                                <p class="hr-sheet-preview-copy">Diese Ansicht wird für den PDF-Druck genutzt. Wichtige Felder sind gelb markiert.</p>
+                            </div>
+
+                            <div class="hr-sheet-preview-actions">
+                                <button type="button" class="btn-secondary" onclick="hrSheetRenderPreview(false)">Vorschau schließen</button>
+                                <button type="button" class="btn-primary" onclick="hrSheetExportPdf()">PDF exportieren</button>
                             </div>
                         </div>
 
-                        <span class="hr-status-pill online">Editor bereit</span>
-                    </div>
-
-                    <div class="hr-sheet-toolbar" aria-label="Tabellen Werkzeugleiste">
-                        <button type="button" class="hr-sheet-tool-button primary" onclick="hrSheetNewSheet()">Neue Tabelle</button>
-                        <button type="button" class="hr-sheet-tool-button" onclick="hrSheetAddRow()">+ Zeile</button>
-                        <button type="button" class="hr-sheet-tool-button" onclick="hrSheetAddColumn()">+ Spalte</button>
-                        <button type="button" class="hr-sheet-tool-button" onclick="hrSheetApplyHrTemplate()">HR-Vorlage</button>
-                        <button type="button" class="hr-sheet-tool-button" onclick="hrSheetClearSelected()">Zelle leeren</button>
-                        <button type="button" class="hr-sheet-tool-button green" onclick="hrSheetSaveDraft(true)">Entwurf speichern</button>
-                    </div>
-
-                    <div class="hr-sheet-formula-row">
-                        <input id="sheet-name-box" class="hr-sheet-name-box" type="text" value="A1" readonly aria-label="Aktive Zelle">
-                        <span class="hr-sheet-formula-label">fx</span>
-                        <input id="sheet-formula-input" class="hr-sheet-formula-input" type="text" placeholder="Wert oder Formel eingeben, z. B. =SUM(A1:A5)" oninput="hrSheetUpdateActiveFromFormula(this.value)">
-                    </div>
-
-                    <div class="hr-sheet-grid-wrap" id="sheet-grid-wrap">
-                        <table id="sheet-builder-table" class="hr-sheet-table" aria-label="Editierbare Tabelle"></table>
-                    </div>
-
-                    <div class="hr-sheet-footer">
-                        <button type="button" class="hr-sheet-add-tab" onclick="hrSheetNewSheet()" aria-label="Neues Tabellenblatt">+</button>
-                        <span id="sheet-tab-label" class="hr-sheet-tab">Tabellenblatt1</span>
-                        <span class="hr-sheet-hint">Tipp: Enter springt nach unten, Tab nach rechts. Formeln: SUM, AVG, MIN, MAX, COUNT.</span>
+                        <div id="hr-sheet-preview-body" class="hr-sheet-preview-body"></div>
                     </div>
                 </div>
             </div>
@@ -1854,21 +2357,32 @@
 
             /* Tabellen-Builder: Google-Sheets-ähnlicher Mini-Editor */
             const HR_SHEET_STORAGE_KEY = 'eifel_log_hr_sheet_builder_v1';
+            const HR_SHEET_DB_ENDPOINT = '/tabellen-builder';
 
             const hrSheetState = {
                 rows: 35,
                 cols: 17,
+                sheetId: null,
                 sheetName: 'Tabellenblatt1',
                 fileName: 'Unbenannte Tabelle',
                 selected: { row: 1, col: 1 },
-                data: {}
+                data: {},
+                styles: {},
+                autoSaveDb: true,
+                collapsed: false,
+                lastSavedAt: null,
+                lastDatabaseSaveAt: null
             };
 
-            function hrInitSheetBuilder() {
+            async function hrInitSheetBuilder() {
                 hrSheetLoadDraft();
+                hrSheetApplyCollapsedState();
                 hrSheetRender();
                 hrSheetBindEvents();
                 hrSheetUpdateNameBox();
+                hrSheetUpdateDbStatus('warning', 'DB: lokaler Entwurf geladen');
+
+                await hrSheetLoadDatabaseDraft();
             }
 
             function hrSheetBindEvents() {
@@ -1929,6 +2443,22 @@
                         event.preventDefault();
                         hrSheetClearSelected();
                     }
+
+                    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+                        event.preventDefault();
+                        hrSheetSaveToDatabase(true, 'keyboard');
+                    }
+                });
+
+                document.addEventListener('click', event => {
+                    if (event.target.closest('.hr-sheet-menu')) return;
+                    document.querySelectorAll('.hr-sheet-menu[open]').forEach(menu => menu.removeAttribute('open'));
+                });
+
+                document.addEventListener('keydown', event => {
+                    if (event.key === 'Escape') {
+                        document.querySelectorAll('.hr-sheet-menu[open]').forEach(menu => menu.removeAttribute('open'));
+                    }
                 });
             }
 
@@ -1960,7 +2490,7 @@
                         const display = hrSheetDisplayValue(raw, new Set([key]));
                         const calculated = String(raw).trim().startsWith('=');
 
-                        html += `<td class="hr-sheet-cell${selected ? ' selected' : ''}${calculated ? ' calculated' : ''}" contenteditable="true" spellcheck="false" data-row="${row}" data-col="${col}" data-cell="${hrSheetAddress(row, col)}">${hrEscape(display)}</td>`;
+                        html += `<td class="${hrSheetCellClass(row, col, selected, calculated)}" contenteditable="true" spellcheck="false" data-row="${row}" data-col="${col}" data-cell="${hrSheetAddress(row, col)}">${hrEscape(display)}</td>`;
                     }
 
                     html += '</tr>';
@@ -2028,7 +2558,12 @@
                     delete hrSheetState.data[key];
                 }
 
-                if (persist) hrSheetSaveDraft(false);
+                if (persist) {
+                    hrSheetSaveDraft(false);
+                    hrSheetUpdateDbStatus('warning', 'DB: Änderungen noch nicht gespeichert');
+                }
+
+                hrSheetRenderPreviewIfOpen();
             }
 
             function hrSheetGetRaw(row, col) {
@@ -2049,6 +2584,7 @@
                 });
 
                 hrSheetSaveDraft(false);
+                hrSheetRenderPreviewIfOpen();
             }
 
             function hrSheetDisplayValue(raw, visited = new Set()) {
@@ -2208,15 +2744,22 @@
                 hrSheetState.fileName = 'HR Tabelle';
 
                 headers.forEach((header, index) => {
-                    hrSheetState.data[hrSheetCellKey(1, index + 1)] = header;
+                    const key = hrSheetCellKey(1, index + 1);
+                    hrSheetState.data[key] = header;
+                    hrSheetSetStyleFlag(1, index + 1, 'header', true, false);
+                    if (['Status', 'Fortschritt', 'Notiz'].includes(header)) {
+                        hrSheetSetStyleFlag(1, index + 1, 'important', true, false);
+                    }
                 });
 
                 hrSheetSaveDraft(false);
                 hrSheetRender();
+                hrSheetRenderPreviewIfOpen();
+                hrSheetUpdateDbStatus('warning', 'DB: Vorlage noch nicht gespeichert');
                 hrShowAlert('HR-Vorlage wurde in die Tabelle eingefügt.', 'success');
             }
 
-            function hrSheetLoadEmployees() {
+            async function hrSheetLoadEmployees() {
                 const employees = hrState.employees || [];
                 const headers = ['Name', 'E-Mail', 'Rolle', 'Status', 'Prozess', 'Startdatum', 'Fortschritt', 'Notiz'];
 
@@ -2225,13 +2768,20 @@
                 hrSheetState.sheetName = 'Personalakten';
                 hrSheetState.fileName = 'Personalakten Tabelle';
                 hrSheetState.data = {};
+                hrSheetState.styles = {};
 
                 headers.forEach((header, index) => {
-                    hrSheetState.data[hrSheetCellKey(1, index + 1)] = header;
+                    const key = hrSheetCellKey(1, index + 1);
+                    hrSheetState.data[key] = header;
+                    hrSheetSetStyleFlag(1, index + 1, 'header', true, false);
+                    if (['Status', 'Fortschritt', 'Notiz'].includes(header)) {
+                        hrSheetSetStyleFlag(1, index + 1, 'important', true, false);
+                    }
                 });
 
                 employees.forEach((employee, rowIndex) => {
                     const row = rowIndex + 2;
+                    const progress = hrClampProgress(employee.progress);
                     const values = [
                         employee.name || '',
                         employee.email || '',
@@ -2239,18 +2789,37 @@
                         employee.status || '',
                         employee.process || '',
                         hrFormatDate(employee.startDate),
-                        `${hrClampProgress(employee.progress)}%`,
+                        `${progress}%`,
                         employee.notes || ''
                     ];
 
                     values.forEach((value, colIndex) => {
                         if (value !== '') hrSheetState.data[hrSheetCellKey(row, colIndex + 1)] = value;
                     });
+
+                    if (employee.status && employee.status !== 'Aktiv') {
+                        hrSheetSetStyleFlag(row, 4, 'important', true, false);
+                    }
+
+                    if (progress < 100) {
+                        hrSheetSetStyleFlag(row, 7, 'important', true, false);
+                    }
+
+                    if (employee.notes) {
+                        hrSheetSetStyleFlag(row, 8, 'important', true, false);
+                    }
                 });
 
                 hrSheetSaveDraft(false);
                 hrSheetRender();
-                hrShowAlert('Personalakten wurden in den Tabellen-Builder übernommen.', 'success');
+                hrSheetRenderPreview(true);
+
+                if (hrSheetState.autoSaveDb) {
+                    await hrSheetSaveToDatabase(true, 'hr_import');
+                } else {
+                    hrSheetUpdateDbStatus('warning', 'DB: HR-Daten übernommen, aber nicht gespeichert');
+                    hrShowAlert('Personalakten wurden übernommen. DB-Autosave ist deaktiviert.', 'warning');
+                }
             }
 
             function hrSheetNewSheet() {
@@ -2262,21 +2831,29 @@
                 hrSheetState.cols = 17;
                 hrSheetState.sheetName = 'Tabellenblatt1';
                 hrSheetState.fileName = 'Unbenannte Tabelle';
+                hrSheetState.sheetId = null;
                 hrSheetState.selected = { row: 1, col: 1 };
                 hrSheetState.data = {};
+                hrSheetState.styles = {};
+                hrSheetState.lastDatabaseSaveAt = null;
 
                 hrSheetSaveDraft(false);
                 hrSheetRender();
+                hrSheetRenderPreviewIfOpen();
+                hrSheetUpdateDbStatus('warning', 'DB: neue Tabelle noch nicht gespeichert');
                 hrShowAlert('Neue Tabelle wurde erstellt.', 'success');
             }
 
             function hrSheetRename(value) {
                 hrSheetState.fileName = String(value || '').trim() || 'Unbenannte Tabelle';
                 hrSheetSaveDraft(false);
+                hrSheetRenderPreviewIfOpen();
+                hrSheetUpdateDbStatus('warning', 'DB: Titel noch nicht gespeichert');
             }
 
             function hrSheetSaveDraft(showMessage = false) {
                 try {
+                    hrSheetState.lastSavedAt = new Date().toISOString();
                     window.localStorage.setItem(HR_SHEET_STORAGE_KEY, JSON.stringify(hrSheetState));
 
                     if (showMessage) hrShowAlert('Tabellenentwurf wurde lokal gespeichert.', 'success');
@@ -2293,10 +2870,19 @@
 
                     hrSheetState.rows = Number(saved.rows) || 35;
                     hrSheetState.cols = Number(saved.cols) || 17;
+                    hrSheetState.sheetId = saved.sheetId || null;
                     hrSheetState.sheetName = saved.sheetName || 'Tabellenblatt1';
                     hrSheetState.fileName = saved.fileName || 'Unbenannte Tabelle';
                     hrSheetState.selected = saved.selected || { row: 1, col: 1 };
                     hrSheetState.data = saved.data || {};
+                    hrSheetState.styles = saved.styles || {};
+                    hrSheetState.autoSaveDb = saved.autoSaveDb !== false;
+                    hrSheetState.collapsed = Boolean(saved.collapsed);
+                    hrSheetState.lastSavedAt = saved.lastSavedAt || null;
+                    hrSheetState.lastDatabaseSaveAt = saved.lastDatabaseSaveAt || null;
+
+                    const autosave = document.getElementById('sheet-autosave-db');
+                    if (autosave) autosave.checked = hrSheetState.autoSaveDb;
                 } catch (error) {
                     // Defekten lokalen Entwurf ignorieren.
                 }
@@ -2333,6 +2919,729 @@
 
                 hrShowAlert('CSV-Datei wurde exportiert.', 'success');
             }
+
+
+            function hrSheetCellClass(row, col, selected = false, calculated = false) {
+                const style = hrSheetGetStyle(row, col);
+                const classes = ['hr-sheet-cell'];
+
+                if (selected) classes.push('selected');
+                if (calculated) classes.push('calculated');
+                if (style.important) classes.push('important');
+                if (style.header) classes.push('header-cell');
+
+                return classes.join(' ');
+            }
+
+            function hrSheetGetStyle(row, col) {
+                return hrSheetState.styles[hrSheetCellKey(row, col)] || {};
+            }
+
+            function hrSheetSetStyleFlag(row, col, flag, value, persist = true) {
+                const key = hrSheetCellKey(row, col);
+                const current = { ...(hrSheetState.styles[key] || {}) };
+
+                current[flag] = Boolean(value);
+
+                if (Object.values(current).some(Boolean)) {
+                    hrSheetState.styles[key] = current;
+                } else {
+                    delete hrSheetState.styles[key];
+                }
+
+                if (persist) {
+                    hrSheetSaveDraft(false);
+                    hrSheetRender();
+                    hrSheetRenderPreviewIfOpen();
+                    hrSheetUpdateDbStatus('warning', 'DB: Formatierung noch nicht gespeichert');
+                }
+            }
+
+            function hrSheetToggleImportant() {
+                const { row, col } = hrSheetState.selected;
+                const style = hrSheetGetStyle(row, col);
+
+                hrSheetSetStyleFlag(row, col, 'important', !style.important);
+                hrShowAlert(style.important ? 'Wichtig-Markierung entfernt.' : 'Zelle wurde als wichtig markiert.', 'success');
+            }
+
+            function hrSheetToggleHeader() {
+                const { row, col } = hrSheetState.selected;
+                const style = hrSheetGetStyle(row, col);
+
+                hrSheetSetStyleFlag(row, col, 'header', !style.header);
+                hrShowAlert(style.header ? 'Header-Markierung entfernt.' : 'Zelle wurde als Header markiert.', 'success');
+            }
+
+            function hrSheetClearFormatting() {
+                const { row, col } = hrSheetState.selected;
+                delete hrSheetState.styles[hrSheetCellKey(row, col)];
+
+                hrSheetSaveDraft(false);
+                hrSheetRender();
+                hrSheetRenderPreviewIfOpen();
+                hrSheetUpdateDbStatus('warning', 'DB: Formatierung noch nicht gespeichert');
+                hrShowAlert('Formatierung der aktiven Zelle wurde entfernt.', 'success');
+            }
+
+            function hrSheetToggleBuilder(forceState = null) {
+                hrSheetState.collapsed = forceState === null ? !hrSheetState.collapsed : Boolean(forceState);
+                hrSheetApplyCollapsedState();
+                hrSheetSaveDraft(false);
+            }
+
+            function hrSheetApplyCollapsedState() {
+                const body = document.getElementById('hr-sheet-collapse-body');
+                const button = document.getElementById('hr-builder-toggle');
+                const label = document.getElementById('hr-builder-toggle-label');
+
+                if (body) body.classList.toggle('collapsed', hrSheetState.collapsed);
+
+                if (button) button.setAttribute('aria-expanded', String(!hrSheetState.collapsed));
+
+                if (label) {
+                    label.textContent = hrSheetState.collapsed ? 'Builder aufklappen' : 'Builder zuklappen';
+                }
+            }
+
+            function hrSheetSetAutosaveDb(enabled) {
+                hrSheetState.autoSaveDb = Boolean(enabled);
+                hrSheetSaveDraft(false);
+                hrShowAlert(hrSheetState.autoSaveDb ? 'DB-Autosave nach Übernahme ist aktiv.' : 'DB-Autosave nach Übernahme ist deaktiviert.', hrSheetState.autoSaveDb ? 'success' : 'warning');
+            }
+
+            function hrSheetGetPayload() {
+                return {
+                    id: hrSheetState.sheetId,
+                    rows: hrSheetState.rows,
+                    cols: hrSheetState.cols,
+                    sheetName: hrSheetState.sheetName,
+                    fileName: hrSheetState.fileName,
+                    selected: hrSheetState.selected,
+                    data: hrSheetState.data,
+                    styles: hrSheetState.styles,
+                    autoSaveDb: hrSheetState.autoSaveDb,
+                    updatedAt: new Date().toISOString()
+                };
+            }
+
+            async function hrSheetLoadDatabaseDraft() {
+                try {
+                    const data = await hrFetchJson(HR_SHEET_DB_ENDPOINT);
+
+                    if (!data || !data.sheet) return;
+
+                    hrSheetApplyPayload(data.sheet);
+                    hrSheetSaveDraft(false);
+                    hrSheetRender();
+                    hrSheetRenderPreviewIfOpen();
+                    hrSheetUpdateDbStatus('success', `DB: geladen · ${hrFormatDateTime(data.sheet.updatedAt || data.lastSync || new Date().toISOString())}`);
+                } catch (error) {
+                    hrSheetUpdateDbStatus('warning', 'DB: kein gespeicherter Tabellenentwurf geladen');
+                }
+            }
+
+            function hrSheetApplyPayload(sheet) {
+                if (!sheet || typeof sheet !== 'object') return;
+
+                hrSheetState.rows = Number(sheet.rows) || 35;
+                hrSheetState.cols = Number(sheet.cols) || 17;
+                hrSheetState.sheetId = sheet.id || sheet.sheetId || hrSheetState.sheetId || null;
+                hrSheetState.sheetName = sheet.sheetName || 'Tabellenblatt1';
+                hrSheetState.fileName = sheet.fileName || 'Unbenannte Tabelle';
+                hrSheetState.selected = sheet.selected || { row: 1, col: 1 };
+                hrSheetState.data = sheet.data || {};
+                hrSheetState.styles = sheet.styles || {};
+                hrSheetState.autoSaveDb = sheet.autoSaveDb !== false;
+                hrSheetState.lastDatabaseSaveAt = sheet.updatedAt || sheet.lastDatabaseSaveAt || new Date().toISOString();
+
+                const autosave = document.getElementById('sheet-autosave-db');
+                if (autosave) autosave.checked = hrSheetState.autoSaveDb;
+            }
+
+            async function hrSheetSaveToDatabase(showMessage = true, reason = 'manual') {
+                const payload = hrSheetGetPayload();
+
+                hrSheetSaveDraft(false);
+                hrSheetUpdateDbStatus('warning', 'DB: speichert ...');
+
+                try {
+                    const data = await hrFetchJson(HR_SHEET_DB_ENDPOINT, {
+                        method: 'POST',
+                        body: JSON.stringify({ sheet: payload, reason })
+                    });
+
+                    const savedSheet = data.sheet || data.table || payload;
+
+                    hrSheetApplyPayload(savedSheet);
+                    hrSheetState.lastDatabaseSaveAt = data.lastSync || savedSheet.updatedAt || new Date().toISOString();
+                    hrSheetSaveDraft(false);
+                    hrSheetUpdateDbStatus('success', `DB: gespeichert · ${hrFormatDateTime(hrSheetState.lastDatabaseSaveAt)}`);
+
+                    if (showMessage) {
+                        hrShowAlert('Tabellen-Builder wurde in der Datenbank gespeichert.', 'success');
+                    }
+
+                    return true;
+                } catch (error) {
+                    hrSheetUpdateDbStatus('danger', 'DB: Speichern fehlgeschlagen');
+
+                    if (showMessage) {
+                        hrShowAlert(`DB-Speichern fehlgeschlagen: ${error.message}. Lokaler Entwurf bleibt erhalten.`, 'error');
+                    }
+
+                    return false;
+                }
+            }
+
+            function hrSheetUpdateDbStatus(type = 'warning', text = '') {
+                const status = document.getElementById('sheet-db-status');
+
+                if (!status) return;
+
+                status.className = `hr-sheet-db-status ${type === 'success' ? '' : type}`;
+                status.textContent = text || 'DB: Status unbekannt';
+            }
+
+            function hrSheetRenderPreviewIfOpen() {
+                const panel = document.getElementById('hr-sheet-preview-panel');
+
+                if (panel && !panel.hidden) {
+                    hrSheetRenderPreview(true, false);
+                }
+            }
+
+            function hrSheetRenderPreview(show = true, showMessage = true) {
+                const panel = document.getElementById('hr-sheet-preview-panel');
+                const body = document.getElementById('hr-sheet-preview-body');
+
+                if (!panel || !body) return;
+
+                if (!show) {
+                    panel.hidden = true;
+                    return;
+                }
+
+                body.innerHTML = hrSheetBuildPreviewDocument(false);
+                panel.hidden = false;
+
+                if (showMessage) {
+                    hrShowAlert('PDF-Vorschau wurde aktualisiert.', 'success');
+                }
+
+                panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+
+            function hrSheetBuildPreviewDocument(forPrint = false) {
+                const activeRange = hrSheetGetActiveRange();
+                const importantCount = Object.values(hrSheetState.styles || {}).filter(style => style && style.important).length;
+                const filledCount = Object.keys(hrSheetState.data || {}).length;
+                const generatedAt = new Date().toLocaleString('de-DE');
+                const sourceLabel = hrState.sourceName || 'Backend-Datenbank';
+                const rows = [];
+
+                for (let row = 1; row <= activeRange.maxRow; row += 1) {
+                    const cells = [];
+
+                    for (let col = 1; col <= activeRange.maxCol; col += 1) {
+                        const raw = hrSheetGetRaw(row, col);
+                        const value = hrSheetDisplayValue(raw, new Set([hrSheetCellKey(row, col)]));
+                        const style = hrSheetGetStyle(row, col);
+                        const classes = [];
+
+                        if (style.important) classes.push('important');
+                        if (style.header || row === 1) classes.push('header-cell');
+
+                        cells.push({
+                            tag: row === 1 ? 'th' : 'td',
+                            value: value || '',
+                            classes: classes.join(' ')
+                        });
+                    }
+
+                    rows.push(cells);
+                }
+
+                const tableRows = rows.map(row => {
+                    const cells = row.map(cell => {
+                        const safe = cell.value ? hrEscape(cell.value) : '<span class="empty">–</span>';
+                        const mark = cell.classes.includes('important') ? '★ ' : '';
+                        return `<${cell.tag} class="${cell.classes}">${mark}${safe}</${cell.tag}>`;
+                    }).join('');
+
+                    return `<tr>${cells}</tr>`;
+                }).join('');
+
+                return `
+                    <div class="hr-sheet-preview-document">
+                        <div class="hr-sheet-preview-cover">
+                            <h3>${hrEscape(hrSheetState.fileName || 'Unbenannte Tabelle')}</h3>
+                            <div class="hr-sheet-preview-meta">
+                                <span class="hr-sheet-preview-chip">Quelle: ${hrEscape(sourceLabel)}</span>
+                                <span class="hr-sheet-preview-chip">Blatt: ${hrEscape(hrSheetState.sheetName || 'Tabellenblatt1')}</span>
+                                <span class="hr-sheet-preview-chip">Erstellt: ${hrEscape(generatedAt)}</span>
+                                <span class="hr-sheet-preview-chip">★ Wichtig: ${importantCount}</span>
+                            </div>
+                        </div>
+
+                        <div class="hr-sheet-preview-summary">
+                            <div class="hr-sheet-preview-summary-item">
+                                <div class="hr-sheet-preview-summary-label">Gefüllte Zellen</div>
+                                <div class="hr-sheet-preview-summary-value">${filledCount}</div>
+                            </div>
+                            <div class="hr-sheet-preview-summary-item">
+                                <div class="hr-sheet-preview-summary-label">Zeilen</div>
+                                <div class="hr-sheet-preview-summary-value">${activeRange.maxRow}</div>
+                            </div>
+                            <div class="hr-sheet-preview-summary-item">
+                                <div class="hr-sheet-preview-summary-label">Spalten</div>
+                                <div class="hr-sheet-preview-summary-value">${activeRange.maxCol}</div>
+                            </div>
+                            <div class="hr-sheet-preview-summary-item">
+                                <div class="hr-sheet-preview-summary-label">DB Sync</div>
+                                <div class="hr-sheet-preview-summary-value">${hrSheetState.lastDatabaseSaveAt ? 'OK' : 'Offen'}</div>
+                            </div>
+                        </div>
+
+                        <div class="hr-sheet-preview-table-wrap">
+                            <table class="hr-sheet-preview-table">
+                                <tbody>${tableRows}</tbody>
+                            </table>
+                        </div>
+
+                        <div class="hr-sheet-preview-footer">
+                            <span>Eifel LOG · HR Controlling</span>
+                            <span>${hrSheetState.lastDatabaseSaveAt ? `DB gespeichert: ${hrFormatDateTime(hrSheetState.lastDatabaseSaveAt)}` : 'Noch nicht in DB gespeichert'}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function hrSheetExportPdf() {
+                const printable = hrSheetBuildPreviewDocument(true);
+                const win = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=800');
+
+                if (!win) {
+                    hrShowAlert('PDF-Fenster wurde blockiert. Bitte Popups erlauben.', 'warning');
+                    return;
+                }
+
+                win.document.open();
+                win.document.write(`
+                    <!doctype html>
+                    <html lang="de">
+                    <head>
+                        <meta charset="utf-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1">
+                        <title>${hrEscape(hrSheetState.fileName || 'HR Tabelle')} · PDF</title>
+                        <style>
+                            * { box-sizing: border-box; }
+                            body {
+                                margin: 0;
+                                padding: 24px;
+                                background: #f8fafc;
+                                color: #111827;
+                                font-family: Arial, Helvetica, sans-serif;
+                            }
+                            .hr-sheet-preview-document {
+                                max-width: 1120px;
+                                margin: 0 auto;
+                                border-radius: 18px;
+                                overflow: hidden;
+                                background: #ffffff;
+                                border: 1px solid #e5e7eb;
+                                box-shadow: 0 14px 34px rgba(17, 24, 39, 0.12);
+                            }
+                            .hr-sheet-preview-cover {
+                                padding: 22px 24px;
+                                background: linear-gradient(135deg, #0a0f0c 0%, #152319 58%, #263508 100%);
+                                color: #ffffff;
+                            }
+                            .hr-sheet-preview-cover h3 {
+                                margin: 0;
+                                font-size: 28px;
+                                font-weight: 900;
+                                text-transform: uppercase;
+                                letter-spacing: 0.04em;
+                            }
+                            .hr-sheet-preview-meta {
+                                display: flex;
+                                flex-wrap: wrap;
+                                gap: 8px;
+                                margin-top: 12px;
+                            }
+                            .hr-sheet-preview-chip {
+                                display: inline-flex;
+                                padding: 6px 10px;
+                                border-radius: 999px;
+                                background: rgba(255, 255, 255, 0.1);
+                                border: 1px solid rgba(255, 255, 255, 0.14);
+                                color: #e5e7eb;
+                                font-size: 12px;
+                                font-weight: 800;
+                            }
+                            .hr-sheet-preview-summary {
+                                display: grid;
+                                grid-template-columns: repeat(4, minmax(0, 1fr));
+                                gap: 12px;
+                                padding: 16px 24px;
+                                background: #ffffff;
+                            }
+                            .hr-sheet-preview-summary-item {
+                                border: 1px solid #e5e7eb;
+                                border-radius: 14px;
+                                padding: 13px;
+                                background: #f8fafc;
+                            }
+                            .hr-sheet-preview-summary-label {
+                                color: #64748b;
+                                font-size: 10px;
+                                font-weight: 900;
+                                letter-spacing: 0.12em;
+                                text-transform: uppercase;
+                            }
+                            .hr-sheet-preview-summary-value {
+                                margin-top: 6px;
+                                color: #111827;
+                                font-size: 22px;
+                                font-weight: 900;
+                            }
+                            .hr-sheet-preview-table-wrap {
+                                width: 100%;
+                                overflow: visible;
+                            }
+                            .hr-sheet-preview-table {
+                                width: 100%;
+                                border-collapse: collapse;
+                                font-size: 12px;
+                            }
+                            .hr-sheet-preview-table th,
+                            .hr-sheet-preview-table td {
+                                padding: 9px 10px;
+                                border-bottom: 1px solid #edf0f2;
+                                text-align: left;
+                                vertical-align: top;
+                            }
+                            .hr-sheet-preview-table th {
+                                background: #f1f5f9;
+                                color: #334155;
+                                font-size: 10px;
+                                font-weight: 900;
+                                letter-spacing: 0.08em;
+                                text-transform: uppercase;
+                            }
+                            .hr-sheet-preview-table td.important,
+                            .hr-sheet-preview-table th.important {
+                                background: #fff8d7 !important;
+                                color: #7a4b00;
+                                font-weight: 900;
+                                border-left: 4px solid #f9ab00;
+                            }
+                            .hr-sheet-preview-table td.header-cell,
+                            .hr-sheet-preview-table th.header-cell {
+                                background: #e8f0fe;
+                                color: #174ea6;
+                                font-weight: 900;
+                            }
+                            .empty { color: #94a3b8; }
+                            .hr-sheet-preview-footer {
+                                padding: 14px 24px;
+                                color: #64748b;
+                                background: #f8fafc;
+                                border-top: 1px solid #e5e7eb;
+                                font-size: 11px;
+                                display: flex;
+                                justify-content: space-between;
+                                gap: 12px;
+                            }
+                            @page { size: A4 landscape; margin: 12mm; }
+                            @media print {
+                                body { padding: 0; background: #ffffff; }
+                                .hr-sheet-preview-document { box-shadow: none; border-radius: 0; border: 0; max-width: none; }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        ${printable}
+                        <script>
+                            window.addEventListener('load', () => {
+                                window.focus();
+                                setTimeout(() => window.print(), 250);
+                            });
+                        <\/script>
+                    </body>
+                    </html>
+                `);
+                win.document.close();
+
+                hrShowAlert('PDF-Druckansicht wurde geöffnet. Im Druckdialog „Als PDF speichern“ wählen.', 'success');
+            }
+
+            function hrSheetGetActiveRange() {
+                let maxRow = 1;
+                let maxCol = 1;
+
+                Object.keys(hrSheetState.data || {}).forEach(key => {
+                    const [row, col] = key.split(':').map(Number);
+                    if (Number.isFinite(row)) maxRow = Math.max(maxRow, row);
+                    if (Number.isFinite(col)) maxCol = Math.max(maxCol, col);
+                });
+
+                Object.keys(hrSheetState.styles || {}).forEach(key => {
+                    const [row, col] = key.split(':').map(Number);
+                    if (Number.isFinite(row)) maxRow = Math.max(maxRow, row);
+                    if (Number.isFinite(col)) maxCol = Math.max(maxCol, col);
+                });
+
+                return {
+                    maxRow: Math.min(Math.max(maxRow, 8), hrSheetState.rows),
+                    maxCol: Math.min(Math.max(maxCol, 8), hrSheetState.cols)
+                };
+            }
+
+            function hrSheetCopySelected() {
+                const { row, col } = hrSheetState.selected;
+                const value = hrSheetGetRaw(row, col);
+
+                if (navigator.clipboard?.writeText) {
+                    navigator.clipboard.writeText(value).then(() => {
+                        hrShowAlert('Zelle wurde kopiert.', 'success');
+                    }).catch(() => {
+                        hrShowAlert('Kopieren wurde vom Browser blockiert.', 'warning');
+                    });
+                } else {
+                    hrShowAlert('Zwischenablage wird von diesem Browser nicht unterstützt.', 'warning');
+                }
+            }
+
+            async function hrSheetPasteClipboard() {
+                if (!navigator.clipboard?.readText) {
+                    hrShowAlert('Einfügen aus der Zwischenablage wird von diesem Browser nicht unterstützt.', 'warning');
+                    return;
+                }
+
+                try {
+                    const value = await navigator.clipboard.readText();
+                    hrSheetUpdateActiveFromFormula(value);
+                    hrShowAlert('In aktive Zelle eingefügt.', 'success');
+                } catch (error) {
+                    hrShowAlert('Einfügen wurde vom Browser blockiert.', 'warning');
+                }
+            }
+
+            function hrSheetFillDown() {
+                const { row, col } = hrSheetState.selected;
+                const value = hrSheetGetRaw(row, col);
+
+                if (!value) {
+                    hrShowAlert('Aktive Zelle ist leer.', 'warning');
+                    return;
+                }
+
+                if (row >= hrSheetState.rows) {
+                    hrSheetAddRow(false);
+                }
+
+                hrSheetSetValue(row + 1, col, value, true);
+                hrSheetRender();
+                hrShowAlert('Wert wurde in die nächste Zeile kopiert.', 'success');
+            }
+
+            function hrSheetInsertTimestamp() {
+                const value = new Date().toLocaleString('de-DE');
+                hrSheetUpdateActiveFromFormula(value);
+                hrShowAlert('Zeitstempel wurde eingefügt.', 'success');
+            }
+
+            function hrSheetSortBySelectedColumn() {
+                const col = hrSheetState.selected.col;
+                const range = hrSheetGetActiveRange();
+                const startRow = 2;
+                const rows = [];
+
+                for (let row = startRow; row <= range.maxRow; row += 1) {
+                    const rowData = [];
+                    const rowStyles = [];
+
+                    for (let c = 1; c <= range.maxCol; c += 1) {
+                        rowData.push(hrSheetGetRaw(row, c));
+                        rowStyles.push(hrSheetGetStyle(row, c));
+                    }
+
+                    rows.push({ rowData, rowStyles, sortValue: String(hrSheetDisplayValue(hrSheetGetRaw(row, col))).toLowerCase() });
+                }
+
+                rows.sort((a, b) => a.sortValue.localeCompare(b.sortValue, 'de', { numeric: true }));
+
+                rows.forEach((item, index) => {
+                    const targetRow = startRow + index;
+
+                    for (let c = 1; c <= range.maxCol; c += 1) {
+                        const key = hrSheetCellKey(targetRow, c);
+                        const value = item.rowData[c - 1];
+
+                        if (value) {
+                            hrSheetState.data[key] = value;
+                        } else {
+                            delete hrSheetState.data[key];
+                        }
+
+                        if (item.rowStyles[c - 1] && Object.values(item.rowStyles[c - 1]).some(Boolean)) {
+                            hrSheetState.styles[key] = item.rowStyles[c - 1];
+                        } else {
+                            delete hrSheetState.styles[key];
+                        }
+                    }
+                });
+
+                hrSheetSaveDraft(false);
+                hrSheetRender();
+                hrSheetRenderPreviewIfOpen();
+                hrSheetUpdateDbStatus('warning', 'DB: sortierte Daten noch nicht gespeichert');
+                hrShowAlert(`Daten wurden nach Spalte ${hrSheetColumnName(col)} sortiert.`, 'success');
+            }
+
+            function hrSheetRecalculate() {
+                hrSheetRefreshComputedCells();
+                hrSheetRenderPreviewIfOpen();
+                hrShowAlert('Formeln wurden neu berechnet.', 'success');
+            }
+
+            function hrSheetValidate() {
+                const issues = [];
+                const range = hrSheetGetActiveRange();
+
+                for (let row = 1; row <= range.maxRow; row += 1) {
+                    for (let col = 1; col <= range.maxCol; col += 1) {
+                        const raw = hrSheetGetRaw(row, col);
+
+                        if (String(raw).trim().startsWith('=') && hrSheetDisplayValue(raw, new Set([hrSheetCellKey(row, col)])) === '#FEHLER') {
+                            issues.push(hrSheetAddress(row, col));
+                        }
+                    }
+                }
+
+                if (issues.length) {
+                    hrShowAlert(`Formelfehler in: ${issues.slice(0, 8).join(', ')}${issues.length > 8 ? ' ...' : ''}`, 'error');
+                    return;
+                }
+
+                hrShowAlert('Tabelle geprüft: keine Formelfehler gefunden.', 'success');
+            }
+
+            function hrSheetScrollToImportant() {
+                const importantKey = Object.keys(hrSheetState.styles || {}).find(key => hrSheetState.styles[key]?.important);
+
+                if (!importantKey) {
+                    hrShowAlert('Keine wichtigen Zellen markiert.', 'warning');
+                    return;
+                }
+
+                const [row, col] = importantKey.split(':').map(Number);
+                hrSheetSelectCell(row, col);
+                const cell = hrSheetGetCellElement(row, col);
+
+                if (cell) {
+                    cell.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                    cell.focus();
+                }
+            }
+
+            function hrSheetImportCsvPick() {
+                const input = document.getElementById('sheet-csv-input');
+                if (input) input.click();
+            }
+
+            function hrSheetImportCsvFile(event) {
+                const file = event.target.files?.[0];
+
+                if (!file) return;
+
+                const reader = new FileReader();
+
+                reader.onload = () => {
+                    const content = String(reader.result || '');
+                    const rows = hrSheetParseCsv(content);
+
+                    if (!rows.length) {
+                        hrShowAlert('CSV-Datei enthält keine lesbaren Daten.', 'warning');
+                        return;
+                    }
+
+                    hrSheetState.data = {};
+                    hrSheetState.styles = {};
+                    hrSheetState.rows = Math.max(35, rows.length + 2);
+                    hrSheetState.cols = Math.max(17, ...rows.map(row => row.length), 1);
+                    hrSheetState.fileName = file.name.replace(/\.csv$/i, '') || 'Importierte Tabelle';
+                    hrSheetState.sheetName = 'CSV Import';
+
+                    rows.forEach((rowValues, rowIndex) => {
+                        rowValues.forEach((value, colIndex) => {
+                            if (value !== '') hrSheetState.data[hrSheetCellKey(rowIndex + 1, colIndex + 1)] = value;
+
+                            if (rowIndex === 0) {
+                                hrSheetSetStyleFlag(rowIndex + 1, colIndex + 1, 'header', true, false);
+                            }
+                        });
+                    });
+
+                    hrSheetSaveDraft(false);
+                    hrSheetRender();
+                    hrSheetRenderPreview(true);
+                    hrSheetUpdateDbStatus('warning', 'DB: CSV importiert, noch nicht gespeichert');
+                    hrShowAlert('CSV-Datei wurde importiert.', 'success');
+                    event.target.value = '';
+                };
+
+                reader.readAsText(file, 'utf-8');
+            }
+
+            function hrSheetParseCsv(content) {
+                const separator = content.includes(';') ? ';' : ',';
+                const rows = [];
+                let row = [];
+                let value = '';
+                let quoted = false;
+
+                for (let index = 0; index < content.length; index += 1) {
+                    const char = content[index];
+                    const next = content[index + 1];
+
+                    if (char === '"' && quoted && next === '"') {
+                        value += '"';
+                        index += 1;
+                        continue;
+                    }
+
+                    if (char === '"') {
+                        quoted = !quoted;
+                        continue;
+                    }
+
+                    if (char === separator && !quoted) {
+                        row.push(value);
+                        value = '';
+                        continue;
+                    }
+
+                    if ((char === '\n' || char === '\r') && !quoted) {
+                        if (char === '\r' && next === '\n') index += 1;
+                        row.push(value);
+                        rows.push(row);
+                        row = [];
+                        value = '';
+                        continue;
+                    }
+
+                    value += char;
+                }
+
+                row.push(value);
+                rows.push(row);
+
+                return rows.filter(item => item.some(cell => String(cell).trim() !== ''));
+            }
+
 
             function hrSheetGetCellElement(row, col) {
                 return document.querySelector(`.hr-sheet-cell[data-row="${row}"][data-col="${col}"]`);
