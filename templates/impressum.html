@@ -4,40 +4,191 @@
 
 {% block content %}
 
-<!-- Page Override: Slideshow leicht rauszoomen -->
 <style>
     /*
-        Override für die Slideshow aus base.html.
-        Die Bilder wirken dadurch weniger stark reingezoomt.
+        Impressum Page Override
+        Ziel: Hintergrund-Slideshow deutlich rauszoomen,
+        damit das Truck-/Hausmotiv nicht so nah wirkt.
     */
+
+    .font-orbitron {
+        font-family: 'Orbitron', sans-serif;
+    }
+
+    .font-inter {
+        font-family: 'Inter', sans-serif;
+    }
+
+    .hero-bg {
+        background: #030704 !important;
+    }
+
     .hero-bg .bg-slide {
-        object-fit: cover !important;
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain !important;
+        object-position: center center !important;
         transform-origin: center center !important;
+        filter: saturate(1.08) brightness(0.48) !important;
+    }
+
+    .hero-overlay {
+        background:
+            radial-gradient(circle at 50% 24%, rgba(10, 20, 15, 0.08) 0%, rgba(4, 10, 6, 0.54) 54%, rgba(2, 5, 3, 0.88) 100%),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.58)) !important;
     }
 
     @keyframes fadeZoom {
         0% {
             opacity: 0;
-            transform: scale(0.92);
+            transform: scale(1);
         }
 
         10% {
             opacity: 1;
         }
 
-        33% {
+        34% {
             opacity: 1;
         }
 
-        45% {
+        46% {
             opacity: 0;
-            transform: scale(0.965);
+            transform: scale(1.025);
         }
 
         100% {
             opacity: 0;
-            transform: scale(0.965);
+            transform: scale(1.025);
         }
+    }
+
+    .impressum-page {
+        width: 100%;
+        max-width: 900px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .impressum-header {
+        margin-bottom: 2.35rem;
+    }
+
+    .impressum-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.55rem 0.85rem;
+        border-radius: 999px;
+        border: 1px solid rgba(137, 190, 50, 0.28);
+        background: rgba(137, 190, 50, 0.08);
+        color: var(--brand-green);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 8px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        box-shadow: 0 0 22px rgba(137, 190, 50, 0.08);
+    }
+
+    .impressum-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: var(--brand-green);
+        box-shadow: 0 0 18px rgba(137, 190, 50, 0.9);
+        animation: impressumPulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes impressumPulse {
+        0%, 100% {
+            opacity: 0.45;
+            transform: scale(0.9);
+        }
+
+        50% {
+            opacity: 1;
+            transform: scale(1.12);
+        }
+    }
+
+    .impressum-kicker {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.34em;
+        text-transform: uppercase;
+        color: var(--brand-yellow);
+    }
+
+    .impressum-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(2.35rem, 5.8vw, 4.55rem);
+        font-weight: 800;
+        line-height: 0.92;
+        letter-spacing: 0.035em;
+        text-transform: uppercase;
+        color: var(--text);
+        text-shadow: 0 0 34px rgba(137, 190, 50, 0.12);
+    }
+
+    .impressum-title span {
+        color: var(--brand-green);
+    }
+
+    .impressum-subtitle {
+        color: var(--muted);
+        font-size: 0.98rem;
+        line-height: 1.85;
+        max-width: 740px;
+    }
+
+    .impressum-card {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .impressum-box {
+        background: rgba(255, 255, 255, 0.035);
+        border: 1px solid rgba(255, 255, 255, 0.075);
+        border-radius: 20px;
+        padding: 1.25rem;
+        transition: border-color 0.25s ease, background 0.25s ease, transform 0.25s ease;
+    }
+
+    .impressum-box:hover {
+        border-color: rgba(137, 190, 50, 0.18);
+        background: rgba(255, 255, 255, 0.045);
+    }
+
+    .impressum-box-green {
+        background: rgba(137, 190, 50, 0.055);
+        border: 1px solid rgba(137, 190, 50, 0.22);
+        border-radius: 24px;
+        padding: 1.35rem;
+        box-shadow: inset 0 0 24px rgba(137, 190, 50, 0.035);
+    }
+
+    .impressum-label {
+        display: block;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 8px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: var(--brand-green);
+        margin-bottom: 0.55rem;
+    }
+
+    .impressum-muted-label {
+        display: block;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 8px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: var(--muted);
+        margin-bottom: 0.55rem;
     }
 
     .impressum-input {
@@ -45,7 +196,7 @@
         border-radius: 1rem;
         border: 1px solid rgba(255, 255, 255, 0.10);
         background: rgba(0, 0, 0, 0.30);
-        padding: 0.85rem 1rem;
+        padding: 0.82rem 1rem;
         color: var(--text);
         outline: none;
         transition: all 0.25s ease;
@@ -56,34 +207,14 @@
     }
 
     .impressum-input:focus {
-        border-color: rgba(var(--brand-green-rgb), 0.65);
+        border-color: rgba(var(--brand-green-rgb), 0.68);
         background: rgba(0, 0, 0, 0.45);
-        box-shadow: 0 0 22px rgba(var(--brand-green-rgb), 0.13);
+        box-shadow: 0 0 22px rgba(var(--brand-green-rgb), 0.14);
     }
 
-    .impressum-label {
-        display: block;
-        font-family: 'Orbitron', sans-serif;
-        font-size: 9px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.18em;
-        color: var(--brand-green);
-        margin-bottom: 0.55rem;
-    }
-
-    .impressum-box {
-        background: rgba(255, 255, 255, 0.035);
-        border: 1px solid rgba(255, 255, 255, 0.075);
-        border-radius: 20px;
-        padding: 1.25rem;
-    }
-
-    .impressum-box-green {
-        background: rgba(137, 190, 50, 0.055);
-        border: 1px solid rgba(137, 190, 50, 0.22);
-        border-radius: 24px;
-        padding: 1.25rem;
+    textarea.impressum-input {
+        resize: none;
+        min-height: 170px;
     }
 
     .impressum-email-disabled {
@@ -91,44 +222,72 @@
         border-radius: 1rem;
         border: 1px solid rgba(255, 255, 255, 0.10);
         background: rgba(255, 255, 255, 0.045);
-        padding: 0.85rem 1rem;
+        padding: 0.82rem 1rem;
         color: var(--muted);
         opacity: 0.62;
         cursor: not-allowed;
         user-select: none;
     }
 
-    textarea.impressum-input {
-        resize: none;
-        min-height: 170px;
+    .impressum-divider {
+        height: 1px;
+        width: 100%;
+        background: linear-gradient(90deg, transparent, rgba(137, 190, 50, 0.62), transparent);
+        opacity: 0.85;
+    }
+
+    @media (min-width: 1536px) {
+        .impressum-page {
+            max-width: 860px;
+        }
+
+        .impressum-title {
+            font-size: clamp(2.25rem, 5.2vw, 4.15rem);
+        }
+    }
+
+    @media (max-width: 640px) {
+        .hero-bg .bg-slide {
+            object-fit: cover !important;
+            object-position: center center !important;
+        }
+
+        .impressum-card {
+            border-radius: 22px;
+        }
+
+        .impressum-box,
+        .impressum-box-green {
+            padding: 1rem;
+        }
     }
 </style>
 
-<section class="w-full max-w-5xl mx-auto">
+<section class="impressum-page">
 
     <!-- Header -->
-    <div class="mb-8 md:mb-10">
-        <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--brand-green)]/25 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[9px] font-bold uppercase tracking-[0.18em] mb-6">
-            <span class="w-2 h-2 rounded-full bg-[var(--brand-green)] shadow-[0_0_18px_rgba(137,190,50,0.8)] animate-pulse"></span>
+    <div class="impressum-header">
+        <div class="impressum-status mb-6">
+            <span class="impressum-dot"></span>
             Legal Node Online
         </div>
 
-        <p class="font-orbitron text-[10px] font-bold tracking-[0.32em] uppercase text-[var(--brand-yellow)] mb-4">
+        <p class="impressum-kicker mb-4">
             Eifel LOG / Projektinformationen
         </p>
 
-        <h1 class="font-orbitron text-[clamp(2.2rem,6vw,5rem)] font-extrabold leading-none tracking-[0.04em] uppercase text-[var(--text)] mb-6">
-            Impress<span class="text-[var(--brand-green)]">um</span>
+        <h1 class="impressum-title mb-6">
+            Impress<span>um</span>
         </h1>
 
-        <p class="text-[var(--muted)] text-base leading-8 max-w-3xl">
+        <p class="impressum-subtitle">
             Informationen zum Betreiber dieser Webseite. Eifel LOG ist ein privates Hobby-Projekt
             rund um virtuelle Spedition, Community, Simulation und digitale Trucking-Organisation.
         </p>
     </div>
 
-    <!-- Impressum Card -->
-    <div class="glass-card p-6 md:p-9 lg:p-10 relative overflow-hidden">
+    <!-- Main Card -->
+    <div class="glass-card impressum-card p-6 md:p-8 lg:p-9">
 
         <!-- Decorative Glow -->
         <div class="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-[var(--brand-green)]/10 blur-3xl pointer-events-none"></div>
@@ -138,7 +297,7 @@
 
             <!-- Projekt Intro -->
             <div>
-                <p class="font-orbitron text-[10px] font-bold tracking-[0.28em] uppercase text-[var(--brand-yellow)] mb-3">
+                <p class="impressum-kicker mb-3">
                     Angaben zum Projekt
                 </p>
 
@@ -154,47 +313,46 @@
                 </p>
             </div>
 
-            <!-- Divider -->
-            <div class="h-px w-full bg-gradient-to-r from-transparent via-[rgba(137,190,50,0.65)] to-transparent"></div>
+            <div class="impressum-divider"></div>
 
             <!-- Daten Grid -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div class="impressum-box">
-                    <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                    <p class="impressum-label">
                         Betreiber
                     </p>
 
-                    <p class="text-[var(--text)] text-base leading-7">
+                    <p class="text-[var(--text)] text-base leading-7 font-semibold">
                         LukxsDE
                     </p>
                 </div>
 
                 <div class="impressum-box">
-                    <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                    <p class="impressum-label">
                         Projektart
                     </p>
 
-                    <p class="text-[var(--text)] text-base leading-7">
+                    <p class="text-[var(--text)] text-base leading-7 font-semibold">
                         Privates Hobby-Projekt / virtuelle Spedition
                     </p>
                 </div>
 
                 <div class="impressum-box">
-                    <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                    <p class="impressum-label">
                         Projektname
                     </p>
 
-                    <p class="text-[var(--text)] text-base leading-7">
+                    <p class="text-[var(--text)] text-base leading-7 font-semibold">
                         Eifel LOG
                     </p>
                 </div>
 
                 <div class="impressum-box">
-                    <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                    <p class="impressum-label">
                         Status
                     </p>
 
-                    <p class="text-[var(--text)] text-base leading-7">
+                    <p class="text-[var(--text)] text-base leading-7 font-semibold">
                         Nicht kommerziell betrieben
                     </p>
                 </div>
@@ -202,7 +360,7 @@
 
             <!-- Kontakt Info -->
             <div class="impressum-box">
-                <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                <p class="impressum-label">
                     Kontakt
                 </p>
 
@@ -212,7 +370,7 @@
                 </p>
 
                 <div class="mt-5">
-                    <label class="block font-orbitron text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--muted)] mb-2">
+                    <label class="impressum-muted-label">
                         Kontakt E-Mail
                     </label>
 
@@ -229,7 +387,7 @@
             <!-- Kontaktformular -->
             <div class="impressum-box-green">
                 <div class="mb-6">
-                    <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                    <p class="impressum-label">
                         Direkt kommunizieren
                     </p>
 
@@ -244,6 +402,9 @@
                 </div>
 
                 <form action="/kontakt" method="POST" class="space-y-5">
+                    {% if csrf_token is defined %}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% endif %}
 
                     <!-- Honeypot gegen einfache Spam-Bots -->
                     <input type="text" name="website" class="hidden" tabindex="-1" autocomplete="off">
@@ -348,7 +509,7 @@
             <!-- Haftung -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div class="impressum-box">
-                    <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                    <p class="impressum-label">
                         Haftung für Inhalte
                     </p>
 
@@ -361,7 +522,7 @@
                 </div>
 
                 <div class="impressum-box">
-                    <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                    <p class="impressum-label">
                         Haftung für Links
                     </p>
 
@@ -375,7 +536,7 @@
 
             <!-- Urheberrecht -->
             <div class="impressum-box">
-                <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                <p class="impressum-label">
                     Urheberrecht
                 </p>
 
@@ -390,7 +551,7 @@
 
             <!-- Hobby-Projekt Hinweis -->
             <div class="impressum-box-green">
-                <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
+                <p class="impressum-label">
                     Kennzeichnung als Hobby-Projekt
                 </p>
 
@@ -416,4 +577,5 @@
         </div>
     </div>
 </section>
+
 {% endblock %}
