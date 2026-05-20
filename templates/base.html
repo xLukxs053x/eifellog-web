@@ -37,6 +37,11 @@
             --nav-max-width: 1280px;
         }
 
+        /*
+            Global leicht rausgezoomt:
+            Tailwind nutzt viel rem. Dadurch werden Abstände, Texte, Karten und Buttons
+            etwas kleiner, ohne dass alles kaputt skaliert wird.
+        */
         html {
             font-size: 14.5px;
             scroll-behavior: smooth;
@@ -105,6 +110,7 @@
             height: 100%;
             object-fit: cover;
             object-position: center;
+            /* Helligkeit wieder etwas dunkler gesetzt */
             filter: saturate(1.05) brightness(0.50);
             opacity: 0;
             animation: fadeZoom 24s infinite;
@@ -151,6 +157,7 @@
             position: absolute;
             inset: 0;
             background:
+                /* Abdunklung wieder leicht verstärkt */
                 radial-gradient(circle at 50% 32%, rgba(10, 20, 15, 0.16) 0%, rgba(4, 10, 6, 0.72) 58%, rgba(2, 5, 3, 0.90) 100%),
                 linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.48));
         }
@@ -176,6 +183,7 @@
             box-shadow: var(--shadow);
         }
 
+        /* Spezialanpassung für das Security Modal */
         .glass-card-danger {
             border-top: 1px solid rgba(255, 159, 159, 0.3);
             border-left: 1px solid rgba(255, 159, 159, 0.3);
@@ -291,362 +299,13 @@
             margin-right: auto;
         }
 
+        /*
+            Modals aus Unterseiten wirken weniger „draufgedrückt“:
+            feste Overlays werden sauber mittig ausgerichtet.
+        */
         .fixed.inset-0.items-center.justify-center {
             align-items: center !important;
             justify-content: center !important;
-        }
-
-        /* === VERBESSERTER FOOTER === */
-        .site-footer {
-            position: relative;
-            z-index: 10;
-            width: 100%;
-            margin-top: auto;
-            overflow: hidden;
-            border-top: 1px solid rgba(var(--brand-green-rgb), 0.18);
-            background:
-                radial-gradient(circle at 15% 0%, rgba(var(--brand-green-rgb), 0.16), transparent 34%),
-                radial-gradient(circle at 85% 20%, rgba(220, 226, 38, 0.10), transparent 32%),
-                linear-gradient(180deg, rgba(8, 20, 12, 0.82), rgba(3, 8, 5, 0.96));
-            backdrop-filter: blur(26px);
-            -webkit-backdrop-filter: blur(26px);
-        }
-
-        .site-footer::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 50%;
-            width: min(780px, 85vw);
-            height: 1px;
-            transform: translateX(-50%);
-            background: linear-gradient(90deg, transparent, rgba(var(--brand-green-rgb), 0.75), rgba(220, 226, 38, 0.65), transparent);
-            opacity: 0.9;
-        }
-
-        .footer-shell {
-            width: 100%;
-            max-width: var(--site-max-width);
-            margin: 0 auto;
-            padding: 2.8rem 1.5rem 1.3rem;
-        }
-
-        .footer-grid {
-            display: grid;
-            grid-template-columns: 1.25fr 1fr 1.1fr;
-            gap: 1.25rem;
-            align-items: stretch;
-        }
-
-        .footer-card {
-            position: relative;
-            overflow: hidden;
-            border-radius: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02));
-            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
-        }
-
-        .footer-card::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            background: linear-gradient(135deg, rgba(var(--brand-green-rgb), 0.10), transparent 45%);
-            opacity: 0.75;
-        }
-
-        .footer-card-inner {
-            position: relative;
-            z-index: 1;
-            height: 100%;
-            padding: 1.25rem;
-        }
-
-        .footer-brand {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .footer-logo {
-            width: 52px;
-            height: 52px;
-            border-radius: 999px;
-            overflow: hidden;
-            border: 1px solid rgba(var(--brand-green-rgb), 0.8);
-            box-shadow: 0 0 24px rgba(var(--brand-green-rgb), 0.28);
-            flex: 0 0 auto;
-        }
-
-        .footer-logo img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .footer-kicker {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 9px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.22em;
-            color: var(--brand-yellow);
-            margin-bottom: 0.35rem;
-        }
-
-        .footer-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.16em;
-            color: var(--text);
-            line-height: 1.15;
-        }
-
-        .footer-text {
-            color: var(--muted);
-            font-size: 0.9rem;
-            line-height: 1.65;
-            margin: 0;
-        }
-
-        .footer-status {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.55rem;
-            margin-top: 1rem;
-        }
-
-        .status-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            border-radius: 999px;
-            border: 1px solid rgba(var(--brand-green-rgb), 0.22);
-            background: rgba(var(--brand-green-rgb), 0.08);
-            color: var(--text);
-            padding: 0.45rem 0.7rem;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 8.5px;
-            font-weight: 700;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-        }
-
-        .status-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 999px;
-            background: var(--brand-green);
-            box-shadow: 0 0 16px rgba(var(--brand-green-rgb), 0.8);
-            animation: pulse 1.8s infinite;
-        }
-
-        .footer-heading {
-            font-family: 'Orbitron', sans-serif;
-            color: var(--text);
-            text-transform: uppercase;
-            letter-spacing: 0.18em;
-            font-size: 10px;
-            font-weight: 800;
-            margin-bottom: 1rem;
-        }
-
-        .footer-links {
-            display: grid;
-            gap: 0.65rem;
-        }
-
-        .footer-link {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.75rem;
-            min-height: 42px;
-            padding: 0.72rem 0.85rem;
-            border-radius: 14px;
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            background: rgba(255, 255, 255, 0.035);
-            color: var(--muted);
-            text-decoration: none;
-            transition: all 0.28s ease;
-            font-size: 0.88rem;
-        }
-
-        .footer-link span {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 9px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.13em;
-        }
-
-        .footer-link svg {
-            width: 16px;
-            height: 16px;
-            color: var(--brand-green);
-            opacity: 0.78;
-            transition: all 0.28s ease;
-        }
-
-        .footer-link:hover {
-            color: var(--text);
-            border-color: rgba(var(--brand-green-rgb), 0.35);
-            background: rgba(var(--brand-green-rgb), 0.10);
-            transform: translateX(3px);
-        }
-
-        .footer-link:hover svg {
-            opacity: 1;
-            transform: translateX(2px);
-        }
-
-        .quick-actions {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.7rem;
-        }
-
-        .quick-action {
-            position: relative;
-            min-height: 94px;
-            padding: 0.95rem;
-            border-radius: 18px;
-            border: 1px solid rgba(255, 255, 255, 0.075);
-            background:
-                linear-gradient(135deg, rgba(var(--brand-green-rgb), 0.11), rgba(255, 255, 255, 0.025)),
-                rgba(0, 0, 0, 0.13);
-            color: var(--text);
-            text-decoration: none;
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-
-        .quick-action::before {
-            content: "";
-            position: absolute;
-            right: -22px;
-            top: -22px;
-            width: 72px;
-            height: 72px;
-            border-radius: 999px;
-            background: rgba(var(--brand-green-rgb), 0.14);
-            filter: blur(3px);
-            transition: all 0.3s ease;
-        }
-
-        .quick-action:hover {
-            border-color: rgba(var(--brand-green-rgb), 0.45);
-            background:
-                linear-gradient(135deg, rgba(var(--brand-green-rgb), 0.18), rgba(220, 226, 38, 0.08)),
-                rgba(0, 0, 0, 0.16);
-            box-shadow: 0 18px 46px rgba(0, 0, 0, 0.32), 0 0 22px rgba(var(--brand-green-rgb), 0.16);
-            transform: translateY(-3px);
-        }
-
-        .quick-action:hover::before {
-            transform: scale(1.22);
-            opacity: 0.95;
-        }
-
-        .quick-icon {
-            position: relative;
-            z-index: 1;
-            width: 34px;
-            height: 34px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 0.75rem;
-            color: var(--brand-green);
-            background: rgba(var(--brand-green-rgb), 0.10);
-            border: 1px solid rgba(var(--brand-green-rgb), 0.25);
-        }
-
-        .quick-icon svg {
-            width: 17px;
-            height: 17px;
-        }
-
-        .quick-title {
-            position: relative;
-            z-index: 1;
-            display: block;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 9px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-            margin-bottom: 0.35rem;
-        }
-
-        .quick-desc {
-            position: relative;
-            z-index: 1;
-            display: block;
-            color: var(--muted);
-            font-size: 0.78rem;
-            line-height: 1.35;
-        }
-
-        .footer-bottom {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 1rem;
-            padding-top: 1.25rem;
-            margin-top: 1.25rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.075);
-        }
-
-        .footer-copy {
-            color: var(--muted);
-            font-size: 0.78rem;
-            margin: 0;
-        }
-
-        .footer-legal {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-            gap: 0.55rem;
-        }
-
-        .footer-legal a {
-            color: var(--muted);
-            text-decoration: none;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 8.5px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-            padding: 0.42rem 0.6rem;
-            border-radius: 999px;
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            background: rgba(255, 255, 255, 0.025);
-            transition: all 0.25s ease;
-        }
-
-        .footer-legal a:hover {
-            color: var(--text);
-            border-color: rgba(var(--brand-green-rgb), 0.32);
-            background: rgba(var(--brand-green-rgb), 0.08);
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 0.65;
-                transform: scale(1);
-            }
-
-            50% {
-                opacity: 1;
-                transform: scale(1.28);
-            }
         }
 
         /* Bei sehr breiten Monitoren etwas kompakter und mittiger */
@@ -663,33 +322,6 @@
         @media (max-width: 1024px) {
             .base-main {
                 padding-top: 7rem;
-            }
-
-            .footer-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .quick-actions {
-                grid-template-columns: repeat(4, minmax(0, 1fr));
-            }
-        }
-
-        @media (max-width: 768px) {
-            .footer-shell {
-                padding: 2.25rem 1rem 1.1rem;
-            }
-
-            .quick-actions {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-
-            .footer-bottom {
-                flex-direction: column;
-                text-align: center;
-            }
-
-            .footer-legal {
-                justify-content: center;
             }
         }
 
@@ -708,18 +340,6 @@
             .btn-secondary,
             .btn-danger {
                 width: 100%;
-            }
-
-            .footer-brand {
-                align-items: flex-start;
-            }
-
-            .quick-actions {
-                grid-template-columns: 1fr;
-            }
-
-            .quick-action {
-                min-height: auto;
             }
         }
 
@@ -798,20 +418,15 @@
         // === SICHERHEITSSYSTEM FUNKTIONEN ===
         function initSecuritySystem() {
             const modal = document.getElementById('security-modal');
-
-            if (!modal) return;
-
             const modalCard = modal.querySelector('.glass-card');
-
-            if (!modalCard) return;
 
             // Modal einblenden
             window.showSecurityAlert = function(e) {
                 if(e) e.preventDefault();
-
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
-
+                
+                // Kurze Verzögerung für saubere Transition
                 setTimeout(() => {
                     modal.classList.remove('opacity-0');
                     modal.classList.add('opacity-100');
@@ -826,34 +441,33 @@
                 modal.classList.add('opacity-0');
                 modalCard.classList.remove('scale-100');
                 modalCard.classList.add('scale-95');
-
+                
                 setTimeout(() => {
                     modal.classList.remove('flex');
                     modal.classList.add('hidden');
                 }, 300);
             };
 
-            // 1. Rechtsklick blockieren
+            // 1. Rechtsklick (Context Menu) blockieren
             document.addEventListener('contextmenu', function(e) {
                 showSecurityAlert(e);
             }, false);
 
             // 2. Tasten-Kombinationen blockieren
             document.addEventListener('keydown', function(e) {
+                // F12 Taste
                 if (e.key === 'F12' || e.keyCode === 123) {
                     showSecurityAlert(e);
                 }
-
+                
+                // Strg + Shift + I (Chrome DevTools)
+                // Strg + Shift + J (Chrome Console)
+                // Strg + Shift + C (Chrome Element Inspector)
+                // Strg + U (Seitenquelltext anzeigen)
                 if (e.ctrlKey) {
-                    if (e.shiftKey && (
-                        e.key === 'I' || e.key === 'i' ||
-                        e.key === 'J' || e.key === 'j' ||
-                        e.key === 'C' || e.key === 'c' ||
-                        e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67
-                    )) {
+                    if (e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c' || e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) {
                         showSecurityAlert(e);
                     }
-
                     if (e.key === 'U' || e.key === 'u' || e.keyCode === 85) {
                         showSecurityAlert(e);
                     }
@@ -895,12 +509,13 @@
                     <a href="/" class="nav-link">Home</a>
                     <a href="/about" class="nav-link">Über uns</a>
                     <a href="/fuhrpark" class="nav-link">Fuhrpark</a>
-                    <a href="/changelog" class="nav-link">News</a>
+                     <a href="/changelog" class="nav-link">News</a>
                 </div>
 
                 <!-- Desktop Buttons -->
                 <div class="hidden lg:flex shrink-0 items-center gap-3">
                     {% if session.get('user') %}
+                        <!-- Zeige Dashboard & Logout, wenn eingeloggt -->
                         <a href="/dashboard" class="btn-primary">
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
@@ -915,6 +530,7 @@
                             Logout
                         </a>
                     {% else %}
+                        <!-- Zeige Driver Hub, wenn NICHT eingeloggt -->
                         <a href="/hub" class="btn-primary">
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path>
@@ -934,16 +550,16 @@
                 </div>
             </nav>
 
-            <!-- Mobile Menu -->
+            <!-- Mobile Menu (Hidden by default) -->
             <div id="mobile-menu" class="hidden flex-col gap-3 mt-4 p-6 glass-nav rounded-3xl lg:hidden pointer-events-auto">
                 <a href="/" class="nav-link text-center w-full bg-white/5 border border-white/5">Home</a>
                 <a href="/about" class="nav-link text-center w-full bg-white/5 border border-white/5">Über uns</a>
                 <a href="/fuhrpark" class="nav-link text-center w-full bg-white/5 border border-white/5">Fuhrpark</a>
-                <a href="/changelog" class="nav-link text-center w-full bg-white/5 border border-white/5">News</a>
 
                 <div class="h-px w-full bg-white/10 my-2"></div>
 
                 {% if session.get('user') %}
+                    <!-- Zeige Dashboard & Logout, wenn eingeloggt -->
                     <a href="/dashboard" class="btn-primary w-full justify-center">
                         Dashboard
                     </a>
@@ -952,6 +568,7 @@
                         Logout
                     </a>
                 {% else %}
+                    <!-- Zeige Driver Hub, wenn NICHT eingeloggt -->
                     <a href="/hub" class="btn-primary w-full justify-center">
                         Driver Hub
                     </a>
@@ -984,166 +601,23 @@
         </div>
     </main>
 
-    <!-- Verbesserter Footer mit Schnellaktionen -->
-    <footer class="site-footer">
-        <div class="footer-shell">
-
-            <div class="footer-grid">
-
-                <!-- Brand / Status -->
-                <section class="footer-card" aria-label="Eifel LOG Status">
-                    <div class="footer-card-inner">
-                        <div class="footer-brand">
-                            <div class="footer-logo">
-                                <img src="{{ url_for('static', filename='eifellog.jpg') }}" alt="Eifel LOG Logo">
-                            </div>
-
-                            <div>
-                                <div class="footer-kicker">Virtual Logistics</div>
-                                <h2 class="footer-title">Eifel LOG</h2>
-                            </div>
-                        </div>
-
-                        <p class="footer-text">
-                            Deine virtuelle Spedition für organisierte Fahrten, starke Community und zuverlässige Transporte.
-                        </p>
-
-                        <div class="footer-status">
-                            <span class="status-pill">
-                                <span class="status-dot"></span>
-                                Systeme aktiv
-                            </span>
-                            <span class="status-pill">ETS2 / TMP Ready</span>
-                            <span class="status-pill">2026 Network</span>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Footer Navigation -->
-                <section class="footer-card" aria-label="Footer Navigation">
-                    <div class="footer-card-inner">
-                        <h3 class="footer-heading">Navigation</h3>
-
-                        <nav class="footer-links">
-                            <a href="/" class="footer-link">
-                                <span>Home</span>
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                                </svg>
-                            </a>
-
-                            <a href="/about" class="footer-link">
-                                <span>Über uns</span>
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                                </svg>
-                            </a>
-
-                            <a href="/fuhrpark" class="footer-link">
-                                <span>Fuhrpark</span>
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                                </svg>
-                            </a>
-
-                            <a href="/changelog" class="footer-link">
-                                <span>News</span>
-                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                                </svg>
-                            </a>
-                        </nav>
-                    </div>
-                </section>
-
-                <!-- Schnellaktionen -->
-                <section class="footer-card" aria-label="Schnellaktionen">
-                    <div class="footer-card-inner">
-                        <h3 class="footer-heading">Schnellaktionen</h3>
-
-                        <div class="quick-actions">
-
-                            {% if session.get('user') %}
-                                <a href="/dashboard" class="quick-action">
-                                    <span class="quick-icon">
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3"></path>
-                                        </svg>
-                                    </span>
-                                    <span class="quick-title">Dashboard</span>
-                                    <span class="quick-desc">Direkt zur Zentrale</span>
-                                </a>
-
-                                <a href="/logout" class="quick-action">
-                                    <span class="quick-icon" style="color: var(--danger); border-color: rgba(255,159,159,0.28); background: rgba(255,159,159,0.08);">
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7"></path>
-                                        </svg>
-                                    </span>
-                                    <span class="quick-title">Logout</span>
-                                    <span class="quick-desc">Session beenden</span>
-                                </a>
-                            {% else %}
-                                <a href="/hub" class="quick-action">
-                                    <span class="quick-icon">
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571M8 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3"></path>
-                                        </svg>
-                                    </span>
-                                    <span class="quick-title">Driver Hub</span>
-                                    <span class="quick-desc">Login & Fahrerbereich</span>
-                                </a>
-
-                                <a href="/about" class="quick-action">
-                                    <span class="quick-icon">
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 20.5a8.5 8.5 0 100-17 8.5 8.5 0 000 17z"></path>
-                                        </svg>
-                                    </span>
-                                    <span class="quick-title">Info</span>
-                                    <span class="quick-desc">Mehr über uns</span>
-                                </a>
-                            {% endif %}
-
-                            <a href="/fuhrpark" class="quick-action">
-                                <span class="quick-icon">
-                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zm10 0a2 2 0 11-4 0 2 2 0 014 0zM13 16V6a1 1 0 00-1-1H4v11h9zm0 0h2m-2 0V9h4l3 4v3h-1"></path>
-                                    </svg>
-                                </span>
-                                <span class="quick-title">Fuhrpark</span>
-                                <span class="quick-desc">Flotte ansehen</span>
-                            </a>
-
-                            <a href="/changelog" class="quick-action">
-                                <span class="quick-icon">
-                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l6 6v8a2 2 0 01-2 2z"></path>
-                                    </svg>
-                                </span>
-                                <span class="quick-title">News</span>
-                                <span class="quick-desc">Updates lesen</span>
-                            </a>
-
-                        </div>
-                    </div>
-                </section>
-
-            </div>
-
-            <!-- Footer Bottom -->
-            <div class="footer-bottom">
-                <p class="footer-copy">
-                    &copy; 2026 Eifel LOG. All systems nominal. Wir bringen deine Fracht sicher ans Ziel.
+    <!-- Footer -->
+    <footer class="relative z-10 border-t border-[var(--line)] py-7 bg-[var(--bg-2)]/80 backdrop-blur-xl mt-auto w-full">
+        <div class="w-full max-w-[var(--site-max-width)] mx-auto px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-2 h-2 rounded-full bg-[var(--brand-green)] opacity-80 animate-pulse"></div>
+                <p class="font-orbitron tracking-[0.2em] uppercase text-[10px] font-bold text-[var(--text)]">
+                    Eifel LOG
                 </p>
-
-                <nav class="footer-legal" aria-label="Rechtliche Links">
-                    <a href="/impressum">Impressum</a>
-                    <a href="/datenschutz">Datenschutz</a>
-                    <a href="/about">Kontakt</a>
-                </nav>
             </div>
 
+            <p class="text-[9px] font-orbitron text-[var(--muted)] uppercase tracking-widest text-center md:text-left">
+                Wir bringen deine Fracht sicher ans Ziel.
+            </p>
+
+            <p class="text-[10px] font-inter text-[var(--muted)]">
+                &copy; 2026 Eifel LOG. All systems nominal.
+            </p>
         </div>
     </footer>
 
@@ -1154,20 +628,20 @@
         <div class="glass-card glass-card-danger max-w-md w-full mx-4 p-8 text-center transform scale-95 transition-transform duration-300 relative">
             <!-- Glow Effect -->
             <div class="absolute -inset-2 bg-[var(--danger)]/10 blur-2xl rounded-full z-[-1]"></div>
-
+            
             <div class="w-16 h-16 mx-auto mb-6 rounded-full border border-[var(--danger)]/50 flex items-center justify-center bg-[var(--danger)]/10 text-[var(--danger)] shadow-[0_0_15px_rgba(255,159,159,0.3)]">
                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                 </svg>
             </div>
-
+            
             <h2 class="font-orbitron text-lg font-bold text-[var(--text)] tracking-widest mb-3 uppercase">Zugriff blockiert</h2>
-
+            
             <p class="font-inter text-[var(--muted)] text-sm mb-8 leading-relaxed">
                 Quellcode-Inspektion und das Kontextmenü sind aus Sicherheitsgründen deaktiviert.<br>
                 <span class="text-[11px] uppercase tracking-wider text-[var(--danger)]/80 mt-2 block font-orbitron">Sicherheitsrichtlinie Eifel LOG</span>
             </p>
-
+            
             <button onclick="closeSecurityAlert()" class="btn-danger w-full justify-center">
                 System Alert schließen
             </button>
