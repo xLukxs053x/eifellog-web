@@ -3,7 +3,109 @@
 {% block title %}Impressum - Eifel LOG{% endblock %}
 
 {% block content %}
+
+<!-- Page Override: Slideshow leicht rauszoomen -->
+<style>
+    /*
+        Override für die Slideshow aus base.html.
+        Die Bilder wirken dadurch weniger stark reingezoomt.
+    */
+    .hero-bg .bg-slide {
+        object-fit: cover !important;
+        transform-origin: center center !important;
+    }
+
+    @keyframes fadeZoom {
+        0% {
+            opacity: 0;
+            transform: scale(0.92);
+        }
+
+        10% {
+            opacity: 1;
+        }
+
+        33% {
+            opacity: 1;
+        }
+
+        45% {
+            opacity: 0;
+            transform: scale(0.965);
+        }
+
+        100% {
+            opacity: 0;
+            transform: scale(0.965);
+        }
+    }
+
+    .impressum-input {
+        width: 100%;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        background: rgba(0, 0, 0, 0.30);
+        padding: 0.85rem 1rem;
+        color: var(--text);
+        outline: none;
+        transition: all 0.25s ease;
+    }
+
+    .impressum-input::placeholder {
+        color: rgba(147, 164, 200, 0.50);
+    }
+
+    .impressum-input:focus {
+        border-color: rgba(var(--brand-green-rgb), 0.65);
+        background: rgba(0, 0, 0, 0.45);
+        box-shadow: 0 0 22px rgba(var(--brand-green-rgb), 0.13);
+    }
+
+    .impressum-label {
+        display: block;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 9px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: var(--brand-green);
+        margin-bottom: 0.55rem;
+    }
+
+    .impressum-box {
+        background: rgba(255, 255, 255, 0.035);
+        border: 1px solid rgba(255, 255, 255, 0.075);
+        border-radius: 20px;
+        padding: 1.25rem;
+    }
+
+    .impressum-box-green {
+        background: rgba(137, 190, 50, 0.055);
+        border: 1px solid rgba(137, 190, 50, 0.22);
+        border-radius: 24px;
+        padding: 1.25rem;
+    }
+
+    .impressum-email-disabled {
+        width: 100%;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        background: rgba(255, 255, 255, 0.045);
+        padding: 0.85rem 1rem;
+        color: var(--muted);
+        opacity: 0.62;
+        cursor: not-allowed;
+        user-select: none;
+    }
+
+    textarea.impressum-input {
+        resize: none;
+        min-height: 170px;
+    }
+</style>
+
 <section class="w-full max-w-5xl mx-auto">
+
     <!-- Header -->
     <div class="mb-8 md:mb-10">
         <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--brand-green)]/25 bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-orbitron text-[9px] font-bold uppercase tracking-[0.18em] mb-6">
@@ -27,6 +129,7 @@
 
     <!-- Impressum Card -->
     <div class="glass-card p-6 md:p-9 lg:p-10 relative overflow-hidden">
+
         <!-- Decorative Glow -->
         <div class="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-[var(--brand-green)]/10 blur-3xl pointer-events-none"></div>
         <div class="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-[var(--brand-yellow)]/5 blur-3xl pointer-events-none"></div>
@@ -56,37 +159,41 @@
 
             <!-- Daten Grid -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+                <div class="impressum-box">
                     <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
                         Betreiber
                     </p>
+
                     <p class="text-[var(--text)] text-base leading-7">
                         LukxsDE
                     </p>
                 </div>
 
-                <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+                <div class="impressum-box">
                     <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
                         Projektart
                     </p>
+
                     <p class="text-[var(--text)] text-base leading-7">
                         Privates Hobby-Projekt / virtuelle Spedition
                     </p>
                 </div>
 
-                <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+                <div class="impressum-box">
                     <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
                         Projektname
                     </p>
+
                     <p class="text-[var(--text)] text-base leading-7">
                         Eifel LOG
                     </p>
                 </div>
 
-                <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+                <div class="impressum-box">
                     <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
                         Status
                     </p>
+
                     <p class="text-[var(--text)] text-base leading-7">
                         Nicht kommerziell betrieben
                     </p>
@@ -94,7 +201,7 @@
             </div>
 
             <!-- Kontakt Info -->
-            <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+            <div class="impressum-box">
                 <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
                     Kontakt
                 </p>
@@ -109,8 +216,8 @@
                         Kontakt E-Mail
                     </label>
 
-                    <div class="w-full rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-[var(--muted)] opacity-60 cursor-not-allowed select-none">
-                        info@eifelllog.de
+                    <div class="impressum-email-disabled">
+                        info@eifellog.de
                     </div>
 
                     <p class="text-[11px] text-[var(--muted)] mt-2 leading-6">
@@ -120,7 +227,7 @@
             </div>
 
             <!-- Kontaktformular -->
-            <div class="bg-[rgba(137,190,50,0.055)] border border-[rgba(137,190,50,0.22)] rounded-[24px] p-5 md:p-7">
+            <div class="impressum-box-green">
                 <div class="mb-6">
                     <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
                         Direkt kommunizieren
@@ -131,18 +238,19 @@
                     </h3>
 
                     <p class="text-[var(--muted)] text-sm md:text-base leading-8">
-                        Sende deine Nachricht direkt über das Formular. Nach dem Absenden wird die Nachricht
+                        Sende deine Nachricht direkt über das Formular. Nach dem Absenden wird deine Anfrage
                         an das System übergeben.
                     </p>
                 </div>
 
                 <form action="/kontakt" method="POST" class="space-y-5">
+
                     <!-- Honeypot gegen einfache Spam-Bots -->
                     <input type="text" name="website" class="hidden" tabindex="-1" autocomplete="off">
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
-                            <label for="name" class="block font-orbitron text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-2">
+                            <label for="name" class="impressum-label">
                                 Dein Name
                             </label>
 
@@ -153,12 +261,12 @@
                                 required
                                 maxlength="80"
                                 placeholder="Name eingeben"
-                                class="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-[var(--text)] placeholder:text-[var(--muted)]/50 outline-none transition-all focus:border-[var(--brand-green)]/60 focus:bg-black/45 focus:shadow-[0_0_20px_rgba(137,190,50,0.12)]"
+                                class="impressum-input"
                             >
                         </div>
 
                         <div>
-                            <label for="email" class="block font-orbitron text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-2">
+                            <label for="email" class="impressum-label">
                                 Deine E-Mail
                             </label>
 
@@ -169,13 +277,13 @@
                                 required
                                 maxlength="120"
                                 placeholder="deine@email.de"
-                                class="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-[var(--text)] placeholder:text-[var(--muted)]/50 outline-none transition-all focus:border-[var(--brand-green)]/60 focus:bg-black/45 focus:shadow-[0_0_20px_rgba(137,190,50,0.12)]"
+                                class="impressum-input"
                             >
                         </div>
                     </div>
 
                     <div>
-                        <label for="betreff" class="block font-orbitron text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-2">
+                        <label for="betreff" class="impressum-label">
                             Betreff
                         </label>
 
@@ -186,12 +294,12 @@
                             required
                             maxlength="120"
                             placeholder="Worum geht es?"
-                            class="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-[var(--text)] placeholder:text-[var(--muted)]/50 outline-none transition-all focus:border-[var(--brand-green)]/60 focus:bg-black/45 focus:shadow-[0_0_20px_rgba(137,190,50,0.12)]"
+                            class="impressum-input"
                         >
                     </div>
 
                     <div>
-                        <label for="nachricht" class="block font-orbitron text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-2">
+                        <label for="nachricht" class="impressum-label">
                             Nachricht
                         </label>
 
@@ -202,7 +310,7 @@
                             maxlength="2000"
                             rows="7"
                             placeholder="Schreibe deine Nachricht an Eifel LOG..."
-                            class="w-full resize-none rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-[var(--text)] placeholder:text-[var(--muted)]/50 outline-none transition-all focus:border-[var(--brand-green)]/60 focus:bg-black/45 focus:shadow-[0_0_20px_rgba(137,190,50,0.12)]"
+                            class="impressum-input"
                         ></textarea>
 
                         <p class="text-[11px] text-[var(--muted)] mt-2 leading-6">
@@ -239,7 +347,7 @@
 
             <!-- Haftung -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+                <div class="impressum-box">
                     <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
                         Haftung für Inhalte
                     </p>
@@ -252,7 +360,7 @@
                     </p>
                 </div>
 
-                <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+                <div class="impressum-box">
                     <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
                         Haftung für Links
                     </p>
@@ -266,7 +374,7 @@
             </div>
 
             <!-- Urheberrecht -->
-            <div class="bg-white/[0.035] border border-white/[0.075] rounded-[20px] p-5">
+            <div class="impressum-box">
                 <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
                     Urheberrecht
                 </p>
@@ -281,7 +389,7 @@
             </div>
 
             <!-- Hobby-Projekt Hinweis -->
-            <div class="bg-[rgba(137,190,50,0.055)] border border-[rgba(137,190,50,0.22)] rounded-[20px] p-5">
+            <div class="impressum-box-green">
                 <p class="font-orbitron text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--brand-green)] mb-3">
                     Kennzeichnung als Hobby-Projekt
                 </p>
