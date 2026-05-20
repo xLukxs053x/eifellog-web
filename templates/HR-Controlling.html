@@ -4,8 +4,7 @@
 
 {% block content %}
 <style>
-    /* 
-     * EIFEL LOG - HR CONTROLLING V2
+    /* * EIFEL LOG - HR CONTROLLING V2.1 (Layout-Fixed)
      * High-Tech Logistics Dark Theme 
      */
 
@@ -34,20 +33,25 @@
         100% { background-position: 0% 50%; }
     }
 
-    /* Base Layout */
-    .hr-shell {
-        width: 100%;
-        display: grid;
-        gap: 1.5rem;
+    /* Base Layout FIX: Force Vertical Stacking to prevent crushing */
+    .hr-shell-wrapper {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        gap: 1.5rem !important;
+        box-sizing: border-box !important;
         animation: fadeUp 0.6s ease-out forwards;
     }
 
     /* Hero Section */
     .hr-hero {
+        width: 100% !important;
         position: relative;
         overflow: hidden;
         border-radius: 24px;
         padding: 2.5rem;
+        box-sizing: border-box !important;
         border: 1px solid var(--hr-border-light);
         background: 
             radial-gradient(circle at 10% 20%, rgba(var(--brand-green-rgb), 0.15), transparent 40%),
@@ -71,9 +75,11 @@
         position: relative;
         z-index: 2;
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
         gap: 2rem;
+        width: 100%;
     }
 
     .hr-kicker {
@@ -128,23 +134,27 @@
         flex-wrap: wrap;
     }
 
-    /* Grid System */
+    /* Grid System FIX: Enforce 12 columns and prevent shrinking */
     .hr-grid {
-        display: grid;
-        grid-template-columns: repeat(12, minmax(0, 1fr));
-        gap: 1.5rem;
+        display: grid !important;
+        grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+        gap: 1.5rem !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 
-    .hr-span-3 { grid-column: span 3; }
-    .hr-span-4 { grid-column: span 4; }
-    .hr-span-5 { grid-column: span 5; }
-    .hr-span-6 { grid-column: span 6; }
-    .hr-span-7 { grid-column: span 7; }
-    .hr-span-8 { grid-column: span 8; }
-    .hr-span-12 { grid-column: span 12; }
+    .hr-span-3 { grid-column: span 3; min-width: 0; }
+    .hr-span-4 { grid-column: span 4; min-width: 0; }
+    .hr-span-5 { grid-column: span 5; min-width: 0; }
+    .hr-span-6 { grid-column: span 6; min-width: 0; }
+    .hr-span-7 { grid-column: span 7; min-width: 0; }
+    .hr-span-8 { grid-column: span 8; min-width: 0; }
+    .hr-span-12 { grid-column: span 12; min-width: 0; }
 
     /* Panels & Cards */
     .hr-panel {
+        width: 100% !important;
+        box-sizing: border-box !important;
         position: relative;
         border-radius: 20px;
         background: var(--hr-bg-panel);
@@ -331,7 +341,7 @@
     /* Forms */
     .hr-form-grid {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 1.25rem;
     }
 
@@ -349,6 +359,7 @@
 
     .hr-input, .hr-select, .hr-textarea {
         width: 100%;
+        box-sizing: border-box;
         padding: 0.85rem 1rem;
         border-radius: 12px;
         border: 1px solid var(--hr-border-light);
@@ -374,9 +385,11 @@
 
     .hr-select option { background: #0f1712; color: #fff; }
 
-    /* Tables */
+    /* Tables FIX: Prevent blowout */
     .hr-table-wrap {
-        overflow-x: auto;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
         border-radius: 16px;
         border: 1px solid var(--hr-border-light);
         background: rgba(0, 0, 0, 0.3);
@@ -444,6 +457,7 @@
         font-weight: 800;
         font-size: 0.9rem;
         box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        flex-shrink: 0;
     }
 
     .hr-person-name { font-weight: 700; color: #fff; }
@@ -536,6 +550,7 @@
         cursor: pointer;
         position: relative;
         transition: all 0.2s;
+        flex-shrink: 0;
     }
 
     .hr-check-row input[type="checkbox"]:checked {
@@ -610,13 +625,15 @@
         border-radius: 12px;
         font-weight: 600;
         animation: fadeUp 0.3s ease-out;
+        width: 100%;
+        box-sizing: border-box;
     }
     .hr-alert.show { display: block; }
     .hr-alert.success { background: rgba(var(--brand-green-rgb), 0.15); border: 1px solid rgba(var(--brand-green-rgb), 0.4); color: var(--brand-green); }
     .hr-alert.warning { background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.4); color: var(--warning, #fbbf24); }
     .hr-alert.error { background: rgba(248, 113, 113, 0.15); border: 1px solid rgba(248, 113, 113, 0.4); color: var(--danger, #f87171); }
 
-    /* Responsive */
+    /* Responsive Overrides */
     @media (max-width: 1024px) {
         .hr-hero-content { flex-direction: column; align-items: flex-start; }
         .hr-hero-actions { width: 100%; }
@@ -630,9 +647,8 @@
     }
 </style>
 
-<section class="hr-shell" data-page="hr-controlling">
+<div class="hr-shell-wrapper" data-page="hr-controlling">
     {% if session.get('user') %}
-        <!-- HERO SECTION -->
         <div class="hr-hero">
             <div class="hr-hero-content">
                 <div>
@@ -665,7 +681,6 @@
 
         <div id="hr-alert" class="hr-alert"></div>
 
-        <!-- METRICS GRID -->
         <section class="hr-grid" aria-label="HR Kennzahlen">
             <article class="hr-panel hr-metric-card hr-span-3">
                 <div class="hr-panel-inner">
@@ -703,7 +718,6 @@
             </article>
         </section>
 
-        <!-- CONFIG & QUICK ADD -->
         <section class="hr-grid" aria-label="Datenquelle und Schnellanlage">
             <article class="hr-panel hr-span-6">
                 <div class="hr-panel-inner">
@@ -816,7 +830,6 @@
             </article>
         </section>
 
-        <!-- DATA TABLE -->
         <section class="hr-panel hr-span-12" aria-label="Personalakten Tabelle">
             <div class="hr-panel-inner">
                 <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4 border-b border-[var(--hr-border-light)] pb-4">
@@ -860,7 +873,6 @@
             </div>
         </section>
 
-        <!-- PROCESS & CHECKLIST -->
         <section class="hr-grid" aria-label="Onboarding und Offboarding Prozess">
             <article class="hr-panel hr-span-7">
                 <div class="hr-panel-inner">
@@ -892,7 +904,6 @@
             </article>
         </section>
 
-        <!-- API CONTRACT -->
         <section class="hr-panel hr-span-12" aria-label="Backend API Vertrag">
             <div class="hr-panel-inner">
                 <div class="hr-panel-header border-none pb-0 mb-4">
@@ -943,7 +954,6 @@
             </div>
         </section>
 
-        <!-- MODAL -->
         <div id="employee-modal" class="hr-modal" aria-hidden="true">
             <div class="hr-modal-card">
                 <div class="flex items-center justify-between p-6 border-b border-[var(--hr-border-light)]">
@@ -1004,7 +1014,7 @@
         </div>
 
         <script>
-            // Dein kompletter, unveränderter JavaScript-Code
+            // Unverändertes Javascript
             const HR_CONFIG_KEY = 'eifellog_hr_system_config_v2';
             const HR_LOCAL_DB_KEY = 'eifellog_hr_local_database_v2';
 
@@ -1288,7 +1298,6 @@
             function hrEscapeAttribute(v = '') { return hrEscape(v).replace(/`/g, '&#096;'); }
         </script>
     {% else %}
-        <!-- GUEST VIEW -->
         <section class="hr-panel !max-w-3xl !mx-auto mt-20">
             <div class="p-10 text-center flex flex-col items-center">
                 <p class="hr-kicker">
@@ -1305,5 +1314,5 @@
             </div>
         </section>
     {% endif %}
-</section>
+</div>
 {% endblock %}
