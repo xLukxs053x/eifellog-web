@@ -17,6 +17,122 @@
         --hr-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
+    /*
+     * HR-Seite: Hintergrund-Slideshow weiter rauszoomen.
+     * Die eigentliche Slideshow kommt aus base.html, deshalb werden die
+     * gängigen Background-/Slideshow-Selektoren hier bewusst überschrieben.
+     */
+    :root {
+        --hr-slideshow-background-size: 92% auto;
+    }
+
+    html,
+    body {
+        background-size: var(--hr-slideshow-background-size) !important;
+        background-position: center center !important;
+        background-repeat: no-repeat !important;
+    }
+
+    body::before,
+    body::after,
+    .background-slideshow,
+    .bg-slideshow,
+    .site-slideshow,
+    .page-slideshow,
+    .hero-slideshow,
+    .slideshow,
+    .slideshow-container,
+    .background-slider,
+    .bg-slider,
+    .page-background,
+    .site-background,
+    .background-image,
+    .bg-image,
+    #background-slideshow,
+    #bg-slideshow,
+    #site-slideshow,
+    #page-slideshow,
+    #hero-slideshow,
+    #slideshow,
+    #background-slider,
+    #bg-slider,
+    #page-background,
+    #site-background {
+        background-size: var(--hr-slideshow-background-size) !important;
+        background-position: center center !important;
+        background-repeat: no-repeat !important;
+    }
+
+    .background-slideshow::before,
+    .background-slideshow::after,
+    .bg-slideshow::before,
+    .bg-slideshow::after,
+    .site-slideshow::before,
+    .site-slideshow::after,
+    .page-slideshow::before,
+    .page-slideshow::after,
+    .hero-slideshow::before,
+    .hero-slideshow::after,
+    .slideshow::before,
+    .slideshow::after,
+    .slideshow-container::before,
+    .slideshow-container::after,
+    .background-slider::before,
+    .background-slider::after,
+    .bg-slider::before,
+    .bg-slider::after,
+    .page-background::before,
+    .page-background::after,
+    .site-background::before,
+    .site-background::after,
+    .background-image::before,
+    .background-image::after,
+    .bg-image::before,
+    .bg-image::after {
+        background-size: var(--hr-slideshow-background-size) !important;
+        background-position: center center !important;
+        background-repeat: no-repeat !important;
+        transform: none !important;
+        animation: none !important;
+    }
+
+    .background-slideshow img,
+    .bg-slideshow img,
+    .site-slideshow img,
+    .page-slideshow img,
+    .hero-slideshow img,
+    .slideshow img,
+    .slideshow-container img,
+    .background-slider img,
+    .bg-slider img,
+    .page-background img,
+    .site-background img,
+    .background-image img,
+    .bg-image img,
+    [class*="slideshow"] img,
+    [id*="slideshow"] img,
+    [class*="background"] > img,
+    [id*="background"] > img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain !important;
+        object-position: center center !important;
+        transform: none !important;
+        animation: none !important;
+    }
+
+    [class*="slideshow"] [class*="slide"],
+    [id*="slideshow"] [class*="slide"],
+    [class*="slider"] [class*="slide"],
+    [id*="slider"] [class*="slide"] {
+        background-size: var(--hr-slideshow-background-size) !important;
+        background-position: center center !important;
+        background-repeat: no-repeat !important;
+        transform: none !important;
+        animation: none !important;
+    }
+
+
     @keyframes fadeUp {
         0% { opacity: 0; transform: translateY(20px); }
         100% { opacity: 1; transform: translateY(0); }
@@ -1912,10 +2028,98 @@
                 const modal = document.getElementById('employee-modal');
                 if (modal) document.body.appendChild(modal);
 
+                hrZoomOutBackgroundSlideshow();
                 hrBindForms();
                 hrInitSheetBuilder();
                 hrRefreshAll();
             });
+
+            window.addEventListener('load', hrZoomOutBackgroundSlideshow);
+
+            function hrZoomOutBackgroundSlideshow() {
+                const backgroundSelectors = [
+                    'body',
+                    '.background-slideshow',
+                    '.bg-slideshow',
+                    '.site-slideshow',
+                    '.page-slideshow',
+                    '.hero-slideshow',
+                    '.slideshow',
+                    '.slideshow-container',
+                    '.background-slider',
+                    '.bg-slider',
+                    '.page-background',
+                    '.site-background',
+                    '.background-image',
+                    '.bg-image',
+                    '#background-slideshow',
+                    '#bg-slideshow',
+                    '#site-slideshow',
+                    '#page-slideshow',
+                    '#hero-slideshow',
+                    '#slideshow',
+                    '#background-slider',
+                    '#bg-slider',
+                    '#page-background',
+                    '#site-background',
+                    '[class*="slideshow"]',
+                    '[id*="slideshow"]',
+                    '[class*="background-slider"]',
+                    '[id*="background-slider"]'
+                ];
+
+                const mediaSelectors = [
+                    '.background-slideshow img',
+                    '.bg-slideshow img',
+                    '.site-slideshow img',
+                    '.page-slideshow img',
+                    '.hero-slideshow img',
+                    '.slideshow img',
+                    '.slideshow-container img',
+                    '.background-slider img',
+                    '.bg-slider img',
+                    '.page-background img',
+                    '.site-background img',
+                    '.background-image img',
+                    '.bg-image img',
+                    '[class*="slideshow"] img',
+                    '[id*="slideshow"] img',
+                    '[class*="slideshow"] video',
+                    '[id*="slideshow"] video'
+                ];
+
+                backgroundSelectors.forEach(selector => {
+                    document.querySelectorAll(selector).forEach(element => {
+                        element.style.setProperty('background-size', '92% auto', 'important');
+                        element.style.setProperty('background-position', 'center center', 'important');
+                        element.style.setProperty('background-repeat', 'no-repeat', 'important');
+                        element.style.setProperty('animation', 'none', 'important');
+                        element.style.setProperty('transform', 'none', 'important');
+                    });
+                });
+
+                mediaSelectors.forEach(selector => {
+                    document.querySelectorAll(selector).forEach(element => {
+                        element.style.setProperty('width', '100%', 'important');
+                        element.style.setProperty('height', '100%', 'important');
+                        element.style.setProperty('object-fit', 'contain', 'important');
+                        element.style.setProperty('object-position', 'center center', 'important');
+                        element.style.setProperty('animation', 'none', 'important');
+                        element.style.setProperty('transform', 'none', 'important');
+                    });
+                });
+
+                clearTimeout(window.__hrBackgroundZoomOutTimer);
+                window.__hrBackgroundZoomOutTimer = setTimeout(() => {
+                    backgroundSelectors.forEach(selector => {
+                        document.querySelectorAll(selector).forEach(element => {
+                            element.style.setProperty('background-size', '92% auto', 'important');
+                            element.style.setProperty('background-position', 'center center', 'important');
+                            element.style.setProperty('background-repeat', 'no-repeat', 'important');
+                        });
+                    });
+                }, 300);
+            }
 
             function hrGetRequestHeaders() {
                 return {
