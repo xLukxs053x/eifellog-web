@@ -8802,7 +8802,8 @@ def tutorial():
 @app.route("/downloads")
 def downloads():
     description = (
-        "In unserem Download-Bereich findest du nützliche Dateien, Formulare und Ressourcen,
+        "In unserem Download-Bereich findest du nützliche Dateien, Formulare und Ressourcen."
+    )
     if "user" not in session: return redirect(url_for("login"))
     return render_template("download.html")
 
