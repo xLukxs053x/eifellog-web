@@ -11178,6 +11178,13 @@ FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER = env_first(
     default=os.path.join("static", "downloads", "personalabteilung", "fahrerkarten_daten")
 )
 
+# Ordner automatisch erstellen, falls sie nicht existieren
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+os.makedirs(FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER, exist_ok=True)
+
+# NEU: Datenbank-Collection für die Historie der Personalabteilung
+tracker_shift_logs_collection = db["tracker_shift_logs"]
+
 # Stelle sicher, dass die Ordner beim Start auch wirklich existieren:
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 os.makedirs(FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER, exist_ok=True)
