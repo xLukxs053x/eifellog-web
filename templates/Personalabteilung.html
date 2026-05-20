@@ -2382,83 +2382,42 @@
 
 
     /* =========================================================
-       FINAL HOTFIX: SLIDESHOW RAUSGEZOOMT OHNE SCHWARZE RÄNDER
-       Wichtig: Das Bild selbst darf NICHT unter scale(1) skaliert
-       werden. Unter 1 entstehen die schwarzen Balken wie im Screenshot.
-       Rausgezoomt wirkt es jetzt über object-fit: cover ohne Extra-Zoom.
+       FINAL HOTFIX: SLIDESHOW DEUTLICH RAUSGEZOOMT
+       Dieser Block steht absichtlich ganz am Ende vom <style>,
+       damit er alle vorherigen .hero-bg/.bg-slide Overrides schlägt.
     ========================================================= */
 
     :root {
-        --personal-slideshow-start-scale: 1;
-        --personal-slideshow-end-scale: 1.018;
+        --personal-slideshow-start-scale: 0.88;
+        --personal-slideshow-end-scale: 0.92;
     }
 
     .hero-bg {
-        position: fixed !important;
-        inset: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
-        min-width: 100vw !important;
-        min-height: 100vh !important;
-        max-width: none !important;
-        max-height: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
+        background:
+            radial-gradient(circle at 50% 46%, rgba(8, 18, 11, 0.30), rgba(2, 5, 3, 0.92) 76%),
+            var(--bg-1, #030805) !important;
         overflow: hidden !important;
-        background: var(--bg-1, #030805) !important;
-        pointer-events: none !important;
     }
 
-    .hero-bg picture,
     .hero-bg .bg-slide {
-        position: absolute !important;
+        width: 100% !important;
+        height: 100% !important;
         inset: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
-        min-width: 100vw !important;
-        min-height: 100vh !important;
-        max-width: none !important;
-        max-height: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-
-    .hero-bg .bg-slide {
-        display: block !important;
         object-fit: cover !important;
         object-position: center center !important;
         transform-origin: center center !important;
-        filter: saturate(1.03) brightness(0.38) contrast(1.04) !important;
-        animation-name: personalSlideshowNoBars !important;
+        filter: saturate(1.03) brightness(0.36) contrast(1.04) !important;
+        animation-name: personalSlideshowZoomedOut !important;
         will-change: opacity, transform !important;
     }
 
-    .hero-bg .slide-1 {
-        animation-delay: 0s !important;
-    }
-
-    .hero-bg .slide-2 {
-        animation-delay: 8s !important;
-    }
-
-    .hero-bg .slide-3 {
-        animation-delay: 16s !important;
-    }
-
     .hero-overlay {
-        position: fixed !important;
-        inset: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
-        max-width: none !important;
-        margin: 0 !important;
-        pointer-events: none !important;
         background:
             radial-gradient(circle at 50% 30%, rgba(8, 18, 11, 0.02) 0%, rgba(4, 10, 6, 0.34) 54%, rgba(2, 5, 3, 0.74) 100%),
             linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.36)) !important;
     }
 
-    @keyframes personalSlideshowNoBars {
+    @keyframes personalSlideshowZoomedOut {
         0% {
             opacity: 0;
             transform: scale(var(--personal-slideshow-start-scale));
@@ -2487,16 +2446,642 @@
 
     @media (min-width: 1536px) {
         :root {
-            --personal-slideshow-start-scale: 1;
-            --personal-slideshow-end-scale: 1.012;
+            --personal-slideshow-start-scale: 0.84;
+            --personal-slideshow-end-scale: 0.88;
         }
     }
 
     @media (max-width: 720px) {
         :root {
-            --personal-slideshow-start-scale: 1;
-            --personal-slideshow-end-scale: 1.025;
+            --personal-slideshow-start-scale: 0.94;
+            --personal-slideshow-end-scale: 0.98;
         }
+    }
+
+
+
+    /* =========================================================
+       CLEAN OPS REDESIGN V3
+       Kompakte Personalabteilung, cleaner Admin-Look, keine
+       schwarzen Slideshow-Ränder: alle alten Zoom/Glass-Overrides
+       werden bewusst am Ende überschrieben.
+    ========================================================= */
+
+    :root {
+        --personal-ui-scale: 1 !important;
+        --personal-shell-width: 1400px !important;
+        --personal-surface: rgba(8, 13, 12, 0.82);
+        --personal-surface-2: rgba(12, 18, 16, 0.74);
+        --personal-line: rgba(255, 255, 255, 0.085);
+        --personal-line-strong: rgba(var(--el-green-rgb), 0.28);
+        --personal-soft: rgba(var(--el-green-rgb), 0.08);
+        --personal-soft-2: rgba(var(--el-yellow-rgb), 0.055);
+        --personal-radius: 16px;
+        --personal-radius-sm: 11px;
+        --personal-shadow: 0 18px 55px rgba(0, 0, 0, 0.42);
+    }
+
+    /* Bühne */
+    .base-main {
+        padding-top: clamp(4.8rem, 6.4vh, 5.9rem) !important;
+        padding-bottom: 2.5rem !important;
+        background: transparent !important;
+    }
+
+    .base-content,
+    .base-shell {
+        width: 100% !important;
+        max-width: none !important;
+        background: transparent !important;
+    }
+
+    .base-shell {
+        max-width: min(var(--personal-shell-width), calc(100vw - 2.2rem)) !important;
+        margin-inline: auto !important;
+    }
+
+    .personal-page {
+        padding-bottom: 2.4rem !important;
+    }
+
+    .personal-shell {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 auto !important;
+        translate: none !important;
+        transform: none !important;
+        zoom: 1 !important;
+        gap: 0.82rem !important;
+    }
+
+    /* Slideshow bleibt fullscreen, aber ohne künstlichen Nahzoom und ohne schwarze Ränder. */
+    .hero-bg {
+        overflow: hidden !important;
+        background: #020604 !important;
+    }
+
+    .hero-bg .bg-slide {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        object-position: center center !important;
+        transform-origin: center center !important;
+        filter: saturate(1.02) brightness(0.34) contrast(1.04) !important;
+        animation-name: personalCleanSlide !important;
+        will-change: opacity, transform !important;
+    }
+
+    .hero-overlay {
+        background:
+            radial-gradient(circle at 50% 20%, rgba(137, 190, 50, 0.06) 0%, rgba(2, 6, 4, 0.22) 40%, rgba(2, 6, 4, 0.74) 100%),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.50)) !important;
+    }
+
+    @keyframes personalCleanSlide {
+        0% { opacity: 0; transform: scale(1.005); }
+        10% { opacity: 1; transform: scale(1.005); }
+        35% { opacity: 1; transform: scale(1.018); }
+        47% { opacity: 0; transform: scale(1.018); }
+        100% { opacity: 0; transform: scale(1.018); }
+    }
+
+    /* Cleaner Glasstil */
+    .personal-page .glass-card {
+        overflow: hidden !important;
+        border-radius: var(--personal-radius) !important;
+        border: 1px solid var(--personal-line) !important;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
+            var(--personal-surface) !important;
+        box-shadow: var(--personal-shadow) !important;
+        backdrop-filter: blur(22px) !important;
+        -webkit-backdrop-filter: blur(22px) !important;
+    }
+
+    .personal-page .glass-card::before {
+        left: 0 !important;
+        right: 0 !important;
+        height: 1px !important;
+        background: linear-gradient(90deg, transparent, rgba(var(--el-green-rgb), 0.34), transparent) !important;
+        opacity: 0.72 !important;
+    }
+
+    .personal-page .glass-card::after {
+        opacity: 0 !important;
+    }
+
+    /* Kopfbereich: deutlich flacher und admin-clean */
+    .personal-page .page-head {
+        grid-template-columns: minmax(0, 1fr) minmax(265px, 360px) !important;
+        align-items: center !important;
+        min-height: 0 !important;
+        padding: 1.05rem 1.15rem !important;
+        gap: 1rem !important;
+        border-left: 1px solid rgba(var(--el-green-rgb), 0.35) !important;
+    }
+
+    .personal-page .page-head::after {
+        content: "" !important;
+        right: -5rem !important;
+        bottom: -7rem !important;
+        width: 15rem !important;
+        height: 15rem !important;
+        background: radial-gradient(circle, rgba(var(--el-green-rgb), 0.11), transparent 68%) !important;
+        opacity: 0.8 !important;
+    }
+
+    .personal-page .page-kicker {
+        min-height: 1.55rem !important;
+        margin-bottom: 0.46rem !important;
+        padding: 0 0.68rem !important;
+        border-radius: 999px !important;
+        font-size: 0.49rem !important;
+        letter-spacing: 0.16em !important;
+        background: rgba(var(--el-green-rgb), 0.09) !important;
+        border-color: rgba(var(--el-green-rgb), 0.22) !important;
+    }
+
+    .personal-page .page-kicker i {
+        width: 0.42rem !important;
+        height: 0.42rem !important;
+    }
+
+    .personal-page .page-head h1 {
+        margin: 0 !important;
+        font-size: clamp(1.85rem, 3.15vw, 3.2rem) !important;
+        line-height: 0.94 !important;
+        letter-spacing: -0.065em !important;
+        white-space: nowrap !important;
+    }
+
+    .personal-page .page-head h1 br {
+        display: none !important;
+    }
+
+    .personal-page .page-head h1 span {
+        color: var(--el-green-soft) !important;
+    }
+
+    .personal-page .page-head p {
+        max-width: 76rem !important;
+        margin-top: 0.58rem !important;
+        color: rgba(184, 197, 220, 0.88) !important;
+        font-size: 0.80rem !important;
+        line-height: 1.42 !important;
+        font-weight: 650 !important;
+    }
+
+    .personal-page .role-access {
+        gap: 0.48rem !important;
+    }
+
+    .personal-page .access-pill {
+        min-height: 2.38rem !important;
+        padding: 0.55rem 0.72rem !important;
+        border-radius: 0.72rem !important;
+        background: rgba(0, 0, 0, 0.20) !important;
+        border-color: rgba(255, 255, 255, 0.075) !important;
+    }
+
+    .personal-page .access-pill small,
+    .personal-page .access-pill strong {
+        font-size: 0.52rem !important;
+        letter-spacing: 0.12em !important;
+    }
+
+    /* KPI-Zeile */
+    .personal-page .stats-grid {
+        display: grid !important;
+        grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+        gap: 0.62rem !important;
+    }
+
+    .personal-page .stat-card {
+        min-height: 4.95rem !important;
+        padding: 0.70rem 0.76rem !important;
+        border-radius: 0.88rem !important;
+        align-content: space-between !important;
+        background:
+            linear-gradient(180deg, rgba(var(--el-green-rgb), 0.055), rgba(255, 255, 255, 0.012)),
+            rgba(7, 12, 11, 0.76) !important;
+        border-color: rgba(255, 255, 255, 0.072) !important;
+    }
+
+    .personal-page .stat-card small {
+        color: rgba(166, 178, 203, 0.82) !important;
+        font-size: 0.47rem !important;
+        line-height: 1.28 !important;
+        letter-spacing: 0.11em !important;
+    }
+
+    .personal-page .stat-card strong {
+        color: #f6fbff !important;
+        font-size: clamp(1.13rem, 1.42vw, 1.48rem) !important;
+        letter-spacing: -0.02em !important;
+    }
+
+    /* Tabs als kompakte Segment-Navigation */
+    .personal-page .tabbar {
+        display: flex !important;
+        grid-template-columns: none !important;
+        gap: 0.42rem !important;
+        padding: 0.42rem !important;
+        border-radius: 0.98rem !important;
+        overflow-x: auto !important;
+        scrollbar-width: thin !important;
+        scrollbar-color: rgba(var(--el-green-rgb), 0.46) transparent !important;
+    }
+
+    .personal-page .tabbar::-webkit-scrollbar {
+        height: 7px !important;
+    }
+
+    .personal-page .tabbar::-webkit-scrollbar-thumb {
+        border-radius: 999px !important;
+        background: rgba(var(--el-green-rgb), 0.45) !important;
+    }
+
+    .personal-page .tab-btn {
+        flex: 1 0 148px !important;
+        min-height: 2.34rem !important;
+        padding: 0 0.68rem !important;
+        border-radius: 0.70rem !important;
+        font-size: 0.49rem !important;
+        letter-spacing: 0.095em !important;
+        color: rgba(170, 181, 205, 0.86) !important;
+        background: rgba(0, 0, 0, 0.20) !important;
+        border-color: rgba(255, 255, 255, 0.07) !important;
+        box-shadow: none !important;
+        transform: none !important;
+    }
+
+    .personal-page .tab-btn::before {
+        width: 0.34rem !important;
+        height: 0.34rem !important;
+        background: rgba(255, 255, 255, 0.20) !important;
+        box-shadow: none !important;
+    }
+
+    .personal-page .tab-btn:hover,
+    .personal-page .tab-btn.active {
+        color: #f6fbff !important;
+        border-color: rgba(var(--el-green-rgb), 0.38) !important;
+        background: rgba(var(--el-green-rgb), 0.15) !important;
+        box-shadow: inset 0 0 0 1px rgba(var(--el-green-rgb), 0.08) !important;
+    }
+
+    .personal-page .tab-btn:hover::before,
+    .personal-page .tab-btn.active::before {
+        background: var(--el-green-soft) !important;
+        box-shadow: 0 0 12px rgba(var(--el-green-rgb), 0.55) !important;
+    }
+
+    /* Filterleisten */
+    .personal-page .toolbar,
+    .personal-page .toolbar.requests,
+    .personal-page .toolbar.accounting,
+    .personal-page .toolbar.service-center-toolbar {
+        padding: 0.62rem !important;
+        gap: 0.55rem !important;
+        border-radius: 0.98rem !important;
+    }
+
+    .search-box,
+    .filter-select,
+    .modal-input,
+    .modal-textarea,
+    .modal-file {
+        min-height: 2.36rem !important;
+        padding: 0 0.72rem !important;
+        border-radius: 0.68rem !important;
+        border-color: rgba(255, 255, 255, 0.08) !important;
+        background: rgba(0, 0, 0, 0.26) !important;
+        color: rgba(238, 244, 255, 0.96) !important;
+        font-size: 0.76rem !important;
+        font-weight: 700 !important;
+    }
+
+    .search-box:focus,
+    .filter-select:focus,
+    .modal-input:focus,
+    .modal-textarea:focus,
+    .modal-file:focus {
+        border-color: rgba(var(--el-green-rgb), 0.38) !important;
+        box-shadow: 0 0 0 3px rgba(var(--el-green-rgb), 0.08) !important;
+    }
+
+    /* Tabellen: weniger Neon, mehr Admin-Dichte */
+    .personal-page .table-card {
+        border-radius: 1rem !important;
+        overflow: hidden !important;
+    }
+
+    .personal-page .table-head {
+        min-height: 3.1rem !important;
+        padding: 0.72rem 0.92rem !important;
+        border-bottom-color: rgba(255, 255, 255, 0.075) !important;
+        background: rgba(0, 0, 0, 0.12) !important;
+    }
+
+    .personal-page .table-head h2 {
+        font-size: 0.76rem !important;
+        letter-spacing: 0.13em !important;
+    }
+
+    .personal-page .table-head span {
+        color: rgba(166, 178, 203, 0.82) !important;
+        font-size: 0.70rem !important;
+    }
+
+    .personal-page .driver-table-wrap,
+    .personal-page .request-table-wrap {
+        padding-bottom: 0.42rem !important;
+        scrollbar-width: thin !important;
+        scrollbar-color: rgba(var(--el-green-rgb), 0.55) rgba(255, 255, 255, 0.04) !important;
+    }
+
+    .personal-page .driver-table-wrap::-webkit-scrollbar,
+    .personal-page .request-table-wrap::-webkit-scrollbar {
+        height: 10px !important;
+    }
+
+    .personal-page .driver-table,
+    .personal-page .request-table {
+        width: 100% !important;
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+        table-layout: auto !important;
+    }
+
+    .personal-page .driver-table { min-width: 1030px !important; }
+    .personal-page .request-table { min-width: 1090px !important; }
+    .personal-page .request-table.wide-table,
+    .personal-page .driver-table.wide-table { min-width: 1180px !important; }
+
+    .personal-page .driver-table thead,
+    .personal-page .request-table thead {
+        background: rgba(255, 255, 255, 0.025) !important;
+    }
+
+    .personal-page .driver-table th,
+    .personal-page .request-table th {
+        padding: 0.56rem 0.70rem !important;
+        color: rgba(157, 170, 198, 0.85) !important;
+        font-size: 0.48rem !important;
+        letter-spacing: 0.115em !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
+    }
+
+    .personal-page .driver-table td,
+    .personal-page .request-table td {
+        padding: 0.58rem 0.70rem !important;
+        color: rgba(235, 241, 252, 0.94) !important;
+        font-size: 0.76rem !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.043) !important;
+    }
+
+    .personal-page .driver-table tbody tr,
+    .personal-page .request-table tbody tr {
+        background: rgba(255, 255, 255, 0.002) !important;
+    }
+
+    .personal-page .driver-table tbody tr:nth-child(even),
+    .personal-page .request-table tbody tr:nth-child(even) {
+        background: rgba(255, 255, 255, 0.014) !important;
+    }
+
+    .personal-page .driver-table tbody tr:hover,
+    .personal-page .request-table tbody tr:hover {
+        background: rgba(var(--el-green-rgb), 0.055) !important;
+    }
+
+    .personal-page .driver-cell {
+        min-width: 200px !important;
+        gap: 0.66rem !important;
+    }
+
+    .personal-page .driver-avatar {
+        width: 2.34rem !important;
+        height: 2.34rem !important;
+        border-radius: 0.68rem !important;
+        background: rgba(0, 0, 0, 0.34) !important;
+        border-color: rgba(var(--el-green-rgb), 0.24) !important;
+    }
+
+    .driver-meta strong {
+        font-size: 0.80rem !important;
+        margin-bottom: 0.10rem !important;
+    }
+
+    .driver-meta span,
+    .mono,
+    .accounting-message-preview,
+    .compliance-summary span {
+        font-size: 0.70rem !important;
+        line-height: 1.34 !important;
+    }
+
+    .mono {
+        color: rgba(166, 178, 203, 0.88) !important;
+    }
+
+    /* Badges / Buttons */
+    .role-badge,
+    .token-badge,
+    .status-badge,
+    .deadline-badge,
+    .compliance-badge {
+        min-height: 1.42rem !important;
+        padding: 0 0.52rem !important;
+        border-radius: 999px !important;
+        font-size: 0.47rem !important;
+        letter-spacing: 0.085em !important;
+    }
+
+    .role-badge {
+        color: #e8ee52 !important;
+        background: rgba(var(--el-yellow-rgb), 0.065) !important;
+    }
+
+    .status-badge.approved,
+    .status-badge.enabled,
+    .status-badge.done,
+    .token-badge.exists,
+    .compliance-badge.ok,
+    .compliance-badge.compliant {
+        color: #aef6c7 !important;
+        background: rgba(var(--el-success-rgb), 0.055) !important;
+    }
+
+    .status-badge.pending,
+    .status-badge.open,
+    .deadline-badge,
+    .compliance-badge.warning,
+    .compliance-badge.review,
+    .compliance-badge.pending {
+        color: #eef05b !important;
+        background: rgba(var(--el-yellow-rgb), 0.06) !important;
+    }
+
+    .token-btn,
+    .request-btn {
+        min-height: 2.05rem !important;
+        padding: 0 0.68rem !important;
+        border-radius: 0.66rem !important;
+        font-size: 0.48rem !important;
+        letter-spacing: 0.085em !important;
+        gap: 0.34rem !important;
+        box-shadow: none !important;
+    }
+
+    .token-btn:hover:not(:disabled),
+    .request-btn:hover:not(:disabled) {
+        transform: none !important;
+        box-shadow: 0 0 0 3px rgba(var(--el-green-rgb), 0.08) !important;
+    }
+
+    .action-wrap {
+        gap: 0.42rem !important;
+    }
+
+    /* Zusatzkarten in anderen Tabs */
+    .personal-page .driver-card-command,
+    .personal-page .service-highlight-card,
+    .personal-page .accounting-sidebar {
+        padding: 0.85rem !important;
+        gap: 0.72rem !important;
+        border-radius: 1rem !important;
+        background: var(--personal-surface-2) !important;
+    }
+
+    .personal-page .driver-card-command h2,
+    .personal-page .service-highlight-copy h2 {
+        font-size: clamp(1.18rem, 1.8vw, 1.72rem) !important;
+        letter-spacing: -0.035em !important;
+    }
+
+    .personal-page .driver-card-command p,
+    .personal-page .service-highlight-copy p {
+        font-size: 0.78rem !important;
+        line-height: 1.42 !important;
+    }
+
+    .personal-page .service-flow-step,
+    .detail-pill,
+    .modal-info,
+    .document-mode-panel,
+    .modal-check-row,
+    .personal-page .sidebar-note {
+        padding: 0.68rem !important;
+        border-radius: 0.74rem !important;
+        background: rgba(0, 0, 0, 0.22) !important;
+        border-color: rgba(255, 255, 255, 0.07) !important;
+    }
+
+    .personal-page .service-flow-step strong,
+    .document-mode-panel strong,
+    .detail-pill small,
+    .modal-field-label {
+        font-size: 0.56rem !important;
+        letter-spacing: 0.11em !important;
+    }
+
+    .personal-page .service-flow-step span,
+    .detail-pill strong,
+    .modal-info,
+    .document-mode-panel,
+    .modal-check-row {
+        font-size: 0.74rem !important;
+    }
+
+    .personal-page .accounting-layout {
+        gap: 0.9rem !important;
+        grid-template-columns: minmax(230px, 285px) minmax(0, 1fr) !important;
+    }
+
+    .personal-page .sidebar-btn {
+        min-height: 2.42rem !important;
+        padding: 0 0.74rem !important;
+        border-radius: 0.72rem !important;
+        font-size: 0.52rem !important;
+    }
+
+    /* Modal/Toast cleaned */
+    .modal-backdrop {
+        background: rgba(0, 0, 0, 0.68) !important;
+        backdrop-filter: blur(18px) !important;
+    }
+
+    .modal-card {
+        border-radius: 1.12rem !important;
+        background: rgba(8, 13, 12, 0.98) !important;
+        border: 1px solid rgba(255, 255, 255, 0.09) !important;
+        box-shadow: 0 28px 80px rgba(0, 0, 0, 0.70) !important;
+    }
+
+    .modal-head {
+        padding: 1rem 1.05rem !important;
+    }
+
+    .modal-head h3 {
+        font-size: 1.05rem !important;
+    }
+
+    .modal-body {
+        padding: 1rem !important;
+        gap: 0.75rem !important;
+    }
+
+    .toast {
+        border-radius: 0.95rem !important;
+        background: rgba(8, 13, 12, 0.98) !important;
+    }
+
+    /* Responsive */
+    @media (min-width: 1536px) {
+        :root { --personal-shell-width: 1460px !important; }
+        .base-shell { max-width: min(var(--personal-shell-width), calc(100vw - 2.4rem)) !important; }
+    }
+
+    @media (max-width: 1280px) {
+        .personal-page .stats-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        }
+    }
+
+    @media (max-width: 1180px) {
+        .personal-page .page-head,
+        .personal-page .driver-card-command,
+        .personal-page .service-highlight-card,
+        .personal-page .accounting-layout {
+            grid-template-columns: 1fr !important;
+        }
+
+        .personal-page .role-access {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+    }
+
+    @media (max-width: 720px) {
+        .base-shell { max-width: calc(100vw - 1rem) !important; }
+        .base-main { padding-top: 4.6rem !important; }
+        .personal-shell { gap: 0.68rem !important; }
+        .personal-page .page-head { padding: 0.9rem !important; }
+        .personal-page .page-head h1 {
+            white-space: normal !important;
+            font-size: clamp(1.7rem, 10vw, 2.55rem) !important;
+        }
+        .personal-page .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        .personal-page .role-access,
+        .detail-grid,
+        .modal-grid-two { grid-template-columns: 1fr !important; }
+        .personal-page .tab-btn { flex-basis: 180px !important; }
+        .personal-page .toolbar,
+        .personal-page .toolbar.requests,
+        .personal-page .toolbar.accounting,
+        .personal-page .toolbar.service-center-toolbar { grid-template-columns: 1fr !important; }
     }
 
 </style>
@@ -2512,14 +3097,12 @@
                 </span>
 
                 <h1>
-                    Fahrer &<br />
-                    <span>Registrierungen</span>
+                    Personal<span>abteilung</span>
                 </h1>
 
                 <p>
-                    Zentrale Bearbeitung für Fahrer-Registrierungen, Fahrerkarten-Daten, Service-Center-Anträge, Token-Anfragen, interne Aufgaben und Rückfragen aus der Buchhaltung.
-                    Das neue Control-Center ist auf schnelle Prüfung, klare Zuständigkeiten und saubere Dokumentenübergabe ins System-Postfach ausgelegt.
-                    Der zusätzliche Fahrerkarten-Tab erstellt PDF-Belege für Kartendaten sowie Lenk- und Ruhezeiten und kann diese direkt an den User übermitteln.
+                    Kompaktes Backoffice für Fahrer-Registrierungen, Fahrerkarten, Service-Center, Token-Anfragen, Aufgaben und Buchhaltung.
+                    Alle Prüfungen, Zuständigkeiten und Dokumentenübergaben sind auf kurze Wege und klare Statusführung reduziert.
                 </p>
             </div>
 
