@@ -227,6 +227,12 @@ tracker_driver_cards_collection = db["tracker_driver_cards"]
 tracker_work_sessions_collection = db["tracker_work_sessions"]
 tracker_job_starts_collection = db["tracker_job_starts"]
 
+# HR Controlling läuft ausschließlich über MongoDB / Backend.
+# Keine Google-Sheets-Konfiguration, keine Browser-LocalStorage-Datenbank.
+hr_personalakten_collection = db["hr_personalakten"]
+hr_process_plan_collection = db["hr_process_plan"]
+hr_checklist_collection = db["hr_checklist"]
+
 
 def ensure_indexes():
     try:
@@ -342,6 +348,30 @@ def ensure_indexes():
         tracker_job_starts_collection.create_index([("job_start_key", ASCENDING)], unique=False)
         tracker_job_starts_collection.create_index([("status", ASCENDING)], unique=False)
         tracker_job_starts_collection.create_index([("created_at", DESCENDING)], unique=False)
+
+        hr_personalakten_collection.create_index([("employee_id", ASCENDING)], unique=False)
+        hr_personalakten_collection.create_index([("id", ASCENDING)], unique=False)
+        hr_personalakten_collection.create_index([("name_lc", ASCENDING)], unique=False)
+        hr_personalakten_collection.create_index([("email_lc", ASCENDING)], unique=False)
+        hr_personalakten_collection.create_index([("status", ASCENDING)], unique=False)
+        hr_personalakten_collection.create_index([("process", ASCENDING)], unique=False)
+        hr_personalakten_collection.create_index([("archived", ASCENDING)], unique=False)
+        hr_personalakten_collection.create_index([("created_at", DESCENDING)], unique=False)
+        hr_personalakten_collection.create_index([("updated_at", DESCENDING)], unique=False)
+
+        hr_process_plan_collection.create_index([("process_id", ASCENDING)], unique=False)
+        hr_process_plan_collection.create_index([("sort_order", ASCENDING)], unique=False)
+        hr_process_plan_collection.create_index([("phase", ASCENDING)], unique=False)
+        hr_process_plan_collection.create_index([("archived", ASCENDING)], unique=False)
+        hr_process_plan_collection.create_index([("created_at", DESCENDING)], unique=False)
+        hr_process_plan_collection.create_index([("updated_at", DESCENDING)], unique=False)
+
+        hr_checklist_collection.create_index([("item_id", ASCENDING)], unique=False)
+        hr_checklist_collection.create_index([("process", ASCENDING)], unique=False)
+        hr_checklist_collection.create_index([("done", ASCENDING)], unique=False)
+        hr_checklist_collection.create_index([("archived", ASCENDING)], unique=False)
+        hr_checklist_collection.create_index([("created_at", DESCENDING)], unique=False)
+        hr_checklist_collection.create_index([("updated_at", DESCENDING)], unique=False)
     except Exception as error:
         print(f"MongoDB Index-Erstellung fehlgeschlagen: {error}")
 
@@ -9603,6 +9633,702 @@ def prepare_driver_for_personalabteilung(user_doc):
     driver.update(prepare_driver_card_fields_for_personalabteilung(user_doc))
     return driver
 
+
+
+
+# ==========================================
+# HR CONTROLLING / MONGODB BACKEND API
+# ==========================================
+# Diese API ist auf die HTML-Datei "HR-Controlling.html" ausgelegt.
+# Das Frontend nutzt fest /api/hr-controlling und speichert nichts mehr manuell
+# im Browser. Alle Personalakten, Prozessschritte und Checklisten liegen in MongoDB.
+
+HR_ALLOWED_EMPLOYEE_STATUSES = {"Aktiv", "Onboarding", "Offboarding", "Inaktiv"}
+HR_ALLOWED_PROCESSES = {"Onboarding", "Offboarding", "Personalakte"}
+
+
+def hr_db_timestamp():
+    return now_utc()
+
+
+def hr_api_permission_response():
+    return require_personalabteilung_api_permission()
+
+
+def hr_object_lookup(public_id, *field_names):
+    public_id = safe_str(public_id)
+    lookup_items = []
+
+    for field_name in field_names:
+        lookup_items.append({field_name: public_id})
+
+    if ObjectId.is_valid(public_id):
+        lookup_items.append({"_id": ObjectId(public_id)})
+
+    if not lookup_items:
+        lookup_items.append({"_id": "__never__"})
+
+    return {"$or": lookup_items}
+
+
+def hr_datetime_for_api(value):
+    if isinstance(value, datetime):
+        return value.isoformat() + "Z"
+    return safe_str(value)
+
+
+def hr_status(value, fallback="Aktiv"):
+    value = safe_str(value, fallback)
+    if value in HR_ALLOWED_EMPLOYEE_STATUSES:
+        return value
+    lower_value = value.lower()
+
+    if lower_value in {"active", "aktiv"}:
+        return "Aktiv"
+    if lower_value in {"onboarding", "einarbeitung"}:
+        return "Onboarding"
+    if lower_value in {"offboarding", "austritt"}:
+        return "Offboarding"
+    if lower_value in {"inactive", "inaktiv"}:
+        return "Inaktiv"
+
+    return fallback
+
+
+def hr_process(value, fallback="Personalakte"):
+    value = safe_str(value, fallback)
+    if value in HR_ALLOWED_PROCESSES:
+        return value
+    lower_value = value.lower()
+
+    if lower_value == "onboarding":
+        return "Onboarding"
+    if lower_value == "offboarding":
+        return "Offboarding"
+    if lower_value in {"personalakte", "akte", "personal"}:
+        return "Personalakte"
+
+    return fallback
+
+
+def hr_progress_from_payload(data):
+    progress = parse_int(data.get("progress"), None)
+    if progress is not None:
+        return max(0, min(100, progress))
+
+    status = hr_status(data.get("status"), "Aktiv")
+    if status == "Aktiv":
+        return 100
+    if status == "Onboarding":
+        return 25
+    if status == "Offboarding":
+        return 35
+    return 0
+
+
+def hr_employee_public_id(document):
+    return safe_str(
+        document.get("employee_id")
+        or document.get("id")
+        or document.get("_id")
+    )
+
+
+def hr_build_employee_doc(payload, actor=None, existing=None):
+    payload = payload or {}
+    existing = existing or {}
+    actor = actor or current_account_identity()
+    now = hr_db_timestamp()
+
+    employee_id = safe_str(
+        payload.get("employee_id")
+        or payload.get("employeeId")
+        or payload.get("id")
+        or existing.get("employee_id")
+        or existing.get("id")
+    )
+
+    if not employee_id:
+        employee_id = f"EL-HR-{now.strftime('%Y%m%d%H%M%S')}-{secrets.token_hex(3).upper()}"
+
+    name = safe_str(payload.get("name") or payload.get("full_name") or payload.get("displayName"))[:160]
+    email = safe_str(payload.get("email"))[:180]
+    role = safe_str(payload.get("role") or payload.get("position") or payload.get("funktion"))[:120]
+    status = hr_status(payload.get("status") or existing.get("status"), "Aktiv")
+    process = hr_process(payload.get("process") or payload.get("prozess") or existing.get("process"), "Personalakte")
+    start_date = safe_str(payload.get("startDate") or payload.get("start_date") or payload.get("date"))[:40]
+    notes = safe_str(payload.get("notes") or payload.get("note") or payload.get("notiz"))[:2000]
+
+    if not name:
+        raise ValueError("Name ist Pflicht.")
+
+    progress = hr_progress_from_payload({
+        "progress": payload.get("progress", existing.get("progress")),
+        "status": status
+    })
+
+    document = {
+        "employee_id": employee_id,
+        "id": employee_id,
+        "name": name,
+        "name_lc": name.lower(),
+        "email": email,
+        "email_lc": email.lower(),
+        "role": role,
+        "status": status,
+        "process": process,
+        "startDate": start_date,
+        "start_date": start_date,
+        "notes": notes,
+        "progress": progress,
+        "archived": False,
+        "updated_at": now,
+        "updated_by": actor,
+        "source": "hr_controlling_mongodb",
+    }
+
+    if existing:
+        document["created_at"] = existing.get("created_at") or now
+        document["created_by"] = existing.get("created_by") or actor
+    else:
+        document["created_at"] = now
+        document["created_by"] = actor
+
+    return document
+
+
+def hr_prepare_employee_for_api(document):
+    document = document or {}
+    public_id = hr_employee_public_id(document)
+
+    return {
+        "id": public_id,
+        "employee_id": public_id,
+        "name": document.get("name") or "",
+        "email": document.get("email") or "",
+        "role": document.get("role") or "",
+        "status": document.get("status") or "Aktiv",
+        "process": document.get("process") or "Personalakte",
+        "startDate": document.get("startDate") or document.get("start_date") or "",
+        "start_date": document.get("start_date") or document.get("startDate") or "",
+        "notes": document.get("notes") or "",
+        "progress": parse_int(document.get("progress"), 0),
+        "createdAt": hr_datetime_for_api(document.get("created_at")),
+        "updatedAt": hr_datetime_for_api(document.get("updated_at")),
+    }
+
+
+def hr_build_process_plan_doc(payload, actor=None, existing=None):
+    payload = payload or {}
+    existing = existing or {}
+    actor = actor or current_account_identity()
+    now = hr_db_timestamp()
+
+    process_id = safe_str(
+        payload.get("process_id")
+        or payload.get("processId")
+        or payload.get("id")
+        or existing.get("process_id")
+        or existing.get("id")
+    )
+
+    if not process_id:
+        process_id = f"EL-HR-PROC-{now.strftime('%Y%m%d%H%M%S')}-{secrets.token_hex(3).upper()}"
+
+    title = safe_str(payload.get("title") or payload.get("name"))[:180]
+    description = safe_str(payload.get("description") or payload.get("text") or payload.get("notes"))[:1000]
+    phase = safe_str(payload.get("phase") or payload.get("status") or existing.get("phase"), "Onboarding")[:80]
+    sort_order = parse_int(payload.get("sort_order") or payload.get("sortOrder") or payload.get("order"), existing.get("sort_order", 0) if existing else 0)
+
+    if not title:
+        raise ValueError("Titel ist Pflicht.")
+
+    document = {
+        "process_id": process_id,
+        "id": process_id,
+        "title": title,
+        "description": description,
+        "phase": phase,
+        "sort_order": sort_order,
+        "archived": False,
+        "updated_at": now,
+        "updated_by": actor,
+        "source": "hr_controlling_mongodb",
+    }
+
+    if existing:
+        document["created_at"] = existing.get("created_at") or now
+        document["created_by"] = existing.get("created_by") or actor
+    else:
+        document["created_at"] = now
+        document["created_by"] = actor
+
+    return document
+
+
+def hr_prepare_process_plan_for_api(document):
+    document = document or {}
+    public_id = safe_str(document.get("process_id") or document.get("id") or document.get("_id"))
+
+    return {
+        "id": public_id,
+        "process_id": public_id,
+        "title": document.get("title") or "",
+        "description": document.get("description") or "",
+        "phase": document.get("phase") or "",
+        "sortOrder": parse_int(document.get("sort_order"), 0),
+        "sort_order": parse_int(document.get("sort_order"), 0),
+        "createdAt": hr_datetime_for_api(document.get("created_at")),
+        "updatedAt": hr_datetime_for_api(document.get("updated_at")),
+    }
+
+
+def hr_build_checklist_doc(payload, actor=None, existing=None):
+    payload = payload or {}
+    existing = existing or {}
+    actor = actor or current_account_identity()
+    now = hr_db_timestamp()
+
+    item_id = safe_str(
+        payload.get("item_id")
+        or payload.get("itemId")
+        or payload.get("checklist_id")
+        or payload.get("id")
+        or existing.get("item_id")
+        or existing.get("id")
+    )
+
+    if not item_id:
+        item_id = f"EL-HR-CHK-{now.strftime('%Y%m%d%H%M%S')}-{secrets.token_hex(3).upper()}"
+
+    title = safe_str(payload.get("title") or payload.get("name") or existing.get("title"))[:180]
+    owner = safe_str(payload.get("owner") or payload.get("assignee") or existing.get("owner"), "HR")[:120]
+    process = hr_process(payload.get("process") or existing.get("process"), "Onboarding")
+    done = bool_from_payload(payload.get("done"), fallback=bool(existing.get("done", False)))
+
+    if not title:
+        title = "HR Aufgabe"
+
+    document = {
+        "item_id": item_id,
+        "id": item_id,
+        "title": title,
+        "owner": owner,
+        "process": process,
+        "done": done,
+        "archived": False,
+        "updated_at": now,
+        "updated_by": actor,
+        "source": "hr_controlling_mongodb",
+    }
+
+    if existing:
+        document["created_at"] = existing.get("created_at") or now
+        document["created_by"] = existing.get("created_by") or actor
+    else:
+        document["created_at"] = now
+        document["created_by"] = actor
+
+    return document
+
+
+def hr_prepare_checklist_for_api(document):
+    document = document or {}
+    public_id = safe_str(document.get("item_id") or document.get("id") or document.get("_id"))
+
+    return {
+        "id": public_id,
+        "item_id": public_id,
+        "title": document.get("title") or "",
+        "owner": document.get("owner") or "HR",
+        "process": document.get("process") or "Onboarding",
+        "done": bool(document.get("done", False)),
+        "createdAt": hr_datetime_for_api(document.get("created_at")),
+        "updatedAt": hr_datetime_for_api(document.get("updated_at")),
+    }
+
+
+def hr_last_sync_timestamp():
+    latest_candidates = []
+
+    for collection in [hr_personalakten_collection, hr_process_plan_collection, hr_checklist_collection]:
+        latest = collection.find_one(
+            {"archived": {"$ne": True}},
+            sort=[("updated_at", DESCENDING)]
+        )
+        if latest and latest.get("updated_at"):
+            latest_candidates.append(latest.get("updated_at"))
+
+    if not latest_candidates:
+        return hr_datetime_for_api(hr_db_timestamp())
+
+    latest_candidates = [
+        value for value in latest_candidates
+        if isinstance(value, datetime)
+    ]
+
+    if not latest_candidates:
+        return hr_datetime_for_api(hr_db_timestamp())
+
+    return hr_datetime_for_api(max(latest_candidates))
+
+
+@app.route("/api/hr-controlling/system/status", methods=["GET", "OPTIONS"])
+def api_hr_controlling_system_status():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    permission_response = hr_api_permission_response()
+    if permission_response:
+        return permission_response
+
+    try:
+        mongo_client.admin.command("ping")
+        connected = True
+        message = "MongoDB verbunden."
+    except Exception as error:
+        connected = False
+        message = f"MongoDB nicht erreichbar: {error}"
+
+    return jsonify({
+        "success": connected,
+        "connected": connected,
+        "mode": "database",
+        "sourceName": "MongoDB / Eifel LOG Datenbank",
+        "lastSync": hr_last_sync_timestamp(),
+        "message": message,
+        "counts": {
+            "employees": hr_personalakten_collection.count_documents({"archived": {"$ne": True}}),
+            "processPlan": hr_process_plan_collection.count_documents({"archived": {"$ne": True}}),
+            "checklist": hr_checklist_collection.count_documents({"archived": {"$ne": True}}),
+        }
+    }), 200 if connected else 503
+
+
+@app.route("/api/hr-controlling/personalakten", methods=["GET", "POST", "OPTIONS"])
+def api_hr_controlling_personalakten():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    permission_response = hr_api_permission_response()
+    if permission_response:
+        return permission_response
+
+    if request.method == "GET":
+        status_filter = safe_str(request.args.get("status") or request.args.get("filter"))
+        query = {"archived": {"$ne": True}}
+        if status_filter and status_filter != "all":
+            query["status"] = hr_status(status_filter, status_filter)
+
+        employees_cursor = hr_personalakten_collection.find(query).sort(
+            [("updated_at", DESCENDING), ("created_at", DESCENDING)]
+        )
+        employees = [hr_prepare_employee_for_api(item) for item in employees_cursor]
+
+        return jsonify({
+            "success": True,
+            "connected": True,
+            "mode": "database",
+            "sourceName": "MongoDB / Personalakten",
+            "employees": employees
+        })
+
+    data = request.get_json(silent=True) or {}
+    payload = data.get("employee") if isinstance(data.get("employee"), dict) else data
+    actor = current_account_identity()
+
+    public_id = safe_str(payload.get("id") or payload.get("employee_id") or payload.get("employeeId"))
+    existing = None
+    if public_id:
+        existing = hr_personalakten_collection.find_one({
+            "$and": [
+                hr_object_lookup(public_id, "employee_id", "id"),
+                {"archived": {"$ne": True}},
+            ]
+        })
+
+    try:
+        employee_doc = hr_build_employee_doc(payload, actor=actor, existing=existing)
+    except ValueError as error:
+        return jsonify({"success": False, "message": str(error)}), 400
+
+    hr_personalakten_collection.update_one(
+        {"employee_id": employee_doc["employee_id"]},
+        mongo_upsert_set_preserve_created_at(employee_doc),
+        upsert=True
+    )
+
+    saved = hr_personalakten_collection.find_one({"employee_id": employee_doc["employee_id"]})
+
+    return jsonify({
+        "success": True,
+        "connected": True,
+        "message": "Personalakte wurde in MongoDB gespeichert.",
+        "employee": hr_prepare_employee_for_api(saved)
+    }), 201 if not existing else 200
+
+
+@app.route("/api/hr-controlling/personalakten/<employee_id>", methods=["GET", "PATCH", "DELETE", "OPTIONS"])
+def api_hr_controlling_personalakte_detail(employee_id):
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    permission_response = hr_api_permission_response()
+    if permission_response:
+        return permission_response
+
+    employee_doc = hr_personalakten_collection.find_one({
+        "$and": [
+            hr_object_lookup(employee_id, "employee_id", "id"),
+            {"archived": {"$ne": True}},
+        ]
+    })
+
+    if not employee_doc:
+        return jsonify({"success": False, "message": "Personalakte wurde nicht gefunden."}), 404
+
+    if request.method == "GET":
+        return jsonify({
+            "success": True,
+            "employee": hr_prepare_employee_for_api(employee_doc)
+        })
+
+    actor = current_account_identity()
+
+    if request.method == "DELETE":
+        hr_personalakten_collection.update_one(
+            {"_id": employee_doc["_id"]},
+            {"$set": {
+                "archived": True,
+                "archived_at": hr_db_timestamp(),
+                "archived_by": actor,
+                "updated_at": hr_db_timestamp(),
+                "updated_by": actor,
+            }}
+        )
+        return jsonify({"success": True, "message": "Personalakte wurde archiviert."})
+
+    data = request.get_json(silent=True) or {}
+    payload = data.get("employee") if isinstance(data.get("employee"), dict) else data
+    payload["id"] = employee_doc.get("employee_id") or employee_doc.get("id")
+
+    try:
+        updated_doc = hr_build_employee_doc(payload, actor=actor, existing=employee_doc)
+    except ValueError as error:
+        return jsonify({"success": False, "message": str(error)}), 400
+
+    hr_personalakten_collection.update_one(
+        {"_id": employee_doc["_id"]},
+        mongo_upsert_set_preserve_created_at(updated_doc)
+    )
+    saved = hr_personalakten_collection.find_one({"_id": employee_doc["_id"]})
+
+    return jsonify({
+        "success": True,
+        "message": "Personalakte wurde aktualisiert.",
+        "employee": hr_prepare_employee_for_api(saved)
+    })
+
+
+@app.route("/api/hr-controlling/checkliste", methods=["GET", "POST", "OPTIONS"])
+def api_hr_controlling_checkliste():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    permission_response = hr_api_permission_response()
+    if permission_response:
+        return permission_response
+
+    if request.method == "GET":
+        process_cursor = hr_process_plan_collection.find(
+            {"archived": {"$ne": True}}
+        ).sort([("sort_order", ASCENDING), ("created_at", ASCENDING)])
+        checklist_cursor = hr_checklist_collection.find(
+            {"archived": {"$ne": True}}
+        ).sort([("created_at", ASCENDING), ("updated_at", DESCENDING)])
+
+        return jsonify({
+            "success": True,
+            "connected": True,
+            "mode": "database",
+            "sourceName": "MongoDB / HR Checkliste",
+            "processPlan": [hr_prepare_process_plan_for_api(item) for item in process_cursor],
+            "checklist": [hr_prepare_checklist_for_api(item) for item in checklist_cursor],
+        })
+
+    data = request.get_json(silent=True) or {}
+    actor = current_account_identity()
+
+    if isinstance(data.get("processPlanItem"), dict):
+        payload = data.get("processPlanItem")
+        public_id = safe_str(payload.get("id") or payload.get("process_id") or payload.get("processId"))
+        existing = None
+        if public_id:
+            existing = hr_process_plan_collection.find_one({
+                "$and": [
+                    hr_object_lookup(public_id, "process_id", "id"),
+                    {"archived": {"$ne": True}},
+                ]
+            })
+
+        try:
+            process_doc = hr_build_process_plan_doc(payload, actor=actor, existing=existing)
+        except ValueError as error:
+            return jsonify({"success": False, "message": str(error)}), 400
+
+        hr_process_plan_collection.update_one(
+            {"process_id": process_doc["process_id"]},
+            mongo_upsert_set_preserve_created_at(process_doc),
+            upsert=True
+        )
+        saved = hr_process_plan_collection.find_one({"process_id": process_doc["process_id"]})
+
+        return jsonify({
+            "success": True,
+            "message": "Prozessschritt wurde gespeichert.",
+            "processPlanItem": hr_prepare_process_plan_for_api(saved)
+        }), 201 if not existing else 200
+
+    payload = data.get("checklistItem") if isinstance(data.get("checklistItem"), dict) else data
+    if "id" not in payload and data.get("id"):
+        payload["id"] = data.get("id")
+    if "done" not in payload and "done" in data:
+        payload["done"] = data.get("done")
+
+    public_id = safe_str(payload.get("id") or payload.get("item_id") or payload.get("itemId"))
+    existing = None
+    if public_id:
+        existing = hr_checklist_collection.find_one({
+            "$and": [
+                hr_object_lookup(public_id, "item_id", "id"),
+                {"archived": {"$ne": True}},
+            ]
+        })
+
+    checklist_doc = hr_build_checklist_doc(payload, actor=actor, existing=existing)
+
+    hr_checklist_collection.update_one(
+        {"item_id": checklist_doc["item_id"]},
+        mongo_upsert_set_preserve_created_at(checklist_doc),
+        upsert=True
+    )
+    saved = hr_checklist_collection.find_one({"item_id": checklist_doc["item_id"]})
+
+    return jsonify({
+        "success": True,
+        "message": "Checklisten-Aufgabe wurde in MongoDB gespeichert.",
+        "checklistItem": hr_prepare_checklist_for_api(saved)
+    }), 201 if not existing else 200
+
+
+@app.route("/api/hr-controlling/checkliste/<item_id>", methods=["GET", "PATCH", "DELETE", "OPTIONS"])
+def api_hr_controlling_checkliste_detail(item_id):
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    permission_response = hr_api_permission_response()
+    if permission_response:
+        return permission_response
+
+    checklist_doc = hr_checklist_collection.find_one({
+        "$and": [
+            hr_object_lookup(item_id, "item_id", "id"),
+            {"archived": {"$ne": True}},
+        ]
+    })
+
+    if not checklist_doc:
+        return jsonify({"success": False, "message": "Checklisten-Aufgabe wurde nicht gefunden."}), 404
+
+    if request.method == "GET":
+        return jsonify({
+            "success": True,
+            "checklistItem": hr_prepare_checklist_for_api(checklist_doc)
+        })
+
+    actor = current_account_identity()
+
+    if request.method == "DELETE":
+        hr_checklist_collection.update_one(
+            {"_id": checklist_doc["_id"]},
+            {"$set": {
+                "archived": True,
+                "archived_at": hr_db_timestamp(),
+                "archived_by": actor,
+                "updated_at": hr_db_timestamp(),
+                "updated_by": actor,
+            }}
+        )
+        return jsonify({"success": True, "message": "Checklisten-Aufgabe wurde archiviert."})
+
+    data = request.get_json(silent=True) or {}
+    payload = data.get("checklistItem") if isinstance(data.get("checklistItem"), dict) else data
+    payload["id"] = checklist_doc.get("item_id") or checklist_doc.get("id")
+
+    updated_doc = hr_build_checklist_doc(payload, actor=actor, existing=checklist_doc)
+    hr_checklist_collection.update_one(
+        {"_id": checklist_doc["_id"]},
+        mongo_upsert_set_preserve_created_at(updated_doc)
+    )
+    saved = hr_checklist_collection.find_one({"_id": checklist_doc["_id"]})
+
+    return jsonify({
+        "success": True,
+        "message": "Checklisten-Aufgabe wurde aktualisiert.",
+        "checklistItem": hr_prepare_checklist_for_api(saved)
+    })
+
+
+@app.route("/api/hr-controlling/prozessplan", methods=["GET", "POST", "OPTIONS"])
+def api_hr_controlling_prozessplan():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    permission_response = hr_api_permission_response()
+    if permission_response:
+        return permission_response
+
+    if request.method == "GET":
+        process_cursor = hr_process_plan_collection.find(
+            {"archived": {"$ne": True}}
+        ).sort([("sort_order", ASCENDING), ("created_at", ASCENDING)])
+
+        return jsonify({
+            "success": True,
+            "processPlan": [hr_prepare_process_plan_for_api(item) for item in process_cursor],
+        })
+
+    data = request.get_json(silent=True) or {}
+    payload = data.get("processPlanItem") if isinstance(data.get("processPlanItem"), dict) else data
+    actor = current_account_identity()
+
+    public_id = safe_str(payload.get("id") or payload.get("process_id") or payload.get("processId"))
+    existing = None
+    if public_id:
+        existing = hr_process_plan_collection.find_one({
+            "$and": [
+                hr_object_lookup(public_id, "process_id", "id"),
+                {"archived": {"$ne": True}},
+            ]
+        })
+
+    try:
+        process_doc = hr_build_process_plan_doc(payload, actor=actor, existing=existing)
+    except ValueError as error:
+        return jsonify({"success": False, "message": str(error)}), 400
+
+    hr_process_plan_collection.update_one(
+        {"process_id": process_doc["process_id"]},
+        mongo_upsert_set_preserve_created_at(process_doc),
+        upsert=True
+    )
+    saved = hr_process_plan_collection.find_one({"process_id": process_doc["process_id"]})
+
+    return jsonify({
+        "success": True,
+        "message": "Prozessschritt wurde in MongoDB gespeichert.",
+        "processPlanItem": hr_prepare_process_plan_for_api(saved)
+    }), 201 if not existing else 200
 
 
 @app.route("/controlling", methods=["GET"])
