@@ -153,6 +153,16 @@ TRACKER_JOB_START_PUBLIC_URL = env_first(
     default="https://www.eifellog.de/api/tracker/jobs/start"
 )
 
+TOUR_START_DUPLICATE_WINDOW_MINUTES = int(env_float(
+    "TOUR_START_DUPLICATE_WINDOW_MINUTES",
+    "JOB_START_WEBHOOK_DUPLICATE_WINDOW_MINUTES",
+    default=180
+))
+TOUR_COMPLETED_BLOCKS_RESTART_MINUTES = int(env_float(
+    "TOUR_COMPLETED_BLOCKS_RESTART_MINUTES",
+    default=180
+))
+
 
 # ==========================================
 # LOCAL TRACKER / WEBVIEW2 CORS
@@ -348,6 +358,9 @@ def ensure_indexes():
         tracker_job_starts_collection.create_index([("job_start_key", ASCENDING)], unique=False)
         tracker_job_starts_collection.create_index([("status", ASCENDING)], unique=False)
         tracker_job_starts_collection.create_index([("created_at", DESCENDING)], unique=False)
+        tracker_job_starts_collection.create_index([("tour_start_discord_sent_at", DESCENDING)], unique=False)
+        tracker_job_starts_collection.create_index([("completed_at", DESCENDING)], unique=False)
+        tracker_job_starts_collection.create_index([("discord_id", ASCENDING), ("job_start_key", ASCENDING), ("status", ASCENDING)], unique=False)
 
         hr_personalakten_collection.create_index([("employee_id", ASCENDING)], unique=False)
         hr_personalakten_collection.create_index([("id", ASCENDING)], unique=False)
@@ -5008,6 +5021,65 @@ def wrap_pdf_line(label, value, max_chars=96):
         return [raw[:max_chars]]
     return lines
 
+def format_ms_to_hhmm(ms):
+    """Wandelt Millisekunden in ein HH:MM Format um."""
+    if not ms or ms < 0: 
+        return "00:00"
+    total_seconds = int(ms / 1000)
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    return f"{hours:02d}:{minutes:02d}"
+
+def generate_shift_log_pdf(shift_doc):
+    """Erstellt den PDF-Beleg für die Schicht/Fahrerkarte."""
+    # Hier nutzen wir deinen neu angelegten Ordner
+    os.makedirs(FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER, exist_ok=True)
+    
+    date_str = shift_doc.get("shift_date", "Unbekannt")
+    driver_name = shift_doc.get("driver_name", "Unbekannt")
+    
+    # Entfernt Sonderzeichen aus dem Namen für einen sauberen Dateinamen
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", driver_name)[:30]
+    filename = f"Fahrerkarte_Auszug_{safe_name}_{date_str}.pdf"
+    file_path = os.path.join(FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER, filename)
+    
+    # 11 Stunden Ruhezeit Check (11 Stunden = 39.600.000 ms)
+    session_data = shift_doc.get("session_data", {})
+    rest_ms = session_data.get("restMs", 0)
+    rest_check = "Erfüllt (Mindestens 11h erreicht)" if rest_ms >= 39600000 else "Ausstehend / Wird jetzt angetreten"
+
+    created_at = shift_doc.get("created_at")
+    created_at_str = created_at.strftime("%d.%m.%Y %H:%M") if created_at else "Unbekannt"
+
+    sections = [
+        ("Fahrerdaten", [
+            ("Name", driver_name),
+            ("Discord-ID", shift_doc.get("discord_id", "")),
+            ("Rolle", shift_doc.get("role", "")),
+            ("Ausstellungsdatum UTC", created_at_str)
+        ]),
+        ("Zeiterfassung (Schicht)", [
+            ("Datum der Schicht", date_str),
+            ("Reine Lenkzeit", format_ms_to_hhmm(session_data.get("driveMs", 0))),
+            ("Arbeitszeit (z.B. Rampe)", format_ms_to_hhmm(session_data.get("workMs", 0))),
+            ("Pausenzeit", format_ms_to_hhmm(session_data.get("breakMs", 0))),
+        ]),
+        ("Ruhezeit-Prüfung", [
+            ("Feierabend Check (11 Std.)", rest_check),
+            ("Bisherige Ruhezeit", format_ms_to_hhmm(rest_ms))
+        ])
+    ]
+
+    # Wir nutzen deinen bestehenden PDF-Builder
+    pdf_bytes = build_simple_pdf(
+        "Auszug Fahrerkarte / Schichtprotokoll",
+        sections
+    )
+
+    with open(file_path, "wb") as file:
+        file.write(pdf_bytes)
+
+    return file_path, filename
 
 def build_simple_pdf(title, sections):
     # Minimaler PDF-Generator ohne externe Bibliothek.
@@ -5442,9 +5514,14 @@ def send_receipt_to_discord(receipt_doc, pdf_bytes, filename):
         webhook_url=DISCORD_TOUR_WEBHOOK_URL or DISCORD_JOB_COMPLETE_WEBHOOK_URL
     )
 
+
 def build_tour_receipt_doc(user_doc, payload, telemetry=None):
     telemetry = telemetry or {}
+    payload = payload or {}
     submitted_at = now_utc()
+
+    active_job = user_doc.get("tracker_current_job") or {}
+    live_state = user_doc.get("tracker_live") or {}
 
     job_id = (
         safe_str(payload.get("jobId"))
@@ -5452,6 +5529,7 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         or safe_str(payload.get("id"))
         or safe_str(payload.get("deliveryId"))
         or safe_str(payload.get("delivery_id"))
+        or safe_str(active_job.get("jobId"))
         or f"job-{submitted_at.strftime('%Y%m%d%H%M%S')}-{secrets.token_hex(3)}"
     )
 
@@ -5466,12 +5544,16 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         safe_str(payload.get("sourceCity"))
         or safe_str(payload.get("source_city"))
         or safe_str(telemetry.get("sourceCity"))
+        or safe_str(active_job.get("sourceCity"))
+        or safe_str(live_state.get("sourceCity"))
         or "-"
     )
     destination_city = (
         safe_str(payload.get("destinationCity"))
         or safe_str(payload.get("destination_city"))
         or safe_str(telemetry.get("destinationCity"))
+        or safe_str(active_job.get("destinationCity"))
+        or safe_str(live_state.get("destinationCity"))
         or "-"
     )
     cargo = safe_str(
@@ -5479,19 +5561,23 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         or payload.get("freight")
         or payload.get("cargoName")
         or payload.get("jobCargo")
-        or telemetry.get("cargo"),
+        or telemetry.get("cargo")
+        or active_job.get("cargo")
+        or live_state.get("cargo"),
         "-"
     )
-    game = safe_str(payload.get("game") or telemetry.get("game"), "ETS2/ATS")
+    game = safe_str(payload.get("game") or telemetry.get("game") or live_state.get("game"), "ETS2/ATS")
     truck = safe_str(
         payload.get("truck")
         or payload.get("truckName")
         or payload.get("truckModel")
         or payload.get("truck_model")
-        or telemetry.get("truck"),
+        or telemetry.get("truck")
+        or active_job.get("truck")
+        or live_state.get("truck"),
         "-"
     )
-    eta = safe_str(payload.get("eta") or payload.get("etaText") or payload.get("eta_text") or telemetry.get("eta"), "-")
+    eta = safe_str(payload.get("eta") or payload.get("etaText") or payload.get("eta_text") or telemetry.get("eta") or active_job.get("eta"), "-")
     driver_card_id = resolve_driver_card_id(user_doc, payload) or resolve_driver_card_id(user_doc, telemetry)
 
     planned_distance = parse_number(
@@ -5502,7 +5588,9 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         or payload.get("completedDistanceKm")
         or payload.get("completed_distance_km")
         or payload.get("distanceKm")
-        or telemetry.get("plannedDistanceKm"),
+        or telemetry.get("plannedDistanceKm")
+        or active_job.get("distanceKm")
+        or live_state.get("plannedDistanceKm"),
         0
     )
     driven_distance = parse_number(
@@ -5518,17 +5606,32 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         or telemetry.get("completedDistanceKm")
         or telemetry.get("drivenDistanceKm")
         or telemetry.get("distanceKm")
-        or telemetry.get("tripDistanceKm"),
+        or telemetry.get("tripDistanceKm")
+        or live_state.get("completedDistanceKm")
+        or live_state.get("drivenDistanceKm")
+        or live_state.get("tripDistanceKm"),
         0
     )
     remaining_distance = parse_number(
         payload.get("remainingDistanceKm")
-        or telemetry.get("remainingDistanceKm"),
+        or telemetry.get("remainingDistanceKm")
+        or active_job.get("remainingDistanceKm")
+        or live_state.get("remainingDistanceKm"),
         0
     )
 
-    if driven_distance <= 0 and planned_distance > 0 and remaining_distance >= 0:
-        driven_distance = max(planned_distance - remaining_distance, 0)
+    if driven_distance <= 0 and planned_distance > 0:
+        if remaining_distance > 0:
+            driven_distance = max(planned_distance - remaining_distance, 0)
+        else:
+            driven_distance = planned_distance
+
+    if driven_distance <= 0:
+        driven_distance = completed_distance_fallback_from_user(user_doc)
+
+    driven_distance = round(max(0.0, driven_distance), 1)
+    planned_distance = round(max(planned_distance, driven_distance, 0.0), 1)
+    remaining_distance = round(max(0.0, remaining_distance), 1)
 
     rate_per_km = parse_number(payload.get("ratePerKm") or payload.get("rate_per_km"), TOUR_RECEIPT_RATE_PER_KM)
     base_amount = parse_number(payload.get("income") or payload.get("baseAmount") or payload.get("base_amount"), 0)
@@ -5540,7 +5643,9 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
     total_amount = round(base_amount + bonus - penalty, 2)
     currency = safe_str(payload.get("currency"), TOUR_RECEIPT_CURRENCY).upper()
 
-    receipt_number = generate_receipt_number(job_id, user_doc.get("discord_id"), submitted_at)
+    receipt_number = safe_str(payload.get("receiptNumber") or payload.get("receipt_number"))
+    if not receipt_number:
+        receipt_number = generate_receipt_number(job_id, user_doc.get("discord_id"), submitted_at)
 
     extra = {}
     for key, value in payload.items():
@@ -5550,7 +5655,7 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
             "planned_distance_km", "completedDistanceKm", "completed_distance_km", "drivenDistanceKm",
             "driven_distance_km", "routeDistanceKm", "route_distance_km", "distanceKm", "distance",
             "remainingDistanceKm", "ratePerKm", "rate_per_km", "income", "baseAmount", "base_amount", "bonus", "penalty",
-            "deduction", "currency", "telemetry", "snapshot"
+            "deduction", "currency", "telemetry", "snapshot", "clientToken", "token"
         }:
             extra[key] = value
 
@@ -5603,7 +5708,6 @@ def build_tour_receipt_doc(user_doc, payload, telemetry=None):
         "extra": extra,
         "raw_telemetry": telemetry
     }
-
 
 def write_receipt_into_user_stats(user_doc, receipt_doc):
     billing = receipt_doc.get("billing") or {}
@@ -5758,6 +5862,8 @@ def complete_tracker_tour_from_request():
 
     tour_receipts_collection.insert_one(receipt_doc)
     write_receipt_into_user_stats(user_doc, receipt_doc)
+    mark_tracker_job_start_completed(user_doc, telemetry or data, receipt_doc)
+    reset_active_tour_start_embed_state(user_doc, reason="tour_completed")
 
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]})
     company_all_time = get_company_all_time_stats()
@@ -5913,59 +6019,138 @@ def send_tour_start_to_discord(user_doc, telemetry):
     )
 
 
+
 def send_tour_start_once_for_active_tour(user_doc, telemetry, current_job_key=None):
     """
-    Sendet den Discord-Embed "Tour gestartet" genau einmal pro aktiver Tour.
+    Sendet den Discord-Embed "Tour gestartet" serverseitig genau einmal pro Tour.
 
-    Der Live-Tracker schickt während der Fahrt fortlaufend Telemetrie. Deshalb darf der
-    Discord-Versand nicht direkt an jede Änderung des berechneten Tour-Keys gekoppelt sein.
-    Dieses Flag bleibt während der aktiven Tour gesetzt und wird erst zurückgesetzt, wenn
-    keine Tour mehr aktiv ist oder die Tour abgegeben wurde.
+    Die Dedupe liegt bewusst in MongoDB und nicht nur im Prozessspeicher:
+    - verhindert doppelte Startmeldungen nach App-Neustart
+    - verhindert erneute Startmeldungen, wenn RPM/Kraftstoff/ETA sich ändern
+    - blockiert einen Neustart derselben Tour kurz nach Abschluss/PDF
     """
     user_doc = user_doc or {}
     telemetry = telemetry or {}
     current_job_key = safe_str(current_job_key or tracker_current_job_key(telemetry, user_doc))
 
+    if not TOUR_START_DISCORD_ENABLED:
+        return {"sent": False, "skipped": True, "reason": "TOUR_START_DISCORD_ENABLED=false", "job_key": current_job_key}
+
     if not current_job_key:
         return {"sent": False, "skipped": True, "reason": "Kein aktiver Tour-Key vorhanden."}
 
-    if not user_doc.get("_id"):
-        return {"sent": False, "skipped": True, "reason": "User-Dokument ohne Mongo-ID."}
+    discord_id = safe_str(user_doc.get("discord_id"))
+    if not discord_id:
+        return {"sent": False, "skipped": True, "reason": "User-Dokument ohne Discord-ID.", "job_key": current_job_key}
 
     now = now_utc()
-    claim_result = users_collection.update_one(
-        {
-            "_id": user_doc["_id"],
-            "$or": [
-                {"tracker_active_tour_start_embed_sent": {"$ne": True}},
-                {"tracker_active_tour_start_embed_sent": {"$exists": False}},
-            ],
-        },
-        {
-            "$set": {
-                "tracker_active_tour_start_embed_sent": True,
-                "tracker_active_tour_start_embed_sent_key": current_job_key,
-                "tracker_active_tour_start_embed_claimed_at": now,
-            }
-        },
-    )
+    duplicate_cutoff = now - timedelta(minutes=max(1, TOUR_START_DUPLICATE_WINDOW_MINUTES))
+    completed_cutoff = now - timedelta(minutes=max(1, TOUR_COMPLETED_BLOCKS_RESTART_MINUTES))
 
-    if getattr(claim_result, "matched_count", 0) == 0:
+    recently_completed = tracker_job_starts_collection.find_one({
+        "discord_id": discord_id,
+        "job_start_key": current_job_key,
+        "status": {"$in": ["completed", "submitted", "done"]},
+        "completed_at": {"$gte": completed_cutoff},
+    })
+    if recently_completed:
+        return {
+            "sent": False,
+            "skipped": True,
+            "already_completed": True,
+            "reason": "Diese Tour wurde bereits abgeschlossen; erneute Start-Meldung unterdrückt.",
+            "job_key": current_job_key,
+        }
+
+    already_sent = tracker_job_starts_collection.find_one({
+        "discord_id": discord_id,
+        "job_start_key": current_job_key,
+        "tour_start_discord_sent": True,
+        "tour_start_discord_sent_at": {"$gte": duplicate_cutoff},
+    })
+    if already_sent:
         return {
             "sent": False,
             "skipped": True,
             "already_sent": True,
-            "reason": "Tour-Start-Embed wurde für die aktive Tour bereits gesendet.",
+            "reason": "Tour-Start-Embed wurde für diese Tour bereits gesendet.",
+            "job_key": current_job_key,
+            "message_id": already_sent.get("tour_start_discord_message_id"),
+            "channel_id": already_sent.get("tour_start_discord_channel_id") or TOUR_CHANNEL_ID,
+        }
+
+    job_id = payload_lookup_value(telemetry, "jobId", "job_id", "id", "deliveryId", "delivery_id", fallback="")
+    claim_result = tracker_job_starts_collection.update_one(
+        {
+            "discord_id": discord_id,
+            "job_start_key": current_job_key,
+            "$or": [
+                {"tour_start_discord_sent": {"$ne": True}},
+                {"tour_start_discord_sent_at": {"$lt": duplicate_cutoff}},
+                {"tour_start_discord_sent_at": {"$exists": False}},
+            ],
+        },
+        {
+            "$set": {
+                "discord_id": discord_id,
+                "user_id": discord_id,
+                "user_mongo_id": safe_str(user_doc.get("_id")),
+                "username": user_doc.get("username") or user_doc.get("discord_username"),
+                "display_name": user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username"),
+                "job_id": job_id or current_job_key,
+                "job_start_key": current_job_key,
+                "telemetry": telemetry,
+                "current_job": current_job_from_live(telemetry),
+                "status": "started",
+                "tour_start_discord_claimed": True,
+                "tour_start_discord_claimed_at": now,
+                "updated_at": now,
+            },
+            "$setOnInsert": {
+                "created_at": now,
+                "start_request_count": 0,
+            },
+            "$inc": {"start_request_count": 1},
+        },
+        upsert=True,
+    )
+
+    if getattr(claim_result, "matched_count", 0) == 0 and getattr(claim_result, "upserted_id", None) is None:
+        return {
+            "sent": False,
+            "skipped": True,
+            "already_sent": True,
+            "reason": "Tour-Start wurde parallel bereits verarbeitet.",
             "job_key": current_job_key,
         }
 
     discord_result = send_tour_start_to_discord(user_doc, telemetry)
     discord_result = discord_result or {"sent": False, "reason": "Kein Discord-Ergebnis erhalten."}
 
+    tracker_job_starts_collection.update_one(
+        {
+            "discord_id": discord_id,
+            "job_start_key": current_job_key,
+        },
+        {
+            "$set": {
+                "tour_start_discord_sent": bool(discord_result.get("sent")),
+                "tour_start_discord_sent_at": now,
+                "tour_start_discord_message_id": discord_result.get("message_id"),
+                "tour_start_discord_channel_id": discord_result.get("channel_id") or TOUR_CHANNEL_ID,
+                "tour_start_discord_result": discord_result,
+                "updated_at": now,
+            }
+        },
+        upsert=True,
+    )
+
     users_collection.update_one(
         {"_id": user_doc["_id"]},
         {
             "$set": {
+                "tracker_active_tour_start_embed_sent": bool(discord_result.get("sent")),
+                "tracker_active_tour_start_embed_sent_key": current_job_key,
                 "tracker_tour_started_at": now,
                 "tracker_tour_started_discord": discord_result,
                 "tracker_tour_started_discord_message_id": discord_result.get("message_id"),
@@ -5977,7 +6162,6 @@ def send_tour_start_once_for_active_tour(user_doc, telemetry, current_job_key=No
     )
 
     return discord_result
-
 
 def reset_active_tour_start_embed_state(user_doc, reason="tour_inactive"):
     """Gibt den einmaligen Tour-Start-Embed wieder für die nächste Tour frei."""
@@ -6134,15 +6318,361 @@ def payload_bool(payload, *keys, fallback=False):
     return fallback
 
 
+
+def discord_embed_title_text(data):
+    data = data or {}
+    titles = []
+    if isinstance(data, dict):
+        content = safe_str(data.get("content"))
+        if content:
+            titles.append(content)
+        embeds = data.get("embeds")
+        if isinstance(embeds, list):
+            for embed in embeds:
+                if not isinstance(embed, dict):
+                    continue
+                for key in ("title", "description"):
+                    value = safe_str(embed.get(key))
+                    if value:
+                        titles.append(value)
+    return " ".join(titles).strip()
+
+
+def normalize_discord_field_name(name):
+    name = safe_str(name).lower()
+    name = re.sub(r"[^\w\säöüÄÖÜß-]", " ", name, flags=re.UNICODE)
+    name = re.sub(r"\s+", " ", name).strip()
+    return name
+
+
+def clean_discord_field_value(value):
+    value = safe_str(value)
+    if value.startswith("`") and value.endswith("`") and len(value) >= 2:
+        value = value[1:-1]
+    return value.strip()
+
+
+def extract_tracker_payload_from_discord_payload(data):
+    """
+    Holt Tracker-Felder aus Discord-Webhook-Payloads/Embeds heraus.
+
+    Hintergrund:
+    Ältere Tracker-Versionen haben bereits fertige Discord-Embeds an /webhook gesendet.
+    Wenn das Backend diese Embeds blind weiterleitet, entstehen doppelte "Tour gestartet"-
+    Meldungen. Deshalb werden Embeds zuerst in normale Tracker-Felder übersetzt und danach
+    durch die gleiche Dedupe-/PDF-Logik verarbeitet.
+    """
+    result = {}
+
+    if not isinstance(data, dict):
+        return result
+
+    title_text = discord_embed_title_text(data)
+    title_lc = title_text.lower()
+
+    if "tour gestartet" in title_lc or "auftrag gestartet" in title_lc:
+        result["event"] = "tour_started"
+        result["status"] = "started"
+
+    if (
+        "abgeschlossen" in title_lc
+        or "abgegeben" in title_lc
+        or "tour-beleg" in title_lc
+        or "beleg eingereicht" in title_lc
+        or "auftrag erfolgreich abgeschlossen" in title_lc
+    ):
+        result["event"] = "tour_completed"
+        result["status"] = "completed"
+        result["jobFinished"] = True
+        result["jobDelivered"] = True
+        result["jobCompleted"] = True
+        result["completed"] = True
+        result["delivered"] = True
+
+    embeds = data.get("embeds")
+    if not isinstance(embeds, list):
+        return result
+
+    for embed in embeds:
+        if not isinstance(embed, dict):
+            continue
+
+        fields = embed.get("fields")
+        if not isinstance(fields, list):
+            continue
+
+        for field in fields:
+            if not isinstance(field, dict):
+                continue
+
+            field_name = normalize_discord_field_name(field.get("name"))
+            field_value = clean_discord_field_value(field.get("value"))
+
+            if not field_name or not field_value:
+                continue
+
+            if "fahrerkarte" in field_name or "driver card" in field_name:
+                result["driverCardId"] = field_value
+                result["fahrerkarteId"] = field_value
+            elif field_name in {"fahrer", "driver"} or field_name.endswith(" fahrer"):
+                result["driverName"] = field_value
+                result["username"] = field_value
+            elif "lkw" in field_name or "truck" in field_name:
+                result["truck"] = field_value
+                result["truckName"] = field_value
+            elif "fracht" in field_name or "cargo" in field_name:
+                result["cargo"] = field_value
+                result["freight"] = field_value
+            elif field_name in {"von", "start", "quelle"} or "source" in field_name:
+                result["sourceCity"] = field_value
+                result["source"] = field_value
+            elif field_name in {"nach", "ziel"} or "destination" in field_name or "target" in field_name:
+                result["destinationCity"] = field_value
+                result["destination"] = field_value
+            elif "job" in field_name:
+                result["jobId"] = field_value
+            elif "beleg" in field_name or "receipt" in field_name:
+                result["receiptNumber"] = field_value
+            elif "strecke" in field_name or "distanz" in field_name or "distance" in field_name:
+                result["completedDistanceKm"] = parse_number(field_value, 0)
+                result["distanceKm"] = parse_number(field_value, 0)
+            elif "schaden" in field_name or "damage" in field_name:
+                result["damagePercent"] = parse_number(field_value, 0)
+            elif "kraftstoff" in field_name or "fuel" in field_name:
+                result["fuelPercent"] = parse_number(field_value, 0)
+            elif "rpm" in field_name:
+                result["rpm"] = parse_number(field_value, 0)
+            elif "eta" in field_name:
+                result["eta"] = field_value
+            elif "abrechnung" in field_name or "betrag" in field_name or "income" in field_name:
+                result["income"] = parse_number(field_value, 0)
+
+    return result
+
+
+def merge_tracker_webhook_payload(data, payload):
+    payload = dict(payload or {})
+
+    embed_payload = extract_tracker_payload_from_discord_payload(data)
+    for key, value in embed_payload.items():
+        if key not in payload or payload.get(key) in (None, "", "-"):
+            payload[key] = value
+
+    # Falls die App ein normales Wrapper-Objekt sendet, wichtige Root-Felder mitnehmen.
+    if isinstance(data, dict):
+        for key in (
+            "clientToken", "trackerClientToken", "token",
+            "driverName", "username", "displayName", "discordId", "discord_id",
+            "jobId", "job_id", "status", "event", "type",
+            "jobFinished", "jobDelivered", "jobCompleted", "completed", "delivered",
+            "sourceCity", "destinationCity", "cargo", "truck", "distanceKm",
+            "completedDistanceKm", "plannedDistanceKm", "remainingDistanceKm",
+            "routeProgressPercent", "damagePercent", "fuelPercent", "fuelLiters",
+            "rpm", "eta", "game", "driverCardId", "fahrerkarteId"
+        ):
+            if key in data and (key not in payload or payload.get(key) in (None, "", "-")):
+                payload[key] = data.get(key)
+
+    return payload
+
+
+def tracker_webhook_payload_is_start(payload, raw_data=None):
+    payload = payload or {}
+    if tracker_webhook_payload_is_completed(payload):
+        return False
+
+    status = first_payload_value(payload, "status", "jobStatus", "job_status", fallback="").lower()
+    event = first_payload_value(payload, "event", "type", "messageType", fallback="").lower()
+    title_text = discord_embed_title_text(raw_data).lower() if raw_data else ""
+
+    if status in {"started", "start", "active", "aktiv", "running"}:
+        return True
+
+    if event in {"tour_started", "tour:start", "job_started", "job:start", "started"}:
+        return True
+
+    if "tour gestartet" in title_text or "auftrag gestartet" in title_text:
+        return True
+
+    return False
+
+
+def completed_distance_fallback_from_user(user_doc):
+    user_doc = user_doc or {}
+    current_job = user_doc.get("tracker_current_job") or {}
+    live = user_doc.get("tracker_live") or {}
+
+    return first_payload_number(
+        {
+            "currentJobDistanceKm": current_job.get("distanceKm"),
+            "currentJobRemainingDistanceKm": current_job.get("remainingDistanceKm"),
+            "liveCompletedDistanceKm": live.get("completedDistanceKm"),
+            "liveDrivenDistanceKm": live.get("drivenDistanceKm"),
+            "liveDistanceKm": live.get("distanceKm"),
+            "liveTripDistanceKm": live.get("tripDistanceKm"),
+            "livePlannedDistanceKm": live.get("plannedDistanceKm"),
+            "liveNavigationDistanceKm": live.get("navigationDistanceKm"),
+        },
+        "currentJobDistanceKm",
+        "liveCompletedDistanceKm",
+        "liveDrivenDistanceKm",
+        "liveDistanceKm",
+        "liveTripDistanceKm",
+        "livePlannedDistanceKm",
+        "liveNavigationDistanceKm",
+        fallback=0.0
+    )
+
+
+def mark_tracker_job_start_completed(user_doc, payload, receipt_doc=None):
+    user_doc = user_doc or {}
+    payload = payload or {}
+    receipt_doc = receipt_doc or {}
+
+    discord_id = safe_str(user_doc.get("discord_id"))
+    if not discord_id:
+        return
+
+    job_id = safe_str(receipt_doc.get("job_id") or payload.get("jobId") or payload.get("job_id"))
+    job_key = (
+        safe_str(user_doc.get("tracker_current_job_key"))
+        or tracker_current_job_key(payload, user_doc)
+        or (f"job:{job_id}" if job_id else "")
+    )
+
+    clauses = []
+    if job_key:
+        clauses.append({"job_start_key": job_key})
+    if job_id:
+        clauses.append({"job_id": job_id})
+
+    if not clauses:
+        return
+
+    now = now_utc()
+    tracker_job_starts_collection.update_many(
+        {
+            "discord_id": discord_id,
+            "$or": clauses,
+            "status": {"$in": ["started", "active"]},
+        },
+        {
+            "$set": {
+                "status": "completed",
+                "completed_at": now,
+                "receipt_id": receipt_doc.get("receipt_id"),
+                "receipt_number": receipt_doc.get("receipt_number"),
+                "updated_at": now,
+            }
+        }
+    )
+
+
+def store_tracker_webhook_start_job(payload, raw_data=None):
+    payload = merge_tracker_webhook_payload(raw_data or {}, payload or {})
+
+    if not tracker_webhook_payload_is_start(payload, raw_data=raw_data):
+        return {"sent": False, "skipped": True, "reason": "Payload ist kein Tour-Start."}
+
+    user_doc = resolve_tracker_webhook_user(payload)
+    if not user_doc:
+        return {"sent": False, "skipped": True, "reason": "Kein Fahrer/User zum Start-Payload gefunden."}
+
+    telemetry = normalize_telemetry_payload(payload)
+    current_job_key = tracker_current_job_key(telemetry, user_doc) or tracker_current_job_key(payload, user_doc)
+    if not current_job_key:
+        return {"sent": False, "skipped": True, "reason": "Kein stabiler Tour-Key gefunden."}
+
+    now = now_utc()
+    job_id = stable_webhook_job_id(payload)
+    tracker_job_starts_collection.update_one(
+        {
+            "discord_id": safe_str(user_doc.get("discord_id")),
+            "job_start_key": current_job_key,
+        },
+        {
+            "$set": {
+                "job_id": job_id,
+                "job_start_key": current_job_key,
+                "discord_id": safe_str(user_doc.get("discord_id")),
+                "user_id": safe_str(user_doc.get("discord_id")),
+                "user_mongo_id": safe_str(user_doc.get("_id")),
+                "username": user_doc.get("username") or user_doc.get("discord_username"),
+                "display_name": user_doc.get("display_name") or user_doc.get("username") or user_doc.get("discord_username"),
+                "telemetry": telemetry,
+                "current_job": current_job_from_live(telemetry),
+                "status": "started",
+                "source": "tracker_webhook",
+                "updated_at": now,
+            },
+            "$setOnInsert": {
+                "created_at": now,
+                "start_request_count": 0,
+            },
+            "$inc": {"start_request_count": 1},
+        },
+        upsert=True,
+    )
+
+    users_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {
+            "$set": {
+                "tracker_live": telemetry,
+                "tracker_live_updated_at": now,
+                "tracker_online": True,
+                "tracker_current_job": current_job_from_live(telemetry),
+                "tracker_current_job_key": current_job_key,
+            }
+        }
+    )
+
+    fresh_user = users_collection.find_one({"_id": user_doc["_id"]}) or user_doc
+    discord_result = send_tour_start_once_for_active_tour(fresh_user, telemetry, current_job_key=current_job_key)
+
+    return {
+        "sent": bool(discord_result.get("sent")),
+        "skipped": bool(discord_result.get("skipped")),
+        "jobStartKey": current_job_key,
+        "jobId": job_id,
+        "discord": discord_result,
+    }
+
+
 def tracker_webhook_payload_is_completed(payload):
     payload = payload or {}
     status = first_payload_value(payload, "status", "jobStatus", "job_status", fallback="").lower()
+    event = first_payload_value(payload, "event", "type", "messageType", fallback="").lower()
 
-    return (
+    explicit_completed = (
         payload_bool(payload, "jobFinished", "jobDelivered", "jobCompleted", "completed", "delivered", fallback=False)
-        or status in {"finished", "completed", "complete", "delivered", "done", "fertig", "submitted"}
+        or status in {"finished", "completed", "complete", "delivered", "done", "fertig", "submitted", "abgegeben", "abgeschlossen"}
+        or event in {"tour_completed", "tour:completed", "job_completed", "job:complete", "completed", "delivered"}
     )
 
+    if explicit_completed:
+        return True
+
+    # Fallback für Telemetrie: Nur als Abschluss werten, wenn eine Reststrecke wirklich vorhanden
+    # ist und der Job gleichzeitig als nicht mehr aktiv markiert wurde. Fehlende Werte werden
+    # bewusst nicht als 0-km-Abschluss interpretiert.
+    has_remaining_key = any(key in payload for key in (
+        "remainingDistanceKm", "remaining_distance_km", "navigationDistanceKm",
+        "navigation_distance_km", "routeRemainingDistance"
+    ))
+    if has_remaining_key:
+        remaining = first_payload_number(
+            payload,
+            "remainingDistanceKm", "remaining_distance_km",
+            "navigationDistanceKm", "navigation_distance_km",
+            "routeRemainingDistance",
+            fallback=999999.0
+        )
+        job_active = payload_bool(payload, "jobActive", "hasJob", "activeJob", fallback=True)
+        if remaining <= 0.1 and not job_active:
+            return True
+
+    return False
 
 def tracker_webhook_completed_distance(payload):
     return first_payload_number(
@@ -6189,24 +6719,36 @@ def stable_webhook_job_id(payload):
     return "webhook-" + tracker_webhook_dedupe_key(payload).split(":", 1)[-1]
 
 
+
 def store_tracker_webhook_completed_job(payload):
     payload = payload or {}
 
     if not tracker_webhook_payload_is_completed(payload):
         return {"stored": False, "reason": "Payload ist kein abgeschlossener Auftrag."}
 
-    distance = tracker_webhook_completed_distance(payload)
-    if distance <= 0:
-        return {"stored": False, "reason": "Keine abgeschlossene Distanz im Payload gefunden."}
-
     user_doc = resolve_tracker_webhook_user(payload)
     if not user_doc:
         return {"stored": False, "reason": "Kein Fahrer/User zum Webhook-Payload gefunden."}
+
+    distance = tracker_webhook_completed_distance(payload)
+    if distance <= 0:
+        distance = completed_distance_fallback_from_user(user_doc)
+
+    # Ein Abschlussbeleg soll trotzdem erzeugt werden, auch wenn das Spiel keine Distanz
+    # mehr liefert. Die Buchhaltung sieht dann 0,0 km statt gar keinen Beleg.
+    distance = round(max(0.0, distance), 1)
 
     payload_for_db = dict(payload)
     payload_for_db["jobId"] = stable_webhook_job_id(payload_for_db)
     payload_for_db["completedDistanceKm"] = distance
     payload_for_db["distanceKm"] = distance
+    payload_for_db["drivenDistanceKm"] = distance
+    payload_for_db["jobFinished"] = True
+    payload_for_db["jobDelivered"] = True
+    payload_for_db["jobCompleted"] = True
+    payload_for_db["completed"] = True
+    payload_for_db["delivered"] = True
+    payload_for_db["status"] = "completed"
 
     receipt_doc = build_tour_receipt_doc(user_doc, payload_for_db, telemetry=payload_for_db)
     receipt_doc["source"] = "tracker_webhook"
@@ -6223,6 +6765,8 @@ def store_tracker_webhook_completed_job(payload):
         "archived": {"$ne": True}
     })
     if existing:
+        mark_tracker_job_start_completed(user_doc, payload_for_db, existing)
+        reset_active_tour_start_embed_state(user_doc, reason="tour_completed_existing")
         refresh_company_all_time_stats_from_receipts()
         company_stats = get_company_all_time_stats()
         return {
@@ -6230,6 +6774,9 @@ def store_tracker_webhook_completed_job(payload):
             "alreadyStored": True,
             "reason": "Dieser Auftrag ist bereits in der Datenbank gespeichert.",
             "jobId": existing.get("job_id"),
+            "receiptId": existing.get("receipt_id"),
+            "pdf": existing.get("pdf"),
+            "discord": existing.get("discord") or {},
             "allTimeKilometers": round(positive_number(company_stats.get("all_time_km"), 0), 1)
         }
 
@@ -6248,6 +6795,8 @@ def store_tracker_webhook_completed_job(payload):
 
     tour_receipts_collection.insert_one(receipt_doc)
     write_receipt_into_user_stats(user_doc, receipt_doc)
+    mark_tracker_job_start_completed(user_doc, payload_for_db, receipt_doc)
+    reset_active_tour_start_embed_state(user_doc, reason="tour_completed")
 
     fresh_user = users_collection.find_one({"_id": user_doc["_id"]}) or user_doc
     company_stats = get_company_all_time_stats()
@@ -6256,6 +6805,7 @@ def store_tracker_webhook_completed_job(payload):
         "stored": True,
         "jobId": receipt_doc.get("job_id"),
         "receiptId": receipt_doc.get("receipt_id"),
+        "receiptNumber": receipt_doc.get("receipt_number"),
         "driverName": receipt_doc.get("driver", {}).get("name"),
         "distanceKm": round(distance, 1),
         "driverAllTimeKilometers": round(get_user_all_time_km(fresh_user), 1),
@@ -6265,10 +6815,10 @@ def store_tracker_webhook_completed_job(payload):
         "discord": receipt_doc.get("discord")
     }
 
-
 @app.route("/webhook", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/tracker/webhook", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/tracker/discord/webhook", methods=["GET", "POST", "OPTIONS"])
+
 def tracker_local_webhook():
     if request.method == "OPTIONS":
         return jsonify({"success": True})
@@ -6277,14 +6827,40 @@ def tracker_local_webhook():
         return jsonify({
             "success": True,
             "message": "Tracker Webhook ist aktiv. Bitte per POST JSON senden.",
-            "routes": ["/webhook", "/api/tracker/webhook", "/api/tracker/discord/webhook"]
+            "routes": ["/webhook", "/api/tracker/webhook", "/api/tracker/discord/webhook"],
+            "handles": ["tour_started", "tour_completed_with_pdf"]
         })
 
     data = request.get_json(silent=True) or {}
-    payload = unwrap_tracker_webhook_payload(data)
+    payload = merge_tracker_webhook_payload(data, unwrap_tracker_webhook_payload(data))
 
     if not payload:
         return jsonify({"success": False, "error": "Webhook Payload fehlt oder ist kein JSON-Objekt."}), 400
+
+    # Abschluss zuerst verarbeiten: PDF erzeugen, speichern, Discord mit Datei senden.
+    if tracker_webhook_payload_is_completed(payload):
+        database_result = store_tracker_webhook_completed_job(payload)
+        discord_result = database_result.get("discord") or {}
+
+        success = bool(database_result.get("stored")) or bool(database_result.get("alreadyStored")) or bool(discord_result.get("sent"))
+        return jsonify({
+            "success": success,
+            "message": "Tour abgeschlossen: PDF-Beleg wurde verarbeitet." if success else "Tour-Abschluss erkannt, aber Verarbeitung fehlgeschlagen.",
+            "event": "tour_completed",
+            "database": database_result,
+            "discord": discord_result
+        }), 200 if success else 502
+
+    # Startmeldungen niemals roh weiterleiten, sondern dedupliziert über die Backend-Logik senden.
+    if tracker_webhook_payload_is_start(payload, raw_data=data):
+        start_result = store_tracker_webhook_start_job(payload, raw_data=data)
+        return jsonify({
+            "success": True,
+            "message": "Tour-Start wurde verarbeitet oder als Duplikat unterdrückt.",
+            "event": "tour_started",
+            "tourStart": start_result,
+            "discord": start_result.get("discord") or start_result
+        })
 
     if tracker_webhook_is_duplicate(payload):
         return jsonify({
@@ -6293,27 +6869,94 @@ def tracker_local_webhook():
             "message": "Webhook wurde als Duplikat erkannt und nicht erneut verarbeitet."
         })
 
+    # Fallback für alte abgeschlossene Payloads, die erst nach Normalisierung erkennbar werden.
     database_result = store_tracker_webhook_completed_job(payload)
 
     discord_result = database_result.get("discord") or {}
-    if not discord_result:
-        if isinstance(data, dict) and ("embeds" in data or "content" in data):
-            discord_payload = data
-        else:
-            discord_payload = build_tracker_webhook_discord_payload(payload)
+    if not discord_result and database_result.get("stored"):
+        discord_result = database_result.get("discord") or {}
 
-        discord_result = post_json_to_discord_webhook(discord_payload)
+    # Nur unbekannte Nicht-Tracker-Payloads werden noch als normales Discord-Embed weitergereicht.
+    # "Tour gestartet" wird oben absichtlich abgefangen, damit keine Duplikate entstehen.
+    if not discord_result and isinstance(data, dict) and ("embeds" in data or "content" in data):
+        title_text = discord_embed_title_text(data).lower()
+        if "tour gestartet" not in title_text and "auftrag gestartet" not in title_text:
+            discord_result = post_json_to_discord_webhook(data)
+        else:
+            discord_result = {"sent": False, "skipped": True, "reason": "Rohes Tour-Start-Embed wurde nicht weitergeleitet."}
 
     success = bool(discord_result.get("sent")) or bool(database_result.get("stored")) or bool(database_result.get("alreadyStored"))
-    status_code = 200 if success else 502
+    status_code = 200 if success else 202
 
     return jsonify({
         "success": success,
-        "message": "Webhook empfangen. All-Time-KM wurden gespeichert und Discord wurde informiert." if success else "Webhook empfangen, aber Datenbank/Discord-Verarbeitung fehlgeschlagen.",
+        "message": "Webhook empfangen und verarbeitet." if success else "Webhook empfangen, aber kein Start/Abschluss erkannt.",
         "database": database_result,
         "discord": discord_result
     }), status_code
 
+@app.route("/api/tracker/feierabend", methods=["POST", "OPTIONS"])
+@tracker_api_key_required
+def tracker_feierabend():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+
+    data = request.get_json(silent=True) or {}
+    
+    # Authentifizierung des Trackers/Fahrers
+    user_doc, client_token, error_response = tracker_auth_user_from_payload(data)
+    if error_response:
+        return error_response
+
+    discord_id = safe_str(user_doc.get("discord_id"))
+    now = now_utc()
+    # Wir formatieren das Datum als DD.MM.YYYY, damit HR es leicht suchen kann
+    shift_date = now.strftime("%d.%m.%Y")
+
+    # Aktuelle Session aus der DB holen
+    current_session_doc = tracker_get_latest_work_session_doc(user_doc)
+    session_data = current_session_doc.get("work_session", {}) if current_session_doc else tracker_default_work_session()
+
+    # Neues historisches Dokument für die Personalabteilung anlegen
+    shift_id = uuid.uuid4().hex
+    
+    # Rolle sicher extrahieren (falls die Funktion get_primary_role_name existiert, ansonsten Fallback)
+    try:
+        role = get_primary_role_name(user_doc.get("roles", []))
+    except NameError:
+        role = "Fahrer"
+
+    shift_doc = {
+        "shift_id": shift_id,
+        "discord_id": discord_id,
+        "driver_name": user_doc.get("display_name") or user_doc.get("username", "Unbekannt"),
+        "role": role,
+        "shift_date": shift_date,
+        "session_data": session_data,
+        "created_at": now
+    }
+
+    # PDF generieren (Funktion aus Schritt 2)
+    file_path, filename = generate_shift_log_pdf(shift_doc)
+    shift_doc["pdf_path"] = file_path
+    shift_doc["pdf_filename"] = filename
+    shift_doc["pdf_url"] = f"/api/hr/download_shift_pdf/{shift_id}"
+
+    # In die Historie (unsere neue Collection aus Schritt 1) speichern
+    tracker_shift_logs_collection.insert_one(shift_doc)
+
+    # Nach dem Speichern: Aktuelle Tracker-Session für den nächsten Tag resetten
+    # Wir simulieren den Feierabend-Status (OffDuty)
+    new_session = tracker_default_work_session()
+    new_session["status"] = "offDuty"
+    tracker_save_work_session(user_doc, new_session)
+
+    return jsonify({
+        "success": True,
+        "message": "Feierabend erfolgreich protokolliert. Daten für die Personalabteilung wurden generiert.",
+        "shift_id": shift_id,
+        "pdf_url": shift_doc["pdf_url"]
+    })
 
 # ==========================================
 # ROUTES - ÖFFENTLICH
@@ -9972,6 +10615,61 @@ def hr_last_sync_timestamp():
 
     return hr_datetime_for_api(max(latest_candidates))
 
+@app.route("/api/hr/driver_card_log/<discord_id>/<date_str>", methods=["GET"])
+def hr_get_driver_card_log(discord_id, date_str):
+    """
+    Holt den Fahrerkarten-Auszug für einen bestimmten Tag aus der Historie.
+    Datum muss im Format DD.MM.YYYY übergeben werden (z.B. 20.05.2026).
+    """
+    # Sicherheitscheck: Nur eingeloggte User mit Dashboard-Rechten (Personalabteilung)
+    user_session = get_current_user()
+    if not user_session or not has_dashboard_permission(user_session.get("roles", [])):
+        return jsonify({"success": False, "error": "Keine Berechtigung."}), 403
+
+    # Suche nach dem spezifischen Tag in unserer neuen Collection
+    shift_log = tracker_shift_logs_collection.find_one({
+        "discord_id": safe_str(discord_id),
+        "shift_date": safe_str(date_str)
+    }, {"_id": 0}) # _id ausblenden, damit es sauber als JSON gesendet wird
+
+    if not shift_log:
+        return jsonify({
+            "success": False, 
+            "error": f"Keine Schichtdaten für den {date_str} gefunden."
+        }), 404
+
+    return jsonify({
+        "success": True,
+        "data": shift_log
+    })
+
+
+@app.route("/api/hr/download_shift_pdf/<shift_id>", methods=["GET"])
+def hr_download_shift_pdf(shift_id):
+    """Ermöglicht den Download des generierten PDF-Auszugs."""
+    # Sicherheitscheck: Nur für eingeloggte User
+    user_session = get_current_user()
+    if not user_session:
+        abort(403)
+
+    # Suche den Eintrag in der Datenbank anhand der ID
+    shift_log = tracker_shift_logs_collection.find_one({"shift_id": safe_str(shift_id)})
+    if not shift_log or not shift_log.get("pdf_path"):
+        abort(404)
+
+    file_path = shift_log["pdf_path"]
+    
+    # Prüfe, ob das Dokument wirklich im Ordner existiert
+    if not os.path.exists(file_path):
+        abort(404)
+
+    # Sende das PDF als Download-Anhang an den Browser
+    return send_file(
+        file_path, 
+        as_attachment=True, 
+        download_name=shift_log.get("pdf_filename", "Fahrerkarte.pdf"),
+        mimetype="application/pdf"
+    )
 
 @app.route("/api/hr-controlling/system/status", methods=["GET", "OPTIONS"])
 def api_hr_controlling_system_status():
@@ -10471,12 +11169,18 @@ def personalabteilung():
 # "Server hat keine gültige JSON-Antwort gesendet", wenn ein Endpoint fehlt oder
 # ein Beleg nicht erzeugt werden kann.
 
+DOWNLOAD_FOLDER = env_first("DOWNLOAD_FOLDER", default=os.path.join("static", "downloads"))
+
+# NEU: Angepasster Pfad für die Fahrerkarten der Personalabteilung
 FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER = env_first(
     "FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER",
     "DRIVER_CARD_REPORT_FOLDER",
     default=os.path.join("static", "downloads", "personalabteilung", "fahrerkarten_daten")
 )
 
+# Stelle sicher, dass die Ordner beim Start auch wirklich existieren:
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+os.makedirs(FAHRERKARTEN_DATEN_DOWNLOAD_FOLDER, exist_ok=True)
 
 def personalabteilung_json_error(message, status=400, **extra):
     payload = {"success": False, "message": safe_str(message, "Aktion fehlgeschlagen.")}
